@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 
 from . import __version__
@@ -42,6 +43,13 @@ def _parser() -> argparse.ArgumentParser:
         help="write chapter markers into a copy of this audio file (for Apple "
         "Podcasts etc.); output is <AUDIO stem>.chapters.<ext>",
     )
+    p.add_argument(
+        "--titler",
+        choices=["api", "claude-cli"],
+        default="api",
+        help="generation backend: api (Anthropic API, needs ANTHROPIC_API_KEY) or "
+        "claude-cli (`claude -p`, uses your Claude Code / Pro/Max subscription, no key)",
+    )
     p.add_argument("--shownotes", action="store_true", help="also generate Hebrew show notes")
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
     p.add_argument("--out", help="base path for sibling output files")
@@ -63,9 +71,12 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
-    # Fail fast on a missing key BEFORE the expensive transcription step.
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("error: ANTHROPIC_API_KEY is not set", file=sys.stderr)
+    # Fail fast on a missing backend BEFORE the expensive transcription step.
+    if args.titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+        print("error: ANTHROPIC_API_KEY is not set (or use --titler claude-cli)", file=sys.stderr)
+        return 1
+    if args.titler == "claude-cli" and not shutil.which("claude"):
+        print("error: claude CLI not found — install Claude Code or use --titler api", file=sys.stderr)
         return 1
 
     from . import format as fmt
@@ -88,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     failed = 0
 
     try:
-        chapters = generate.make_chapters(segments, max_chapters=args.max_chapters)
+        chapters = generate.make_chapters(segments, max_chapters=args.max_chapters, titler=args.titler)
         ext = "md"
         if args.format in ("youtube", "spotify"):
             min_gap = 30.0 if args.format == "spotify" else 10.0
@@ -124,13 +135,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.shownotes:
         try:
-            _emit("shownotes", fmt.render_shownotes_md(generate.make_shownotes(segments)), args.out)
+            _emit("shownotes", fmt.render_shownotes_md(generate.make_shownotes(segments, titler=args.titler)), args.out)
         except generate.GenerationError as e:
             print(f"warning: show notes failed: {e}", file=sys.stderr)
             failed += 1
     if args.quotes:
         try:
-            _emit("quotes", fmt.render_quotes_md(generate.make_quotes(segments)), args.out)
+            _emit("quotes", fmt.render_quotes_md(generate.make_quotes(segments, titler=args.titler)), args.out)
         except generate.GenerationError as e:
             print(f"warning: quotes failed: {e}", file=sys.stderr)
             failed += 1

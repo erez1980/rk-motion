@@ -101,3 +101,30 @@ def test_max_chapters_cap_enforced(monkeypatch):
 def test_empty_segments_returns_empty(monkeypatch):
     _stub_claude(monkeypatch, [])
     assert make_chapters([]) == []
+
+
+def test_titler_claude_cli_uses_cli_transport(monkeypatch):
+    # titler="claude-cli" must route through _call_claude_cli, not the API client.
+    import json as _json
+    calls = {"api": 0, "cli": 0}
+
+    def fake_cli(system, user, model):
+        calls["cli"] += 1
+        return _json.dumps([{"title": "פתיחה", "quote": "שלום וברוכים הבאים"}], ensure_ascii=False)
+
+    def boom_api(*a, **k):
+        calls["api"] += 1
+        raise AssertionError("API transport must not be called for claude-cli")
+
+    monkeypatch.setattr(gen, "_call_claude_cli", fake_cli)
+    monkeypatch.setattr(gen, "_call_api", boom_api)
+    chapters = make_chapters(SEGMENTS, titler="claude-cli")
+    assert chapters[0].start == 0.0
+    assert calls == {"api": 0, "cli": 1}
+
+
+def test_claude_cli_missing_binary_raises(monkeypatch):
+    import shutil
+    monkeypatch.setattr(shutil, "which", lambda _: None)
+    with pytest.raises(GenerationError):
+        gen._call_claude_cli("sys", "user", "model")

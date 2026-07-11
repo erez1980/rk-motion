@@ -47,25 +47,49 @@ def _client():
     return anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
 
 
-def call_claude_json(system: str, user: str, validate, model: str = CLAUDE_MODEL):
+def _call_api(system: str, user: str, model: str) -> str:
+    """Transport: Anthropic API (per-token billing; needs ANTHROPIC_API_KEY)."""
+    msg = _client().messages.create(
+        model=model,
+        max_tokens=4096,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    return "".join(b.text for b in msg.content if b.type == "text").strip()
+
+
+def _call_claude_cli(system: str, user: str, model: str) -> str:
+    """Transport: the `claude -p` CLI (uses your Claude Code / Pro/Max subscription,
+    no API key). The large user text goes on stdin to dodge argv limits; the small
+    system prompt rides on --append-system-prompt. Whatever model Claude Code is
+    configured with is used, so `model` is ignored here."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("claude"):
+        raise GenerationError("claude CLI not found — install Claude Code or use --titler api")
+    proc = subprocess.run(
+        ["claude", "-p", "--append-system-prompt", system, "--output-format", "text"],
+        input=user, capture_output=True, text=True, timeout=300,
+    )
+    if proc.returncode != 0:
+        raise GenerationError(f"claude CLI failed: {(proc.stderr or '').strip()[:200]}")
+    return proc.stdout.strip()
+
+
+def call_claude_json(system: str, user: str, validate, model: str = CLAUDE_MODEL, titler: str = "api"):
     """Call Claude, parse a JSON body, validate it, retry once on failure.
 
+    `titler`: "api" (Anthropic API + key) or "claude-cli" (`claude -p`, subscription).
     `validate(obj)` must return the accepted value or raise GenerationError.
     Raises GenerationError after the retry is exhausted.
     """
-    client = _client()
+    transport = _call_claude_cli if titler == "claude-cli" else _call_api
     last_err: Exception | None = None
-    for attempt in range(2):
-        msg = client.messages.create(
-            model=model,
-            max_tokens=4096,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
-        text = "".join(block.text for block in msg.content if block.type == "text").strip()
+    for _ in range(2):
+        text = transport(system, user, model)
         try:
-            obj = json.loads(_strip_fences(text))
-            return validate(obj)
+            return validate(json.loads(_strip_fences(text)))
         except (json.JSONDecodeError, GenerationError) as e:
             last_err = e
     raise GenerationError(f"Claude returned unusable output after retry: {last_err}")
@@ -107,7 +131,7 @@ def _locate(quote: str, segments: list[Segment], start_from: int) -> Segment | N
     return None
 
 
-def make_chapters(segments: list[Segment], max_chapters: int = 12) -> list[Chapter]:
+def make_chapters(segments: list[Segment], max_chapters: int = 12, titler: str = "api") -> list[Chapter]:
     if not segments:
         return []
     system = (
@@ -134,10 +158,10 @@ def make_chapters(segments: list[Segment], max_chapters: int = 12) -> list[Chapt
             raise GenerationError("no chapters could be located in the transcript")
         return chapters[:max_chapters]  # enforce the cap in code; the prompt alone isn't reliable
 
-    return call_claude_json(system, user, validate)
+    return call_claude_json(system, user, validate, titler=titler)
 
 
-def make_shownotes(segments: list[Segment]) -> dict:
+def make_shownotes(segments: list[Segment], titler: str = "api") -> dict:
     if not segments:
         return {"summary": "", "bullets": []}
     system = (
@@ -153,10 +177,10 @@ def make_shownotes(segments: list[Segment]) -> dict:
         obj.setdefault("bullets", [])
         return obj
 
-    return call_claude_json(system, user, validate)
+    return call_claude_json(system, user, validate, titler=titler)
 
 
-def make_quotes(segments: list[Segment]) -> list[Quote]:
+def make_quotes(segments: list[Segment], titler: str = "api") -> list[Quote]:
     if not segments:
         return []
     audio_end = segments[-1].end
@@ -184,4 +208,4 @@ def make_quotes(segments: list[Segment]) -> list[Quote]:
             quotes.append(Quote(start=start, end=min(end, audio_end), text=item["title"].strip()))
         return quotes
 
-    return call_claude_json(system, user, validate)
+    return call_claude_json(system, user, validate, titler=titler)

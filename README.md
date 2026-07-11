@@ -18,6 +18,12 @@ pip install hebrew-chapters
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+**No API key?** If you have Claude Code (a Pro/Max subscription) installed and
+logged in, pass `--titler claude-cli` to generate chapters through `claude -p`
+using your subscription instead of a key. Slower per run and subject to your
+Claude Code usage limits, but no per-episode API cost. The default (`--titler api`)
+uses the Anthropic API and produces cleaner structured output.
+
 `ffmpeg` is used as a fallback decoder for exotic containers — install it if you
 hit a decode error (`brew install ffmpeg` / `apt install ffmpeg`).
 
@@ -117,8 +123,8 @@ chapters and Hebrew show notes for it."*
 ## Notes
 
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
-  `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`, `--shownotes`,
-  `--quotes`, `--out`, `--no-cache`.
+  `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
+  `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--out`, `--no-cache`.
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.
 
