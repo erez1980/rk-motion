@@ -70,22 +70,37 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     audio_end = segments[-1].end
-    chapters = generate.make_chapters(segments, max_chapters=args.max_chapters)
+    # Each generator is independent: if one fails, warn and keep going so the
+    # others still produce output (they're separate Claude calls by design).
+    failed = 0
 
-    if args.format == "youtube":
-        body = fmt.render_chapters_youtube(chapters, audio_end)
-        if not body:
-            print("warning: fewer than 3 chapters; emitting markdown instead", file=sys.stderr)
+    try:
+        chapters = generate.make_chapters(segments, max_chapters=args.max_chapters)
+        if args.format == "youtube":
+            body = fmt.render_chapters_youtube(chapters, audio_end)
+            if not body:
+                print("warning: fewer than 3 chapters; emitting markdown instead", file=sys.stderr)
+                body = fmt.render_chapters_md(chapters)
+        else:
             body = fmt.render_chapters_md(chapters)
-    else:
-        body = fmt.render_chapters_md(chapters)
-    _emit("chapters", body, args.out)
+        _emit("chapters", body, args.out)
+    except generate.GenerationError as e:
+        print(f"warning: chapters failed: {e}", file=sys.stderr)
+        failed += 1
 
     if args.shownotes:
-        _emit("shownotes", fmt.render_shownotes_md(generate.make_shownotes(segments)), args.out)
+        try:
+            _emit("shownotes", fmt.render_shownotes_md(generate.make_shownotes(segments)), args.out)
+        except generate.GenerationError as e:
+            print(f"warning: show notes failed: {e}", file=sys.stderr)
+            failed += 1
     if args.quotes:
-        _emit("quotes", fmt.render_quotes_md(generate.make_quotes(segments)), args.out)
-    return 0
+        try:
+            _emit("quotes", fmt.render_quotes_md(generate.make_quotes(segments)), args.out)
+        except generate.GenerationError as e:
+            print(f"warning: quotes failed: {e}", file=sys.stderr)
+            failed += 1
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

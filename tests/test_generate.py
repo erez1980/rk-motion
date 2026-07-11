@@ -1,8 +1,9 @@
 """Offline tests for the generator logic — no ANTHROPIC_API_KEY needed.
 
-We stub the Claude call so we can exercise the part the review flagged as the
-make-or-break: the chapter index-correctness guard (in-range + strictly
-increasing + text-echo cross-check) and the index→Whisper-timestamp mapping.
+We stub the Claude call to exercise the part the review flagged (and a live run
+confirmed): Claude's segment indices drift over a long transcript, so chapters
+are located by matching Claude's verbatim quote back to the transcript text, and
+the timestamp comes from the located segment.
 """
 
 import json
@@ -19,14 +20,13 @@ def _seg(i, start, text):
 
 
 SEGMENTS = [
-    _seg(0, 0.0, "שלום וברוכים הבאים"),
+    _seg(0, 0.0, "שלום וברוכים הבאים לפודקאסט"),
     _seg(1, 30.0, "היום נדבר על בינה מלאכותית"),
-    _seg(2, 90.0, "עכשיו לנושא השני עתיד העבודה"),
+    _seg(2, 90.0, "עכשיו נעבור לנושא השני עתיד העבודה"),
 ]
 
 
 def _stub_claude(monkeypatch, payload):
-    """Make call_claude_json return `payload` (a Python obj) as Claude's JSON."""
     class _Block:
         type = "text"
         text = json.dumps(payload, ensure_ascii=False)
@@ -43,37 +43,49 @@ def _stub_claude(monkeypatch, payload):
     monkeypatch.setattr(gen, "_client", lambda: _Client())
 
 
-def test_chapters_map_index_to_whisper_start(monkeypatch):
+def test_chapters_located_by_quote(monkeypatch):
     _stub_claude(monkeypatch, [
-        {"start_index": 0, "title": "פתיחה", "echo": "שלום וברוכים"},
-        {"start_index": 2, "title": "עתיד העבודה", "echo": "עכשיו לנושא"},
+        {"title": "פתיחה", "quote": "שלום וברוכים הבאים"},
+        {"title": "עתיד העבודה", "quote": "עכשיו נעבור לנושא"},
     ])
     chapters = make_chapters(SEGMENTS)
-    # timestamps come from the segments, not the LLM
+    # timestamps come from the located segments, not any LLM-supplied number
     assert [c.start for c in chapters] == [0.0, 90.0]
     assert chapters[1].title == "עתיד העבודה"
 
 
-def test_rejects_out_of_range_index(monkeypatch):
-    _stub_claude(monkeypatch, [{"start_index": 99, "title": "x", "echo": ""}])
-    with pytest.raises(GenerationError):
-        make_chapters(SEGMENTS)
+def test_quote_matches_despite_punctuation(monkeypatch):
+    # Claude quotes with different punctuation; normalized match still locates it.
+    _stub_claude(monkeypatch, [{"title": "x", "quote": "היום, נדבר. על בינה"}])
+    chapters = make_chapters(SEGMENTS)
+    assert chapters[0].start == 30.0
 
 
-def test_rejects_non_increasing_index(monkeypatch):
+def test_unlocatable_chapter_is_dropped_not_fatal(monkeypatch):
     _stub_claude(monkeypatch, [
-        {"start_index": 2, "title": "b", "echo": ""},
-        {"start_index": 1, "title": "a", "echo": ""},
+        {"title": "real", "quote": "שלום וברוכים"},
+        {"title": "ghost", "quote": "משפט שלא נאמר מעולם בכלל"},
     ])
+    chapters = make_chapters(SEGMENTS)
+    assert len(chapters) == 1
+    assert chapters[0].title == "real"
+
+
+def test_all_unlocatable_raises(monkeypatch):
+    _stub_claude(monkeypatch, [{"title": "x", "quote": "טקסט מומצא לחלוטין שאיננו"}])
     with pytest.raises(GenerationError):
         make_chapters(SEGMENTS)
 
 
-def test_rejects_echo_mismatch(monkeypatch):
-    # Claude claims segment 1 starts with text that isn't actually there.
-    _stub_claude(monkeypatch, [{"start_index": 1, "title": "x", "echo": "טקסט לא קיים כלל"}])
-    with pytest.raises(GenerationError):
-        make_chapters(SEGMENTS)
+def test_order_enforced_by_cursor(monkeypatch):
+    # Second quote points backward (seg 0); cursor has advanced past it, so it's
+    # dropped rather than producing an out-of-order chapter.
+    _stub_claude(monkeypatch, [
+        {"title": "second", "quote": "עכשיו נעבור לנושא"},
+        {"title": "backward", "quote": "שלום וברוכים"},
+    ])
+    chapters = make_chapters(SEGMENTS)
+    assert [c.start for c in chapters] == [90.0]
 
 
 def test_empty_segments_returns_empty(monkeypatch):

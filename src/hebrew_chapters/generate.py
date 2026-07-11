@@ -14,6 +14,7 @@ actually matches the segment it selected.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
 from .transcribe import Segment
@@ -81,36 +82,56 @@ def _numbered(segments: list[Segment]) -> str:
     return "\n".join(f"[{s.index}] {s.text}" for s in segments)
 
 
+def _norm(s: str) -> str:
+    """Lowercase-ish normalize for matching: keep word chars (incl. Hebrew) and
+    spaces, collapse whitespace. Punctuation and niqqud differences don't matter."""
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", s)).strip()
+
+
+def _locate(quote: str, segments: list[Segment], start_from: int) -> Segment | None:
+    """Find the segment where `quote` occurs, at or after index `start_from`.
+
+    LLMs drift badly when asked for a segment index over a 1000-line list, but
+    they quote transcript text accurately. So we match on the quote's first few
+    words instead of trusting any index Claude returns.
+    """
+    words = _norm(quote).split()
+    if not words:
+        return None
+    phrase = " ".join(words[:4])
+    for s in segments:
+        if s.index < start_from:
+            continue
+        if phrase in _norm(s.text):
+            return s
+    return None
+
+
 def make_chapters(segments: list[Segment], max_chapters: int = 12) -> list[Chapter]:
     if not segments:
         return []
     system = (
         "You split a Hebrew podcast transcript into chapters. Return ONLY a JSON "
-        'array of objects: [{"start_index": int, "title": str, "echo": str}]. '
-        "start_index is the segment number where the chapter begins. title is a "
-        "concise, natural Hebrew chapter title. echo is the first ~5 words of that "
-        f"segment, copied verbatim. Return at most {max_chapters} chapters, ordered."
+        'array: [{"title": str, "quote": str}]. title is a concise, natural Hebrew '
+        "chapter title. quote is the first 4-8 words of the transcript where that "
+        "chapter begins, copied VERBATIM so it can be found in the text. Chapters "
+        f"must be in chronological order. Return at most {max_chapters}."
     )
-    user = f"Segments:\n{_numbered(segments)}"
-    by_index = {s.index: s for s in segments}
+    user = f"Transcript segments:\n{_numbered(segments)}"
 
     def validate(obj):
         if not isinstance(obj, list) or not obj:
             raise GenerationError("expected a non-empty array")
         chapters: list[Chapter] = []
-        last = -1
+        cursor = 0
         for item in obj:
-            idx = item.get("start_index")
-            if idx not in by_index:
-                raise GenerationError(f"start_index {idx} out of range")
-            if idx <= last:
-                raise GenerationError("start_index not strictly increasing")
-            seg = by_index[idx]
-            echo = (item.get("echo") or "").strip()
-            if echo and echo[:12] not in seg.text:
-                raise GenerationError(f"echo mismatch at index {idx}")
+            seg = _locate(item.get("quote", ""), segments, cursor)
+            if seg is None:
+                continue  # drop unlocatable chapter rather than fail the batch
             chapters.append(Chapter(start=seg.start, title=item["title"].strip()))
-            last = idx
+            cursor = seg.index + 1
+        if not chapters:
+            raise GenerationError("no chapters could be located in the transcript")
         return chapters
 
     return call_claude_json(system, user, validate)
@@ -141,26 +162,26 @@ def make_quotes(segments: list[Segment]) -> list[Quote]:
     audio_end = segments[-1].end
     system = (
         "You pick 3-5 clip-worthy moments from a Hebrew podcast. Return ONLY a JSON "
-        'array: [{"start_index": int, "end_index": int, "title": str}]. The range '
-        "must be a coherent, quotable moment; title is a short Hebrew label."
+        'array: [{"title": str, "quote_start": str, "quote_end": str}]. quote_start '
+        "and quote_end are the first ~4 words of the transcript where the moment "
+        "begins and ends, copied VERBATIM. title is a short Hebrew label."
     )
-    user = f"Segments:\n{_numbered(segments)}"
-    by_index = {s.index: s for s in segments}
+    user = f"Transcript segments:\n{_numbered(segments)}"
 
     def validate(obj):
         if not isinstance(obj, list):
             raise GenerationError("expected an array")
         quotes: list[Quote] = []
         for item in obj:
-            si, ei = item.get("start_index"), item.get("end_index")
-            if si not in by_index or ei not in by_index or ei < si:
-                raise GenerationError(f"bad quote range {si}..{ei}")
-            start_seg, end_seg = by_index[si], by_index[ei]
+            start_seg = _locate(item.get("quote_start", ""), segments, 0)
+            if start_seg is None:
+                continue  # can't place it; skip this quote
+            end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index)
+            end_seg = end_seg or start_seg
             # snap to word boundaries when available; clamp end to the audio length
             start = start_seg.words[0].start if start_seg.words else start_seg.start
             end = end_seg.words[-1].end if end_seg.words else end_seg.end
-            end = min(end, audio_end)
-            quotes.append(Quote(start=start, end=end, text=item["title"].strip()))
+            quotes.append(Quote(start=start, end=min(end, audio_end), text=item["title"].strip()))
         return quotes
 
     return call_claude_json(system, user, validate)
