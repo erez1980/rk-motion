@@ -42,10 +42,16 @@ chapters episode.mp4 --embed-into episode.m4a   # writes episode.chapters.m4a
 ```
 
 ### Making chapters show up everywhere
-- **YouTube** — `--format youtube`, paste into the description. Needs first chapter
-  at `0:00` and ≥3 chapters (the tool enforces both).
+- **YouTube** — `--format youtube`, paste into the description. First chapter at
+  `0:00`, ≥3 chapters, ≥10s apart (enforced).
+- **Spotify (and Megaphone-hosted shows)** — `--format spotify`, paste into the
+  episode description. Spotify parses description timestamps into chapters; it needs
+  `0:00` first, ≥3 chapters, and **≥30s apart** (enforced — stricter than YouTube).
+  Plain text, no emoji/HTML. Note: if the show uses dynamic ad insertion, mid-roll
+  ads shift later timestamps out of sync.
 - **Modern podcast apps** (Overcast, Fountain, Podcast Addict) — `--format podcast`
   produces a Podcasting 2.0 JSON; host it and add `<podcast:chapters>` to the RSS item.
+  (Doesn't work through Megaphone, which controls its own feed.)
 - **Apple Podcasts and file-based players** — `--embed-into audio.m4a|.mp3` writes
   chapter markers directly into a copy of the audio (stream copy, no re-encode).
 
@@ -77,7 +83,7 @@ prompt tweaks skip re-transcribing.
 ## Notes
 
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
-  `--format {md,txt,youtube,podcast}`, `--embed-into AUDIO`, `--shownotes`,
+  `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`, `--shownotes`,
   `--quotes`, `--out`, `--no-cache`.
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.

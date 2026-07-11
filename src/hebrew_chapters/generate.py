@@ -132,7 +132,7 @@ def make_chapters(segments: list[Segment], max_chapters: int = 12) -> list[Chapt
             cursor = seg.index + 1
         if not chapters:
             raise GenerationError("no chapters could be located in the transcript")
-        return chapters
+        return chapters[:max_chapters]  # enforce the cap in code; the prompt alone isn't reliable
 
     return call_claude_json(system, user, validate)
 

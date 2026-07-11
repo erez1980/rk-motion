@@ -30,9 +30,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--max-chapters", type=int, default=12)
     p.add_argument(
         "--format",
-        choices=["md", "txt", "youtube", "podcast"],
+        choices=["md", "txt", "youtube", "spotify", "podcast"],
         default="md",
-        help="chapter output: md/txt (read), youtube (description paste), "
+        help="chapter output: md/txt (read), youtube (description paste, >=10s), "
+        "spotify (description paste for Spotify/Megaphone, >=30s), "
         "podcast (Podcasting 2.0 chapters JSON for your RSS feed)",
     )
     p.add_argument(
@@ -89,8 +90,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         chapters = generate.make_chapters(segments, max_chapters=args.max_chapters)
         ext = "md"
-        if args.format == "youtube":
-            body = fmt.render_chapters_youtube(chapters, audio_end)
+        if args.format in ("youtube", "spotify"):
+            min_gap = 30.0 if args.format == "spotify" else 10.0
+            body = fmt.render_chapters_youtube(chapters, audio_end, min_gap=min_gap)
             ext = "txt"
             if not body:
                 print("warning: fewer than 3 chapters; emitting markdown instead", file=sys.stderr)

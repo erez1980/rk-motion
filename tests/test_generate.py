@@ -88,6 +88,16 @@ def test_order_enforced_by_cursor(monkeypatch):
     assert [c.start for c in chapters] == [90.0]
 
 
+def test_max_chapters_cap_enforced(monkeypatch):
+    # Claude ignores "at most N" and returns all 3; code must cap to max_chapters.
+    _stub_claude(monkeypatch, [
+        {"title": "a", "quote": "שלום וברוכים"},
+        {"title": "b", "quote": "היום נדבר"},
+        {"title": "c", "quote": "עכשיו נעבור"},
+    ])
+    assert len(make_chapters(SEGMENTS, max_chapters=2)) == 2
+
+
 def test_empty_segments_returns_empty(monkeypatch):
     _stub_claude(monkeypatch, [])
     assert make_chapters([]) == []

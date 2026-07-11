@@ -52,6 +52,16 @@ def test_youtube_fewer_than_three_returns_empty():
     assert render_chapters_youtube(ch, audio_end=120.0) == ""
 
 
+def test_spotify_min_gap_30s():
+    # Spotify needs >=30s spacing; the 20s chapter is dropped, 40s/90s kept.
+    ch = [Chapter(0.0, "א"), Chapter(20.0, "ב"), Chapter(40.0, "ג"), Chapter(90.0, "ד")]
+    yt = render_chapters_youtube(ch, audio_end=200.0, min_gap=30.0)
+    lines = yt.splitlines()
+    assert len(lines) == 3
+    assert lines[0].startswith("0:00 ")
+    assert lines[1].startswith("0:40 ")  # 20s one dropped
+
+
 def test_podcast_json_is_valid_pc20():
     ch = [Chapter(0.0, "פתיחה"), Chapter(35.5, "נושא")]
     doc = json.loads(render_chapters_podcast_json(ch))
