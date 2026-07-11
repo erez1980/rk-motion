@@ -1,10 +1,13 @@
 """Tests for the pure formatting logic — the part most likely to break silently
 (bidi marks, YouTube rules). No Whisper or Claude needed."""
 
+import json
+
 from hebrew_chapters.format import (
     LRM,
     fmt_timestamp,
     render_chapters_md,
+    render_chapters_podcast_json,
     render_chapters_youtube,
 )
 from hebrew_chapters.generate import Chapter
@@ -47,6 +50,16 @@ def test_youtube_merges_sub_10s_chapters():
 def test_youtube_fewer_than_three_returns_empty():
     ch = [Chapter(0.0, "א"), Chapter(60.0, "ב")]
     assert render_chapters_youtube(ch, audio_end=120.0) == ""
+
+
+def test_podcast_json_is_valid_pc20():
+    ch = [Chapter(0.0, "פתיחה"), Chapter(35.5, "נושא")]
+    doc = json.loads(render_chapters_podcast_json(ch))
+    assert doc["version"] == "1.2.0"
+    assert doc["chapters"] == [
+        {"startTime": 0.0, "title": "פתיחה"},
+        {"startTime": 35.5, "title": "נושא"},
+    ]
 
 
 def test_index_guard_rejects_non_increasing():

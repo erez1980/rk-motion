@@ -28,7 +28,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--lang", default="he", help="transcript language (default: he)")
     p.add_argument("--max-chapters", type=int, default=12)
-    p.add_argument("--format", choices=["md", "txt", "youtube"], default="md")
+    p.add_argument(
+        "--format",
+        choices=["md", "txt", "youtube", "podcast"],
+        default="md",
+        help="chapter output: md/txt (read), youtube (description paste), "
+        "podcast (Podcasting 2.0 chapters JSON for your RSS feed)",
+    )
+    p.add_argument(
+        "--embed-into",
+        metavar="AUDIO",
+        help="write chapter markers into a copy of this audio file (for Apple "
+        "Podcasts etc.); output is <AUDIO stem>.chapters.<ext>",
+    )
     p.add_argument("--shownotes", action="store_true", help="also generate Hebrew show notes")
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
     p.add_argument("--out", help="base path for sibling output files")
@@ -37,9 +49,9 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
-def _emit(kind: str, body: str, out_base: str | None) -> None:
+def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
     if out_base:
-        path = f"{out_base}.{kind}.md"
+        path = f"{out_base}.{kind}.{ext}"
         with open(path, "w", encoding="utf-8") as f:
             f.write(body + "\n")
         print(f"wrote {path}", file=sys.stderr)
@@ -76,14 +88,34 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         chapters = generate.make_chapters(segments, max_chapters=args.max_chapters)
+        ext = "md"
         if args.format == "youtube":
             body = fmt.render_chapters_youtube(chapters, audio_end)
+            ext = "txt"
             if not body:
                 print("warning: fewer than 3 chapters; emitting markdown instead", file=sys.stderr)
-                body = fmt.render_chapters_md(chapters)
+                body, ext = fmt.render_chapters_md(chapters), "md"
+        elif args.format == "podcast":
+            body, ext = fmt.render_chapters_podcast_json(chapters), "json"
+        elif args.format == "txt":
+            body, ext = fmt.render_chapters_md(chapters), "txt"
         else:
             body = fmt.render_chapters_md(chapters)
-        _emit("chapters", body, args.out)
+        _emit("chapters", body, args.out, ext)
+
+        # Optionally embed the same chapters into an audio file for apps that
+        # read in-file chapter markers (Apple Podcasts, etc.).
+        if args.embed_into:
+            from . import embed
+            from pathlib import Path
+            src = Path(args.embed_into)
+            dst = str(src.with_suffix("")) + ".chapters" + src.suffix
+            try:
+                embed.embed_chapters(str(src), chapters, audio_end, dst)
+                print(f"wrote {dst} (embedded chapters)", file=sys.stderr)
+            except (RuntimeError, OSError) as e:
+                print(f"warning: embedding failed: {e}", file=sys.stderr)
+                failed += 1
     except generate.GenerationError as e:
         print(f"warning: chapters failed: {e}", file=sys.stderr)
         failed += 1

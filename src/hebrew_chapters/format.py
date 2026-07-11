@@ -10,6 +10,8 @@ it silently fail to detect chapters.
 
 from __future__ import annotations
 
+import json
+
 from .generate import Chapter, Quote
 
 LRM = "‎"  # Left-to-Right Mark
@@ -52,6 +54,17 @@ def render_chapters_youtube(chapters: list[Chapter], audio_end: float) -> str:
     if len(merged) < 3:
         return ""  # YouTube needs >=3; signal fallback
     return "\n".join(f"{fmt_timestamp(c.start)} {c.title}" for c in merged)
+
+
+def render_chapters_podcast_json(chapters: list[Chapter]) -> str:
+    """Podcasting 2.0 chapters JSON. Host this file and point your RSS item at it
+    with <podcast:chapters url="..." type="application/json+chapters" />. Read by
+    Overcast, Fountain, Podcast Addict, and other modern podcast apps."""
+    doc = {
+        "version": "1.2.0",
+        "chapters": [{"startTime": round(c.start, 3), "title": c.title} for c in chapters],
+    }
+    return json.dumps(doc, ensure_ascii=False, indent=2)
 
 
 def render_shownotes_md(notes: dict) -> str:

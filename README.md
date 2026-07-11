@@ -30,9 +30,24 @@ chapters episode.mp3
 # Video podcast + show notes + pull-quotes
 chapters episode.mp4 --shownotes --quotes
 
-# YouTube-ready chapter list, written to episode.chapters.md
+# YouTube: paste the .txt into your video description (0:00-first, no bidi marks)
 chapters episode.mp4 --format youtube --out episode
+
+# Podcast apps via RSS: Podcasting 2.0 chapters JSON to host + reference in your feed
+#   <podcast:chapters url="…/episode.chapters.json" type="application/json+chapters" />
+chapters episode.mp4 --format podcast --out episode
+
+# Podcast apps via the file (Apple Podcasts etc.): embed markers into the audio
+chapters episode.mp4 --embed-into episode.m4a   # writes episode.chapters.m4a
 ```
+
+### Making chapters show up everywhere
+- **YouTube** — `--format youtube`, paste into the description. Needs first chapter
+  at `0:00` and ≥3 chapters (the tool enforces both).
+- **Modern podcast apps** (Overcast, Fountain, Podcast Addict) — `--format podcast`
+  produces a Podcasting 2.0 JSON; host it and add `<podcast:chapters>` to the RSS item.
+- **Apple Podcasts and file-based players** — `--embed-into audio.m4a|.mp3` writes
+  chapter markers directly into a copy of the audio (stream copy, no re-encode).
 
 Example output:
 
@@ -61,8 +76,9 @@ prompt tweaks skip re-transcribing.
 
 ## Notes
 
-- `--model` (default `medium`), `--lang` (default `he`), `--max-chapters`,
-  `--format {md,txt,youtube}`, `--out`, `--no-cache`.
+- `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
+  `--format {md,txt,youtube,podcast}`, `--embed-into AUDIO`, `--shownotes`,
+  `--quotes`, `--out`, `--no-cache`.
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.
 
