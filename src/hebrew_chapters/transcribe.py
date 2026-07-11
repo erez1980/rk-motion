@@ -82,9 +82,15 @@ def _save_cache(key: str, segments: list[Segment]) -> None:
     p.write_text(json.dumps([asdict(s) for s in segments], ensure_ascii=False))
 
 
+# ivrit-ai fine-tunes Whisper on Hebrew and ships CTranslate2 builds that
+# faster-whisper loads directly by repo id. It vastly out-transcribes stock
+# Whisper on Hebrew (and segments better). `--model medium` etc. still work.
+DEFAULT_MODEL = "ivrit-ai/whisper-large-v3-turbo-ct2"
+
+
 def transcribe(
     media_path: str,
-    model: str = "medium",
+    model: str = DEFAULT_MODEL,
     lang: str = "he",
     compute_type: str = "int8",
     use_cache: bool = True,

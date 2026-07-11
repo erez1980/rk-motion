@@ -21,7 +21,11 @@ from . import __version__
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="chapters", description="Hebrew podcast episode kit.")
     p.add_argument("media", help="path to an mp3 or mp4 file")
-    p.add_argument("--model", default="medium", help="faster-whisper model (default: medium)")
+    p.add_argument(
+        "--model",
+        default="ivrit-ai/whisper-large-v3-turbo-ct2",
+        help="faster-whisper model or HF ct2 repo id (default: Hebrew-tuned ivrit-ai turbo)",
+    )
     p.add_argument("--lang", default="he", help="transcript language (default: he)")
     p.add_argument("--max-chapters", type=int, default=12)
     p.add_argument("--format", choices=["md", "txt", "youtube"], default="md")

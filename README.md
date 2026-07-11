@@ -5,8 +5,11 @@ podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
 machine.
 
 Transcription runs on [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-(no file-size limit, free, private). A small text transcript then goes to Claude,
-which writes the chapter titles and notes in natural Hebrew for pennies per episode.
+(no file-size limit, free, private), defaulting to the Hebrew-tuned
+[`ivrit-ai/whisper-large-v3-turbo-ct2`](https://huggingface.co/ivrit-ai) model —
+which transcribes Hebrew far better than stock Whisper. A small text transcript then
+goes to Claude, which writes the chapter titles and notes in natural Hebrew for
+pennies per episode.
 
 ## Install
 
@@ -52,8 +55,9 @@ media ─▶ faster-whisper (local, cached) ─▶ transcript
 The transcript is cached (keyed by file hash + model + version), so re-runs and
 prompt tweaks skip re-transcribing.
 
-> First run downloads the Whisper model (~1.5 GB for `medium`). On CPU,
-> transcription is roughly real-time; use a smaller `--model` or a GPU to go faster.
+> First run downloads the model (~1.6 GB for the ivrit-ai turbo default). On CPU,
+> transcription is roughly real-time; use a smaller `--model` (e.g. `base`) or a GPU
+> to go faster. Pass any faster-whisper size name or HF ct2 repo id to `--model`.
 
 ## Notes
 
