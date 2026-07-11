@@ -80,6 +80,40 @@ prompt tweaks skip re-transcribing.
 > transcription is roughly real-time; use a smaller `--model` (e.g. `base`) or a GPU
 > to go faster. Pass any faster-whisper size name or HF ct2 repo id to `--model`.
 
+## Run it from an AI app (MCP)
+
+An MCP server lets any MCP-capable client (Claude Desktop, Claude Code, Cursor…)
+drive the tool in natural language.
+
+```bash
+pip install "hebrew-chapters[mcp]"     # adds the MCP server
+```
+
+Because transcription takes tens of minutes, it's split across three tools so no
+single call blocks: **`transcribe_episode(path)`** starts it in the background,
+**`transcription_status(path)`** reports `ready`/`running`, and
+**`generate_kit(path, chapter_format, shownotes, quotes, …)`** returns the results
+once the transcript is cached.
+
+**Claude Desktop** — add to `claude_desktop_config.json` (use the absolute path to
+the `chapters-mcp` binary if it's in a venv):
+
+```json
+{
+  "mcpServers": {
+    "hebrew-chapters": {
+      "command": "/path/to/.venv/bin/chapters-mcp",
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+**Claude Code** — `claude mcp add hebrew-chapters -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/chapters-mcp`
+
+Then just ask: *"Transcribe ~/Downloads/ep.mp4"* → wait → *"Now give me Spotify
+chapters and Hebrew show notes for it."*
+
 ## Notes
 
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,

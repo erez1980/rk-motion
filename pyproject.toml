@@ -12,9 +12,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+mcp = ["mcp>=1.0"]
 
 [project.scripts]
 chapters = "hebrew_chapters.cli:main"
+chapters-mcp = "hebrew_chapters.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

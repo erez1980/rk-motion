@@ -88,6 +88,19 @@ def _save_cache(key: str, segments: list[Segment]) -> None:
 DEFAULT_MODEL = "ivrit-ai/whisper-large-v3-turbo-ct2"
 
 
+def cached_segments(
+    media_path: str,
+    model: str = DEFAULT_MODEL,
+    lang: str = "he",
+    compute_type: str = "int8",
+) -> list[Segment] | None:
+    """Return the cached transcript for this file+settings, or None if not yet
+    transcribed. Never runs the model — safe for a quick "is it ready?" check."""
+    if not os.path.exists(media_path):
+        return None
+    return _load_cache(cache_key(media_path, model, lang, compute_type))
+
+
 def transcribe(
     media_path: str,
     model: str = DEFAULT_MODEL,
