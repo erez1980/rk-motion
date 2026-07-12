@@ -677,31 +677,41 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     out.mkdir(parents=True, exist_ok=True)
 
     outputs: list[str] = []
-    for clip in clips:
-        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
-        start = float(clip["start"])
-        end = float(clip["end"])
-        output_path = out / f"{clip_id}.mp4"
+    # SRTs are a burn-in intermediate, not an output — keep them out of out_dir so
+    # only the captioned mp4s remain (no stray sidecar alongside the baked-in text).
+    with tempfile.TemporaryDirectory(prefix="hc_srt_") as tmp:
+        tmpdir = Path(tmp)
+        for clip in clips:
+            clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+            start = float(clip["start"])
+            end = float(clip["end"])
+            output_path = out / f"{clip_id}.mp4"
 
-        subtitles_path = None
-        if subtitles and clip.get("words"):
-            transcript = _clip_transcript(clip)
-            srt_path = out / f"{clip_id}.srt"
-            generate_srt(transcript, start, end, srt_path)
-            subtitles_path = srt_path
+            subtitles_path = None
+            if subtitles and clip.get("words"):
+                transcript = _clip_transcript(clip)
+                srt_path = tmpdir / f"{clip_id}.srt"
+                generate_srt(transcript, start, end, srt_path)
+                subtitles_path = srt_path
 
-        extract_clip(
-            source_video=source,
-            start_time=start,
-            end_time=end,
-            output_path=output_path,
-            aspect_ratio=aspect,
-            crop_position=0.5,
-            subtitles_path=subtitles_path,
-            speed=speed,
-            pad_seconds=0.0,   # keep caption timing aligned with the SRT
-            font=font,
-        )
-        outputs.append(str(output_path))
+            # Crop center: an explicit clip `focus` in [0,1] recenters the crop
+            # (0=left, 0.5=center, 1=right) — use it to frame an off-center speaker
+            # or pick a side of a two-shot. Defaults to center.
+            focus = clip.get("focus")
+            crop_position = float(focus) if isinstance(focus, (int, float)) else 0.5
+
+            extract_clip(
+                source_video=source,
+                start_time=start,
+                end_time=end,
+                output_path=output_path,
+                aspect_ratio=aspect,
+                crop_position=crop_position,
+                subtitles_path=subtitles_path,
+                speed=speed,
+                pad_seconds=0.0,   # keep caption timing aligned with the SRT
+                font=font,
+            )
+            outputs.append(str(output_path))
 
     return outputs

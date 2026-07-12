@@ -180,15 +180,34 @@ def make_shownotes(segments: list[Segment], titler: str = "api") -> dict:
     return call_claude_json(system, user, validate, titler=titler)
 
 
-def make_quotes(segments: list[Segment], titler: str = "api") -> list[Quote]:
+def make_quotes(
+    segments: list[Segment],
+    titler: str = "api",
+    min_sec: float = 18.0,
+    max_sec: float = 90.0,
+    min_score: int = 7,
+) -> list[Quote]:
+    """Select scroll-stopping short-form clips. Each must open with a hook and be a
+    complete, self-contained thought — the two things (per short-form research) that
+    decide whether a clip holds past the first 3 seconds. Enforces a hook-strength
+    score gate and a minimum length in code, so weak/fragment clips are dropped even
+    if the model proposes them."""
     if not segments:
         return []
     audio_end = segments[-1].end
     system = (
-        "You pick 3-5 clip-worthy moments from a Hebrew podcast. Return ONLY a JSON "
-        'array: [{"title": str, "quote_start": str, "quote_end": str}]. quote_start '
-        "and quote_end are the first ~4 words of the transcript where the moment "
-        "begins and ends, copied VERBATIM. title is a short Hebrew label."
+        "You select scroll-stopping short-form clips from a Hebrew podcast (for "
+        "Reels / TikTok / Shorts). Each clip MUST: (1) OPEN with a hook in its first "
+        "sentence — a question, a bold or contrarian claim, a surprising fact, or a "
+        "strong emotional moment — that stops the scroll within ~3 seconds; (2) be a "
+        "COMPLETE, self-contained thought with a payoff, not a fragment; (3) run about "
+        "20-60 seconds. Return ONLY a JSON array: "
+        '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
+        '"quote_end": str}]. title = a punchy Hebrew hook line for the clip. hook_type '
+        "= one of question|bold_claim|surprise|emotion|story. score = 1-10 for how "
+        "strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
+        "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM. "
+        "Only include clips you would score 7 or higher."
     )
     user = f"Transcript segments:\n{_numbered(segments)}"
 
@@ -197,15 +216,26 @@ def make_quotes(segments: list[Segment], titler: str = "api") -> list[Quote]:
             raise GenerationError("expected an array")
         quotes: list[Quote] = []
         for item in obj:
+            try:
+                score = int(item.get("score", 0))
+            except (TypeError, ValueError):
+                score = 0
+            if score < min_score:
+                continue  # weak hook — drop
             start_seg = _locate(item.get("quote_start", ""), segments, 0)
             if start_seg is None:
-                continue  # can't place it; skip this quote
-            end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index)
-            end_seg = end_seg or start_seg
-            # snap to word boundaries when available; clamp end to the audio length
+                continue  # can't place it; skip
+            end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index) or start_seg
             start = start_seg.words[0].start if start_seg.words else start_seg.start
             end = end_seg.words[-1].end if end_seg.words else end_seg.end
-            quotes.append(Quote(start=start, end=min(end, audio_end), text=item["title"].strip()))
+            end = min(end, audio_end)
+            if end - start < min_sec:
+                continue  # too short for a hook + payoff — drop (bug: tiny clips)
+            if end - start > max_sec:
+                end = start + max_sec  # clamp runaway clips
+            quotes.append(Quote(start=start, end=end, text=item["title"].strip()))
+        if not quotes:
+            raise GenerationError("no clips met the hook-strength / length bar")
         return quotes
 
     return call_claude_json(system, user, validate, titler=titler)

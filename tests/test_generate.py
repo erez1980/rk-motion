@@ -119,7 +119,8 @@ def test_clip_words_relative_and_fallback():
 
 def test_make_clips_structure(monkeypatch):
     _stub_claude(monkeypatch, [
-        {"title": "רגע מעניין", "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "רגע מעניין", "hook_type": "question", "score": 9,
+         "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
     ])
     clips = gen.make_clips(SEGMENTS)
     assert len(clips) == 1
@@ -129,6 +130,27 @@ def test_make_clips_structure(monkeypatch):
     assert c["focus"] is None
     assert c["start"] == 0.0
     assert c["words"][0]["t"] == 0.0  # first word at clip start
+
+
+def test_make_quotes_drops_weak_and_short(monkeypatch):
+    # Weak hook (score < 7) and a too-short clip must both be dropped; only the
+    # strong, long-enough clip survives.
+    _stub_claude(monkeypatch, [
+        {"title": "חלש", "score": 4, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "קצר", "score": 9, "quote_start": "היום נדבר", "quote_end": "היום נדבר"},
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+    ])
+    quotes = gen.make_quotes(SEGMENTS)
+    assert len(quotes) == 1
+    assert quotes[0].text == "טוב"
+
+
+def test_make_quotes_raises_when_none_qualify(monkeypatch):
+    _stub_claude(monkeypatch, [
+        {"title": "חלש", "score": 3, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+    ])
+    with pytest.raises(GenerationError):
+        gen.make_quotes(SEGMENTS)
 
 
 def test_titler_claude_cli_uses_cli_transport(monkeypatch):
