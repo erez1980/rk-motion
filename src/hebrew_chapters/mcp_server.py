@@ -109,6 +109,24 @@ def generate_kit(
     return out
 
 
+@mcp.tool()
+def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "") -> dict:
+    """Render each pull-quote of an already-transcribed episode to a vertical
+    (default 9:16) clip with burned Hebrew captions, written to out_dir. Requires
+    the transcript cached (call transcribe_episode first), the [render] extra
+    installed, and ffmpeg. Returns the output file paths."""
+    segs = transcribe.cached_segments(path, model or transcribe.DEFAULT_MODEL)
+    if segs is None:
+        return {"error": "not transcribed yet — call transcribe_episode(path) first"}
+    try:
+        from . import render
+    except ImportError:
+        return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
+    clips = generate.make_clips(segs, titler="api")
+    outs = render.render_clips(path, clips, out_dir, aspect=aspect)
+    return {"clips": len(outs), "files": outs}
+
+
 def main() -> None:
     mcp.run()
 

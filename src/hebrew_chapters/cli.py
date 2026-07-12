@@ -58,6 +58,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
     p.add_argument("--clips-json", metavar="PATH",
                    help="write a clips.json (clip ranges + hooks + per-word timings) for a social-clip renderer")
+    p.add_argument("--render-clips", metavar="DIR",
+                   help="render each pull-quote to DIR as a vertical (9:16) clip with burned "
+                   "Hebrew captions (needs the [render] extra + ffmpeg)")
+    p.add_argument("--aspect", default="9:16", help="aspect ratio for --render-clips (default 9:16)")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
     p.add_argument("--version", action="version", version=f"hebrew-chapters {__version__}")
@@ -191,6 +195,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"wrote {args.clips_json} ({len(doc['clips'])} clips)", file=sys.stderr)
         except generate.GenerationError as e:
             print(f"warning: clips-json failed: {e}", file=sys.stderr)
+            failed += 1
+    if args.render_clips:
+        try:
+            from . import render
+            clips = generate.make_clips(segments, titler=args.titler)
+            outs = render.render_clips(media_path, clips, args.render_clips, aspect=args.aspect)
+            print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
+        except generate.GenerationError as e:
+            print(f"warning: render-clips failed: {e}", file=sys.stderr)
+            failed += 1
+        except ImportError:
+            print("error: --render-clips needs the render extra: pip install 'hebrew-chapters[render]'", file=sys.stderr)
             failed += 1
     return 1 if failed else 0
 

@@ -136,7 +136,18 @@ chapters and Hebrew show notes for it."*
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
   `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--clips-json PATH`,
-  `--out`, `--no-cache`.
+  `--render-clips DIR`, `--aspect`, `--out`, `--no-cache`.
+
+### Render social clips directly (no external tool)
+`--render-clips DIR` turns each pull-quote into a vertical (9:16) clip with burned-in
+Hebrew captions, written to `DIR`. Crop-to-fill (no letterbox); captions come from the
+per-word timings; RTL rendered correctly. Needs the render extra + ffmpeg:
+```bash
+pip install 'hebrew-chapters[render]'
+chapters episode.mp4 --render-clips clips_out --aspect 9:16
+```
+Also exposed as the MCP `render_clips` tool for the Claude-app interface. (Rendering
+logic is self-contained here — no dependency on any other tool.)
 
 ### Feeding a social-clip renderer
 `--clips-json PATH` writes a clip spec for a downstream vertical-clip renderer (e.g. a

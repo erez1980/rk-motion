@@ -1,0 +1,707 @@
+"""Render vertical (or any-aspect) video clips with burned Hebrew captions.
+
+Self-contained port of SocialClipper's clipper.py video-rendering path, adapted
+for hebrew-chapters. No dependency on socialclipper.
+
+The public entry point is `render_clips`. It takes a source video and a list of
+clip dicts in the hebrew-chapters clips.json shape and writes one cropped-to-fill
+mp4 per clip with the clip's Hebrew word timings burned in as captions.
+
+Stack: stdlib + ffmpeg/ffprobe (external) + Pillow. python-bidi is used when
+importable so mixed Hebrew/Latin captions render in correct visual order; if it
+is missing the raw text is drawn instead (no crash).
+
+Caption rendering has two paths:
+  * libass -- used when the local ffmpeg was built with the `subtitles` filter.
+  * Pillow per-frame overlay -- the fallback used when ffmpeg lacks libass. This
+    is the path that runs on machines without libass and renders Hebrew
+    correctly. Ported faithfully from SocialClipper.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+try:  # optional; captions still render (in logical order) without it
+    from bidi.algorithm import get_display as _bidi_display
+except Exception:  # pragma: no cover - depends on env
+    _bidi_display = None
+
+
+# ---------------------------------------------------------------------------
+# ffmpeg capability probe
+# ---------------------------------------------------------------------------
+
+def _check_ffmpeg_subtitles_support() -> bool:
+    """Check if ffmpeg was built with the subtitles filter (requires libass)."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-filters"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return "subtitles" in result.stdout
+    except Exception:
+        return False
+
+
+_HAS_SUBTITLES_FILTER = _check_ffmpeg_subtitles_support()
+
+
+# ---------------------------------------------------------------------------
+# Fonts (Hebrew-capable)
+# ---------------------------------------------------------------------------
+
+# macOS ships Arial variants with full Hebrew glyph coverage. These are tried in
+# order for the Pillow path. `font` (a path) overrides this list.
+_HEBREW_FONT_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/ArialHB.ttc",
+    "/Library/Fonts/Arial.ttf",
+    # Linux fallbacks
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansHebrew-Bold.ttf",
+]
+
+# Default family name for the libass force_style path. Arial carries Hebrew on
+# macOS; libass resolves it via fontconfig.
+_DEFAULT_LIBASS_FONT = "Arial"
+
+
+def _resolve_pillow_font_path(font: str | None):
+    """Return a font file path for Pillow, preferring an explicit override."""
+    candidates = []
+    if font and os.path.exists(font):
+        candidates.append(font)
+    candidates.extend(_HEBREW_FONT_CANDIDATES)
+    for path in candidates:
+        if Path(path).exists():
+            return path
+    return None
+
+
+def _libass_font_name(font: str | None) -> str:
+    """Family name to hand libass' force_style."""
+    if not font:
+        return _DEFAULT_LIBASS_FONT
+    if os.path.exists(font):
+        return Path(font).stem
+    return font
+
+
+def _shape_bidi(text: str) -> str:
+    """Reorder a caption line for correct visual RTL/LTR display.
+
+    Uses python-bidi when available; otherwise returns the text unchanged.
+    """
+    if _bidi_display is None:
+        return text
+    try:
+        return _bidi_display(text)
+    except Exception:
+        return text
+
+
+# ---------------------------------------------------------------------------
+# Aspect / crop
+# ---------------------------------------------------------------------------
+
+ASPECT_RESOLUTIONS = {
+    "16:9": (1920, 1080),
+    "1:1": (1080, 1080),
+    "9:16": (1080, 1920),
+}
+
+
+def _target_resolution(aspect_ratio: str) -> tuple[int, int]:
+    """Resolve an aspect string like "9:16" to a concrete even (w, h)."""
+    if aspect_ratio in ASPECT_RESOLUTIONS:
+        return ASPECT_RESOLUTIONS[aspect_ratio]
+    try:
+        w_str, h_str = aspect_ratio.split(":")
+        ratio = float(w_str) / float(h_str)
+    except Exception:
+        return ASPECT_RESOLUTIONS["9:16"]
+
+    def _even(n: float) -> int:
+        n = int(round(n))
+        return n - (n % 2)
+
+    if ratio < 1:          # portrait
+        return (_even(1920 * ratio), 1920)
+    if ratio > 1:          # landscape
+        return (1920, _even(1920 / ratio))
+    return (1080, 1080)    # square
+
+
+def _build_crop_vf(aspect_ratio: str, crop_position: float = 0.5) -> str:
+    """Build an ffmpeg -vf string that crops (instead of padding) to fill the frame.
+
+    crop_position: 0.0 = left/top edge, 0.5 = center, 1.0 = right/bottom edge.
+    Crop-to-fill for every aspect -- never letterbox.
+    """
+    tw, th = _target_resolution(aspect_ratio)
+    target_ratio = tw / th
+    cp = max(0.0, min(1.0, crop_position))
+
+    if target_ratio > 1:
+        # Target is landscape: crop height, keep full width
+        crop = f"crop=iw:iw*{th}/{tw}:0:(ih-iw*{th}/{tw})*{cp}"
+    elif target_ratio < 1:
+        # Target is portrait: crop width, keep full height
+        crop = f"crop=ih*{tw}/{th}:ih:(iw-ih*{tw}/{th})*{cp}:0"
+    else:
+        # Target is square: crop to the smaller dimension
+        crop = f"crop=min(iw\\,ih):min(iw\\,ih):(iw-min(iw\\,ih))*{cp}:(ih-min(iw\\,ih))*{cp}"
+
+    return f"{crop},scale={tw}:{th}"
+
+
+# ---------------------------------------------------------------------------
+# SRT generation from word timings
+# ---------------------------------------------------------------------------
+
+def generate_srt(transcript: dict, start_time: float, end_time: float, output_path: Path) -> Path:
+    """Generate an SRT subtitle file from transcript segments within a time range.
+
+    Timestamps are offset so the clip starts at 0:00.
+    """
+    word_entries = _subtitle_entries_from_words(transcript, start_time, end_time)
+    if word_entries:
+        lines = []
+        for idx, entry in enumerate(word_entries, 1):
+            lines.append(str(idx))
+            lines.append(f"{_srt_time(entry['start'])} --> {_srt_time(entry['end'])}")
+            lines.append(entry["text"])
+            lines.append("")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("\n".join(lines), encoding="utf-8")
+        return output_path
+
+    lines = []
+    idx = 1
+
+    for seg in transcript.get("segments", []):
+        seg_start = seg["start"]
+        seg_end = seg["end"]
+
+        # Skip segments outside the clip range
+        if seg_end <= start_time or seg_start >= end_time:
+            continue
+
+        # Clamp to clip boundaries
+        s = max(seg_start, start_time) - start_time
+        e = min(seg_end, end_time) - start_time
+
+        text = seg["text"].strip()
+        if not text:
+            continue
+
+        # Break long segments into shorter chunks (max ~10 words per subtitle)
+        words = text.split()
+        chunk_size = 10
+        seg_duration = e - s
+        word_count = len(words)
+
+        if word_count <= chunk_size:
+            lines.append(str(idx))
+            lines.append(f"{_srt_time(s)} --> {_srt_time(e)}")
+            lines.append(text)
+            lines.append("")
+            idx += 1
+        else:
+            # Split into chunks with proportional timing
+            for i in range(0, word_count, chunk_size):
+                chunk_words = words[i:i + chunk_size]
+                chunk_start = s + (i / word_count) * seg_duration
+                chunk_end = s + (min(i + chunk_size, word_count) / word_count) * seg_duration
+                lines.append(str(idx))
+                lines.append(f"{_srt_time(chunk_start)} --> {_srt_time(chunk_end)}")
+                lines.append(" ".join(chunk_words))
+                lines.append("")
+                idx += 1
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return output_path
+
+
+def _subtitle_entries_from_words(
+    transcript: dict,
+    start_time: float,
+    end_time: float,
+) -> list[dict]:
+    """Build subtitle entries from word-level timestamps when available."""
+    words = []
+    for segment in transcript.get("segments", []):
+        for word in segment.get("words", []):
+            word_start = word.get("start")
+            word_end = word.get("end")
+            text = (word.get("text") or "").strip()
+            if word_start is None or word_end is None or not text:
+                continue
+            if word_end <= start_time or word_start >= end_time:
+                continue
+            words.append({
+                "start": max(word_start, start_time) - start_time,
+                "end": min(word_end, end_time) - start_time,
+                "text": text,
+            })
+
+    if not words:
+        return []
+
+    entries = []
+    chunk = []
+    punctuation = (".", "!", "?", ",", ";", ":", "...")
+    max_words = 7
+    max_span = 3.0
+
+    def flush_chunk() -> None:
+        if not chunk:
+            return
+        entries.append({
+            "start": chunk[0]["start"],
+            "end": max(chunk[-1]["end"], chunk[0]["start"] + 0.25),
+            "text": _join_word_tokens(item["text"] for item in chunk),
+        })
+        chunk.clear()
+
+    for word in words:
+        if not chunk:
+            chunk.append(word)
+            continue
+
+        prospective_span = word["end"] - chunk[0]["start"]
+        chunk.append(word)
+        if (
+            len(chunk) >= max_words
+            or prospective_span >= max_span
+            or word["text"].endswith(punctuation)
+        ):
+            flush_chunk()
+
+    flush_chunk()
+    return entries
+
+
+def _join_word_tokens(tokens) -> str:
+    text = ""
+    for token in tokens:
+        if not text:
+            text = token
+        elif token[:1] in ",.!?;:":
+            text += token
+        else:
+            text += " " + token
+    return text.strip()
+
+
+def _srt_time(seconds: float) -> str:
+    """Format seconds as SRT timestamp: HH:MM:SS,mmm"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int((seconds % 1) * 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+# ---------------------------------------------------------------------------
+# SRT parsing (used by the Pillow burn path)
+# ---------------------------------------------------------------------------
+
+def _parse_srt(srt_path: Path) -> list[dict]:
+    """Parse an SRT file into a list of {start, end, text} dicts (times in seconds)."""
+    content = srt_path.read_text(encoding="utf-8").strip()
+    if not content:
+        return []
+
+    entries = []
+    blocks = content.split("\n\n")
+    for block in blocks:
+        lines = block.strip().splitlines()
+        if len(lines) < 3:
+            continue
+        # Line 1: index, Line 2: timestamps, Line 3+: text
+        time_line = lines[1]
+        text = " ".join(lines[2:]).strip()
+        if " --> " not in time_line or not text:
+            continue
+
+        start_str, end_str = time_line.split(" --> ")
+        entries.append({
+            "start": _parse_srt_time(start_str.strip()),
+            "end": _parse_srt_time(end_str.strip()),
+            "text": text,
+        })
+    return entries
+
+
+def _parse_srt_time(ts: str) -> float:
+    """Parse HH:MM:SS,mmm to seconds."""
+    ts = ts.replace(",", ".")
+    parts = ts.split(":")
+    return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+
+
+# ---------------------------------------------------------------------------
+# Pillow per-frame subtitle burn (libass-free fallback)
+# ---------------------------------------------------------------------------
+
+def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
+                           width: int, height: int, speed: float = 1.0,
+                           font: str | None = None) -> Path:
+    """Burn subtitles onto a video using Pillow to render text + ffmpeg overlay.
+
+    Creates a transparent subtitle video track from the SRT, then composites it
+    onto the input video. Works without libass/libfreetype in ffmpeg.
+
+    Hebrew is reordered for display with python-bidi when available.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    entries = _parse_srt(srt_path)
+    if not entries:
+        shutil.copy2(str(video_path), str(output_path))
+        return output_path
+
+    # Adjust subtitle timing for speed-up (video is already faster, so
+    # subtitle timestamps need to be compressed by the same factor)
+    if speed and speed != 1.0:
+        for entry in entries:
+            entry["start"] /= speed
+            entry["end"] /= speed
+
+    # Get video frame rate
+    probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
+         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0",
+         str(video_path)],
+        capture_output=True, text=True, timeout=10,
+    )
+    fps_str = probe.stdout.strip()
+    if "/" in fps_str:
+        num, den = fps_str.split("/")
+        fps = float(num) / float(den)
+    else:
+        fps = float(fps_str) if fps_str else 30.0
+
+    # Get video duration
+    dur_probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(video_path)],
+        capture_output=True, text=True, timeout=10,
+    )
+    total_duration = float(dur_probe.stdout.strip())
+    total_frames = int(total_duration * fps)
+
+    # Font setup -- prefer an explicit override, then Hebrew-capable candidates.
+    font_size = max(22, height // 30)
+    pil_font = None
+    font_path = _resolve_pillow_font_path(font)
+    if font_path:
+        try:
+            pil_font = ImageFont.truetype(font_path, font_size)
+        except Exception:
+            pil_font = None
+    if pil_font is None:
+        pil_font = ImageFont.load_default()
+
+    outline_width = max(2, font_size // 11)
+    margin_bottom = height // 10
+    max_text_width = int(width * 0.85)
+
+    def _wrap_text(text: str, draw: "ImageDraw.ImageDraw") -> list[str]:
+        """Word-wrap text to fit within max_text_width (logical order)."""
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip()
+            bbox = draw.textbbox((0, 0), test, font=pil_font)
+            if bbox[2] - bbox[0] > max_text_width and current:
+                lines.append(current)
+                current = word
+            else:
+                current = test
+        if current:
+            lines.append(current)
+        return lines or [text]
+
+    # Pre-compute the empty transparent frame (reused for all non-subtitle frames)
+    _empty_frame = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes("raw", "RGBA")
+
+    def _render_frame(text: str | None) -> bytes:
+        """Render a single transparent frame with optional subtitle text."""
+        if not text:
+            return _empty_frame
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        # Pillow (with libraqm) already shapes RTL/bidi correctly, so we draw the
+        # logical-order text as-is. Applying python-bidi here would double-reverse it.
+        wrapped = _wrap_text(text, draw)
+        line_height = font_size + 4
+        block_height = len(wrapped) * line_height
+
+        y = height - margin_bottom - block_height
+        for line in wrapped:
+            bbox = draw.textbbox((0, 0), line, font=pil_font)
+            tw = bbox[2] - bbox[0]
+            x = (width - tw) // 2
+
+            # Draw outline
+            for dx in range(-outline_width, outline_width + 1):
+                for dy in range(-outline_width, outline_width + 1):
+                    if dx != 0 or dy != 0:
+                        draw.text((x + dx, y + dy), line, font=pil_font, fill=(0, 0, 0, 255))
+            # Draw text
+            draw.text((x, y), line, font=pil_font, fill=(255, 255, 255, 255))
+            y += line_height
+
+        return img.tobytes("raw", "RGBA")
+
+    # Pipe rendered frames into ffmpeg as a second input and overlay
+    overlay_cmd = [
+        "ffmpeg",
+        "-i", str(video_path),
+        "-f", "rawvideo",
+        "-pix_fmt", "rgba",
+        "-s", f"{width}x{height}",
+        "-r", str(fps),
+        "-i", "pipe:0",
+        "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "medium",
+        "-crf", "23",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        "-shortest",
+        "-y",
+        str(output_path),
+    ]
+
+    proc = subprocess.Popen(
+        overlay_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Generate frames and pipe them
+    for frame_idx in range(total_frames):
+        t = frame_idx / fps
+        # Find active subtitle
+        active_text = None
+        for entry in entries:
+            if entry["start"] <= t < entry["end"]:
+                active_text = entry["text"]
+                break
+        proc.stdin.write(_render_frame(active_text))
+
+    proc.stdin.close()
+    _, stderr = proc.communicate(timeout=300)
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"Subtitle overlay failed: {stderr.decode()[-500:]}")
+
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# ffmpeg runner + clip extraction
+# ---------------------------------------------------------------------------
+
+def _run_ffmpeg(cmd: list[str]) -> None:
+    """Run an ffmpeg command and raise with a useful error on failure."""
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        error_lines = [
+            line for line in stderr.splitlines()
+            if not line.startswith((" ", "ffmpeg version", "  ", "lib"))
+            and "Copyright" not in line
+            and "configuration:" not in line
+            and "built with" not in line
+        ]
+        error_msg = "\n".join(error_lines[-10:]) if error_lines else stderr[-500:]
+        raise RuntimeError(f"ffmpeg failed: {error_msg}")
+
+
+def extract_clip(
+    source_video: Path,
+    start_time: float,
+    end_time: float,
+    output_path: Path,
+    aspect_ratio: str = "9:16",
+    crop_position: float = 0.5,
+    subtitles_path: Path | None = None,
+    speed: float = 1.0,
+    pad_seconds: float = 0.0,
+    font: str | None = None,
+) -> Path:
+    """Extract a clip, crop-to-fill the target aspect, and burn captions.
+
+    Crop-to-fill is always used (never letterbox). Captions are burned via
+    libass when available, otherwise via the Pillow per-frame fallback.
+
+    pad_seconds defaults to 0: caption timestamps are relative to `start_time`,
+    so any pre-roll pad would desync them. Keep it 0 unless the SRT is offset to
+    match the padded start.
+    """
+    padded_start = max(0, start_time - pad_seconds)
+    padded_end = end_time + pad_seconds
+    duration = padded_end - padded_start
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    tw, th = _target_resolution(aspect_ratio)
+
+    # Crop-to-fill for every aspect (center by default).
+    vf = _build_crop_vf(aspect_ratio, crop_position)
+
+    # Burn subtitles with libass BEFORE speed-up so subtitle timing matches
+    # the original video timestamps (both get sped up together by setpts)
+    _sub_symlink = None
+    burn_with_pillow = False
+    if subtitles_path and subtitles_path.exists():
+        if _HAS_SUBTITLES_FILTER:
+            _sub_symlink = Path(tempfile.mktemp(suffix=".srt", prefix="hc_sub_"))
+            _sub_symlink.symlink_to(subtitles_path.resolve())
+            safe_sub_path = str(_sub_symlink).replace("\\", "\\\\").replace(":", "\\:")
+            font_name = _libass_font_name(font)
+            sub_style = (
+                f"FontName={font_name},FontSize=22,PrimaryColour=&H00FFFFFF,"
+                "OutlineColour=&H00000000,Outline=2,Bold=1"
+            )
+            vf += f",subtitles={safe_sub_path}:force_style='{sub_style}'"
+        else:
+            burn_with_pillow = True
+
+    # Add speed-up filter AFTER subtitles (setpts for video)
+    if speed and speed != 1.0:
+        vf += f",setpts={1.0/speed}*PTS"
+        af = f"atempo={speed}"
+    else:
+        af = None
+
+    # Step 1: Extract and scale/crop the clip
+    if burn_with_pillow:
+        temp_clip = output_path.with_suffix(".tmp.mp4")
+    else:
+        temp_clip = output_path
+
+    cmd = [
+        "ffmpeg",
+        "-ss", str(padded_start),
+        "-i", str(source_video),
+        "-t", str(duration),
+        "-vf", vf,
+    ]
+    if af:
+        cmd += ["-af", af]
+    cmd += [
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "medium",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-y",
+        str(temp_clip),
+    ]
+
+    try:
+        _run_ffmpeg(cmd)
+    finally:
+        if _sub_symlink and _sub_symlink.exists():
+            _sub_symlink.unlink()
+
+    # Step 2: Burn subtitles with Pillow if needed
+    if burn_with_pillow:
+        try:
+            _burn_subtitles_pillow(temp_clip, subtitles_path, output_path, tw, th,
+                                   speed=speed, font=font)
+        finally:
+            if temp_clip.exists():
+                temp_clip.unlink()
+
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# Transcript synthesis + public entry point
+# ---------------------------------------------------------------------------
+
+def _clip_transcript(clip: dict) -> dict:
+    """Synthesize the transcript shape the caption functions expect from a clip.
+
+    hebrew-chapters clips carry word timings relative to the clip start:
+        {"t": <sec from clip start>, "d": <dur sec>, "w": <word text>}
+    The caption code expects one segment with ABSOLUTE word start/end/text, so
+    we offset each word by the clip's absolute start.
+    """
+    clip_start = float(clip["start"])
+    words = []
+    for w in clip.get("words", []):
+        t = float(w["t"])
+        d = float(w.get("d", 0.0))
+        words.append({
+            "start": clip_start + t,
+            "end": clip_start + t + d,
+            "text": w.get("w", ""),
+        })
+    seg_end = words[-1]["end"] if words else float(clip["end"])
+    return {
+        "segments": [
+            {"start": clip_start, "end": seg_end, "words": words}
+        ]
+    }
+
+
+def render_clips(video_path: str, clips: list[dict], out_dir: str,
+                 aspect: str = "9:16", subtitles: bool = True,
+                 speed: float = 1.0, font: str | None = None) -> list[str]:
+    """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
+    burned Hebrew captions from the clip's word timings. Returns the list of
+    output paths."""
+    source = Path(video_path)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    outputs: list[str] = []
+    for clip in clips:
+        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+        start = float(clip["start"])
+        end = float(clip["end"])
+        output_path = out / f"{clip_id}.mp4"
+
+        subtitles_path = None
+        if subtitles and clip.get("words"):
+            transcript = _clip_transcript(clip)
+            srt_path = out / f"{clip_id}.srt"
+            generate_srt(transcript, start, end, srt_path)
+            subtitles_path = srt_path
+
+        extract_clip(
+            source_video=source,
+            start_time=start,
+            end_time=end,
+            output_path=output_path,
+            aspect_ratio=aspect,
+            crop_position=0.5,
+            subtitles_path=subtitles_path,
+            speed=speed,
+            pad_seconds=0.0,   # keep caption timing aligned with the SRT
+            font=font,
+        )
+        outputs.append(str(output_path))
+
+    return outputs
