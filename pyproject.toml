@@ -13,6 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 mcp = ["mcp>=1.0"]
+youtube = ["yt-dlp>=2024.1"]
 
 [project.scripts]
 chapters = "hebrew_chapters.cli:main"

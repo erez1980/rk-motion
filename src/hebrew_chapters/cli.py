@@ -21,7 +21,7 @@ from . import __version__
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="chapters", description="Hebrew podcast episode kit.")
-    p.add_argument("media", help="an mp3/mp4 file, an RSS feed URL, or a direct audio URL")
+    p.add_argument("media", help="an mp3/mp4 file, an RSS feed URL, a YouTube URL, or a direct audio URL")
     p.add_argument("--episode", type=int, default=1,
                    help="which episode from an RSS feed (1 = first/latest item); ignored for files")
     p.add_argument("--list-episodes", action="store_true",

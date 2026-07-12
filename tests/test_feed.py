@@ -44,6 +44,35 @@ def test_resolve_episode_out_of_range(monkeypatch):
         feed.resolve("https://x/feed.xml", episode=9)
 
 
+def test_is_youtube():
+    assert feed.is_youtube("https://www.youtube.com/watch?v=abc123")
+    assert feed.is_youtube("https://youtu.be/abc123")
+    assert feed.is_youtube("https://music.youtube.com/watch?v=abc")
+    assert not feed.is_youtube("https://feeds.example.com/show.xml")
+
+
+def test_resolve_youtube_routes_to_downloader(monkeypatch):
+    # A YouTube URL must go to download_youtube, not the feed parser or audio downloader.
+    monkeypatch.setattr(feed, "_fetch", lambda *a, **k: pytest.fail("should not parse feed"))
+    monkeypatch.setattr(feed, "download_youtube", lambda url: "/cache/yt.m4a")
+    assert feed.resolve("https://www.youtube.com/watch?v=abc123") == "/cache/yt.m4a"
+
+
+def test_youtube_without_ytdlp_raises(monkeypatch):
+    # Simulate yt-dlp not installed → clear, actionable error.
+    import builtins
+    real_import = builtins.__import__
+
+    def no_ytdlp(name, *a, **k):
+        if name == "yt_dlp":
+            raise ImportError("no yt_dlp")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", no_ytdlp)
+    with pytest.raises(feed.FeedError, match="yt-dlp"):
+        feed.download_youtube("https://youtu.be/abc")
+
+
 def test_resolve_direct_audio_url_skips_feed_parse(monkeypatch):
     # A direct audio URL must download without fetching/parsing a feed.
     monkeypatch.setattr(feed, "_fetch", lambda *a, **k: pytest.fail("should not parse feed"))

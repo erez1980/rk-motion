@@ -37,6 +37,8 @@ chapters episode.mp3
 chapters https://feeds.example.com/show.xml --shownotes --out latest
 chapters https://feeds.example.com/show.xml --episode 3      # a specific episode
 chapters --list-episodes https://feeds.example.com/show.xml  # see the feed first
+# From a YouTube URL (needs the youtube extra: pip install 'hebrew-chapters[youtube]')
+chapters https://www.youtube.com/watch?v=VIDEO_ID --shownotes --out episode
 # (a direct audio URL works too: chapters https://.../episode.mp3)
 
 # Video podcast + show notes + pull-quotes
@@ -129,7 +131,8 @@ chapters and Hebrew show notes for it."*
 ## Notes
 
 - Input: a local mp3/mp4 file, an RSS feed URL (add `--episode N`, default latest;
-  `--list-episodes` to inspect), or a direct audio URL — all cached after first fetch.
+  `--list-episodes` to inspect), a YouTube URL (needs `pip install 'hebrew-chapters[youtube]'`),
+  or a direct audio URL — all cached after first fetch.
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
   `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--out`, `--no-cache`.
