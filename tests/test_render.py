@@ -8,6 +8,7 @@ Covers the two things most likely to break silently:
 from hebrew_chapters.render import (
     _build_crop_vf,
     _clip_transcript,
+    _crop_position_for_face,
     _parse_srt,
     _srt_time,
     _target_resolution,
@@ -46,6 +47,25 @@ def test_target_resolution_arbitrary_aspect_is_even():
     assert h == 1920
     assert w % 2 == 0 and h % 2 == 0
     assert w < h  # portrait
+
+
+# --- face-aware crop mapping --------------------------------------------
+
+def test_crop_position_centers_on_face():
+    # A face at frame center maps to a centered crop.
+    assert _crop_position_for_face(0.5, 0.316) == 0.5
+    # A face left of center pulls the crop left (< 0.5); right pulls right.
+    assert _crop_position_for_face(0.3, 0.316) < 0.5
+    assert _crop_position_for_face(0.7, 0.316) > 0.5
+    # Edges clamp to [0,1].
+    assert _crop_position_for_face(0.0, 0.316) == 0.0
+    assert _crop_position_for_face(1.0, 0.316) == 1.0
+
+
+def test_crop_position_degenerate_widths_are_center():
+    # A crop as wide as the source (or wider) can't recenter — stay centered.
+    assert _crop_position_for_face(0.2, 1.0) == 0.5
+    assert _crop_position_for_face(0.2, 1.5) == 0.5
 
 
 # --- SRT timing ----------------------------------------------------------

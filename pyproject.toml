@@ -15,6 +15,7 @@ dev = ["pytest>=8"]
 mcp = ["mcp>=1.0"]
 youtube = ["yt-dlp>=2024.1"]
 render = ["pillow>=10", "python-bidi>=0.4"]
+crop = ["opencv-python-headless>=4.9"]  # face-aware crop centering (optional)
 
 [project.scripts]
 chapters = "hebrew_chapters.cli:main"

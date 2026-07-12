@@ -163,6 +163,116 @@ def _build_crop_vf(aspect_ratio: str, crop_position: float = 0.5) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Face-aware crop position
+# ---------------------------------------------------------------------------
+
+_FACE_MODEL = Path(__file__).parent / "data" / "face_detection_yunet_2023mar.onnx"
+
+
+def _crop_position_for_face(face_cx: float, crop_w_frac: float) -> float:
+    """Map a face center-x fraction [0,1] to the crop_position [0,1] that centers
+    a crop of width `crop_w_frac` (fraction of source width) on that face.
+
+    crop_position places the crop's LEFT edge at (iw-crop_w)*cp, so to center the
+    crop on face_cx we solve (iw-crop_w)*cp + crop_w/2 == face_cx*iw.
+    """
+    if not 0.0 < crop_w_frac < 1.0:
+        return 0.5
+    cp = (face_cx - crop_w_frac / 2) / (1.0 - crop_w_frac)
+    return max(0.0, min(1.0, cp))
+
+
+def _detect_face_center(video_path: Path, start: float, end: float,
+                        samples: int = 8) -> tuple[float, float] | None:
+    """Detect the dominant face across sampled frames of the clip.
+
+    Returns (face_center_x_frac, source_aspect_h_over_w) or None when OpenCV /
+    the model / ffmpeg is unavailable or no face is found. Frames are downscaled
+    (fractions and the h/w ratio are scale-invariant) so detection is cheap.
+    """
+    try:
+        import cv2  # optional: the `crop` extra (opencv-python-headless)
+    except Exception:
+        return None
+    if not _FACE_MODEL.exists():
+        return None
+
+    span = max(end - start, 0.001)
+    faces: list[tuple[float, float]] = []  # (center_x_frac, area*confidence weight)
+    aspect_hw = 0.0
+    with tempfile.TemporaryDirectory(prefix="hc_face_") as tmp:
+        pattern = str(Path(tmp) / "f_%03d.png")
+        cmd = [
+            "ffmpeg", "-v", "error",
+            "-ss", str(max(0.0, start)), "-t", str(span),
+            "-i", str(video_path),
+            "-vf", f"fps={samples}/{span},scale=640:-1",
+            "-frames:v", str(samples), "-y", pattern,
+        ]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=120, check=True)
+        except Exception:
+            return None
+
+        detector = None
+        for fp in sorted(Path(tmp).glob("f_*.png")):
+            img = cv2.imread(str(fp))
+            if img is None:
+                continue
+            h, w = img.shape[:2]
+            aspect_hw = h / w
+            if detector is None:
+                detector = cv2.FaceDetectorYN.create(
+                    str(_FACE_MODEL), "", (w, h), score_threshold=0.7,
+                )
+            else:
+                detector.setInputSize((w, h))
+            _, dets = detector.detect(img)
+            if dets is None:
+                continue
+            for d in dets:
+                fw, fh, conf = float(d[2]), float(d[3]), float(d[-1])
+                cx = (float(d[0]) + fw / 2) / w
+                faces.append((cx, fw * fh * conf))
+
+    if not faces or not aspect_hw:
+        return None
+
+    # Cluster face centers by x; pick the cluster with the most total weight — so a
+    # side-by-side two-shot resolves to the more prominent person, not their midpoint.
+    faces.sort()
+    clusters: list[list[tuple[float, float]]] = [[faces[0]]]
+    for f in faces[1:]:
+        if f[0] - clusters[-1][-1][0] > 0.12:
+            clusters.append([f])
+        else:
+            clusters[-1].append(f)
+    best = max(clusters, key=lambda c: sum(wt for _, wt in c))
+    face_cx = sum(cx * wt for cx, wt in best) / sum(wt for _, wt in best)
+    return face_cx, aspect_hw
+
+
+def _smart_crop_position(video_path: Path, start: float, end: float,
+                         aspect_ratio: str) -> float:
+    """Crop center [0,1] that frames a detected face for a portrait/square target.
+
+    Fixes the off-center-speaker misframe (a centered crop of a speaker sitting
+    left/right of frame catches empty background beside them). Returns 0.5
+    (center) for landscape targets, when OpenCV is unavailable, or when no face
+    is found — so wide/no-face shots are unchanged.
+    """
+    tw, th = _target_resolution(aspect_ratio)
+    if tw >= th:
+        return 0.5
+    found = _detect_face_center(video_path, start, end)
+    if found is None:
+        return 0.5
+    face_cx, aspect_hw = found
+    crop_w_frac = (tw / th) * aspect_hw  # crop width as a fraction of source width
+    return _crop_position_for_face(face_cx, crop_w_frac)
+
+
+# ---------------------------------------------------------------------------
 # SRT generation from word timings
 # ---------------------------------------------------------------------------
 
@@ -694,11 +804,14 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                 generate_srt(transcript, start, end, srt_path)
                 subtitles_path = srt_path
 
-            # Crop center: an explicit clip `focus` in [0,1] recenters the crop
-            # (0=left, 0.5=center, 1=right) — use it to frame an off-center speaker
-            # or pick a side of a two-shot. Defaults to center.
+            # Crop center: an explicit clip `focus` in [0,1] wins (0=left,
+            # 0.5=center, 1=right); otherwise detect a face so an off-center
+            # speaker is framed instead of the empty background beside them.
             focus = clip.get("focus")
-            crop_position = float(focus) if isinstance(focus, (int, float)) else 0.5
+            crop_position = (
+                float(focus) if isinstance(focus, (int, float))
+                else _smart_crop_position(source, start, end, aspect)
+            )
 
             extract_clip(
                 source_video=source,

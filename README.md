@@ -149,6 +149,13 @@ chapters episode.mp4 --render-clips clips_out --aspect 9:16
 Also exposed as the MCP `render_clips` tool for the Claude-app interface. (Rendering
 logic is self-contained here — no dependency on any other tool.)
 
+**Framing.** By default the crop is centered. With the optional `crop` extra
+(`pip install 'hebrew-chapters[crop]'`, adds OpenCV) each clip is auto-cropped to
+center on a detected face — so a speaker sitting off to one side is framed instead
+of the empty background beside them. When there's no clear face (a wide two-shot,
+backs of heads) it stays centered. To override, set a clip's `focus` to a value in
+`[0,1]` (`0`=left, `0.5`=center, `1`=right) in the clips JSON.
+
 ### Feeding a social-clip renderer
 `--clips-json PATH` writes a clip spec for a downstream vertical-clip renderer (e.g. a
 Remotion app): each pull-quote becomes `{id, start, end, hook, focus, words}` where cut
