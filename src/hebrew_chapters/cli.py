@@ -21,7 +21,11 @@ from . import __version__
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="chapters", description="Hebrew podcast episode kit.")
-    p.add_argument("media", help="path to an mp3 or mp4 file")
+    p.add_argument("media", help="an mp3/mp4 file, an RSS feed URL, or a direct audio URL")
+    p.add_argument("--episode", type=int, default=1,
+                   help="which episode from an RSS feed (1 = first/latest item); ignored for files")
+    p.add_argument("--list-episodes", action="store_true",
+                   help="list the episodes in an RSS feed and exit")
     p.add_argument(
         "--model",
         default="ivrit-ai/whisper-large-v3-turbo-ct2",
@@ -71,6 +75,25 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
+    from . import feed
+
+    # List a feed's episodes and exit — no key or transcription needed.
+    if args.list_episodes:
+        if not feed.is_url(args.media):
+            print("error: --list-episodes needs an RSS feed URL", file=sys.stderr)
+            return 1
+        try:
+            episodes = feed.list_episodes(args.media)
+        except (feed.FeedError, OSError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        if not episodes:
+            print("error: no episodes with an audio enclosure found", file=sys.stderr)
+            return 1
+        for i, ep in enumerate(episodes, 1):
+            print(f"{i}\t{ep.title}")
+        return 0
+
     # Fail fast on a missing backend BEFORE the expensive transcription step.
     if args.titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
         print("error: ANTHROPIC_API_KEY is not set (or use --titler claude-cli)", file=sys.stderr)
@@ -79,12 +102,20 @@ def main(argv: list[str] | None = None) -> int:
         print("error: claude CLI not found — install Claude Code or use --titler api", file=sys.stderr)
         return 1
 
+    # Resolve an RSS feed / audio URL to a local file (downloads + caches). A
+    # local path passes through unchanged.
+    try:
+        media_path = feed.resolve(args.media, episode=args.episode)
+    except (feed.FeedError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+
     from . import format as fmt
     from . import generate, transcribe
 
     try:
         segments = transcribe.transcribe(
-            args.media, model=args.model, lang=args.lang, use_cache=not args.no_cache
+            media_path, model=args.model, lang=args.lang, use_cache=not args.no_cache
         )
     except FileNotFoundError:
         print(f"error: file not found: {args.media}", file=sys.stderr)

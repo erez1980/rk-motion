@@ -33,6 +33,12 @@ hit a decode error (`brew install ffmpeg` / `apt install ffmpeg`).
 # Chapters to stdout
 chapters episode.mp3
 
+# From an RSS feed — processes the latest episode (item 1)
+chapters https://feeds.example.com/show.xml --shownotes --out latest
+chapters https://feeds.example.com/show.xml --episode 3      # a specific episode
+chapters --list-episodes https://feeds.example.com/show.xml  # see the feed first
+# (a direct audio URL works too: chapters https://.../episode.mp3)
+
 # Video podcast + show notes + pull-quotes
 chapters episode.mp4 --shownotes --quotes
 
@@ -122,6 +128,8 @@ chapters and Hebrew show notes for it."*
 
 ## Notes
 
+- Input: a local mp3/mp4 file, an RSS feed URL (add `--episode N`, default latest;
+  `--list-episodes` to inspect), or a direct audio URL — all cached after first fetch.
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
   `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--out`, `--no-cache`.
