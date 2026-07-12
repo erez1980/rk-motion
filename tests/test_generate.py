@@ -103,6 +103,34 @@ def test_empty_segments_returns_empty(monkeypatch):
     assert make_chapters([]) == []
 
 
+def test_clip_words_relative_and_fallback():
+    segs = [
+        Segment(0, 10.0, 12.0, "a b", [Word(10.0, 10.5, "a"), Word(11.0, 11.4, "b")]),
+        Segment(1, 20.0, 22.0, "x y", []),  # no word timestamps → even distribution
+    ]
+    words = gen._clip_words(segs, start=10.0, end=22.0)
+    # word times are relative to clip start (10.0)
+    assert words[0] == {"t": 0.0, "d": 0.5, "w": "a"}
+    assert words[1]["t"] == 1.0
+    # fallback: "x y" spread evenly over [20,22] → t=10.0 and t=11.0 (relative)
+    assert [w["w"] for w in words[2:]] == ["x", "y"]
+    assert words[2]["t"] == 10.0 and words[3]["t"] == 11.0
+
+
+def test_make_clips_structure(monkeypatch):
+    _stub_claude(monkeypatch, [
+        {"title": "רגע מעניין", "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+    ])
+    clips = gen.make_clips(SEGMENTS)
+    assert len(clips) == 1
+    c = clips[0]
+    assert c["id"] == "clip-1"
+    assert c["hook"] == "רגע מעניין"
+    assert c["focus"] is None
+    assert c["start"] == 0.0
+    assert c["words"][0]["t"] == 0.0  # first word at clip start
+
+
 def test_titler_claude_cli_uses_cli_transport(monkeypatch):
     # titler="claude-cli" must route through _call_claude_cli, not the API client.
     import json as _json

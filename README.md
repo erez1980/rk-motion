@@ -135,7 +135,19 @@ chapters and Hebrew show notes for it."*
   or a direct audio URL — all cached after first fetch.
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
-  `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--out`, `--no-cache`.
+  `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--clips-json PATH`,
+  `--out`, `--no-cache`.
+
+### Feeding a social-clip renderer
+`--clips-json PATH` writes a clip spec for a downstream vertical-clip renderer (e.g. a
+Remotion app): each pull-quote becomes `{id, start, end, hook, focus, words}` where cut
+times (`start`/`end`) are absolute episode seconds and caption `words[].t` are relative
+to the clip start. The renderer crops to 9:16, burns Hebrew captions from `words`, and
+adds a hook/branding card. `hebrew-chapters` finds and times the moments; it does not
+render video.
+```bash
+chapters episode.mp4 --clips-json clips.json
+```
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.
 

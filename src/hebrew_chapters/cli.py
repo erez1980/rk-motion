@@ -56,6 +56,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--shownotes", action="store_true", help="also generate Hebrew show notes")
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
+    p.add_argument("--clips-json", metavar="PATH",
+                   help="write a clips.json (clip ranges + hooks + per-word timings) for a social-clip renderer")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
     p.add_argument("--version", action="version", version=f"hebrew-chapters {__version__}")
@@ -175,6 +177,20 @@ def main(argv: list[str] | None = None) -> int:
             _emit("quotes", fmt.render_quotes_md(generate.make_quotes(segments, titler=args.titler)), args.out)
         except generate.GenerationError as e:
             print(f"warning: quotes failed: {e}", file=sys.stderr)
+            failed += 1
+    if args.clips_json:
+        try:
+            import json
+            from pathlib import Path
+            doc = {
+                "schema_version": 1,
+                "source": {"video": os.path.abspath(media_path)},
+                "clips": generate.make_clips(segments, titler=args.titler),
+            }
+            Path(args.clips_json).write_text(json.dumps(doc, ensure_ascii=False, indent=2))
+            print(f"wrote {args.clips_json} ({len(doc['clips'])} clips)", file=sys.stderr)
+        except generate.GenerationError as e:
+            print(f"warning: clips-json failed: {e}", file=sys.stderr)
             failed += 1
     return 1 if failed else 0
 

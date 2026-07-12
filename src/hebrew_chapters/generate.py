@@ -209,3 +209,46 @@ def make_quotes(segments: list[Segment], titler: str = "api") -> list[Quote]:
         return quotes
 
     return call_claude_json(system, user, validate, titler=titler)
+
+
+def _clip_words(segments: list[Segment], start: float, end: float) -> list[dict]:
+    """Per-word caption timing for one clip, times RELATIVE to the clip start (t=0 at
+    `start`). If a segment in range has no word timestamps, distribute its text evenly
+    across the segment so the karaoke never gets null gaps (clips.json contract)."""
+    out: list[dict] = []
+    for s in segments:
+        if s.end < start or s.start > end:  # segment fully outside the clip
+            continue
+        if s.words:
+            for w in s.words:
+                if start <= w.start <= end:
+                    out.append({
+                        "t": round(w.start - start, 3),
+                        "d": round(max(w.end - w.start, 0.01), 3),
+                        "w": w.text.strip(),
+                    })
+        else:
+            toks = s.text.split()
+            if not toks:
+                continue
+            seg_start, seg_end = max(s.start, start), min(s.end, end)
+            step = max(seg_end - seg_start, 0.01) / len(toks)
+            for i, tok in enumerate(toks):
+                out.append({"t": round(seg_start - start + i * step, 3), "d": round(step, 3), "w": tok})
+    return out
+
+
+def make_clips(segments: list[Segment], titler: str = "api") -> list[dict]:
+    """Clip specs for the social-clipper: reuse the pull-quote ranges + hooks, attach
+    clip-relative per-word timings. Returns the `clips` array of the clips.json contract."""
+    clips = []
+    for i, q in enumerate(make_quotes(segments, titler=titler), 1):
+        clips.append({
+            "id": f"clip-{i}",
+            "start": round(q.start, 3),
+            "end": round(q.end, 3),
+            "hook": q.text,
+            "focus": None,
+            "words": _clip_words(segments, q.start, q.end),
+        })
+    return clips
