@@ -625,6 +625,357 @@ def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
 
 
 # ---------------------------------------------------------------------------
+# Social captions: heavy Hebrew font + word-by-word highlight (Pillow)
+# ---------------------------------------------------------------------------
+
+_BUNDLED_FONT = Path(__file__).parent / "data" / "fonts" / "Rubik.ttf"
+_ACCENT = (255, 214, 10, 255)     # active word — punchy yellow
+_WHITE = (255, 255, 255, 255)
+_OUTLINE = (0, 0, 0, 255)
+
+
+def _load_caption_font(size: int, font: str | None = None):
+    """Load a heavy Hebrew-capable caption font at `size`. Prefers an explicit
+    override, then the bundled Rubik (pushed to its Black weight), then system
+    Hebrew fonts, then Pillow's default."""
+    from PIL import ImageFont
+
+    candidates: list[str] = []
+    if font and os.path.exists(font):
+        candidates.append(font)
+    if _BUNDLED_FONT.exists():
+        candidates.append(str(_BUNDLED_FONT))
+    candidates.extend(_HEBREW_FONT_CANDIDATES)
+    for path in candidates:
+        try:
+            f = ImageFont.truetype(path, size)
+        except Exception:
+            continue
+        try:  # Rubik is a variable font — go as heavy as possible for social
+            f.set_variation_by_name("Black")
+        except Exception:
+            pass
+        return f
+    return ImageFont.load_default()
+
+
+def _caption_entries(transcript: dict, start_time: float, end_time: float) -> list[dict]:
+    """Group the clip's words into short caption chunks, KEEPING per-word timings
+    (clip-relative) so the burn-in can highlight the word being spoken.
+
+    Returns [{start, end, words: [{text, start, end}, ...]}, ...].
+    """
+    words: list[dict] = []
+    for seg in transcript.get("segments", []):
+        for w in seg.get("words", []):
+            ws, we = w.get("start"), w.get("end")
+            txt = (w.get("text") or "").strip()
+            if ws is None or we is None or not txt:
+                continue
+            if we <= start_time or ws >= end_time:
+                continue
+            words.append({
+                "text": txt,
+                "start": max(ws, start_time) - start_time,
+                "end": min(we, end_time) - start_time,
+            })
+    if not words:
+        return []
+
+    entries: list[dict] = []
+    chunk: list[dict] = []
+    punct = (".", "!", "?", ",", ";", ":", "…")
+    max_words = 6      # short chunks read better in short-form
+    max_span = 2.6
+
+    def flush() -> None:
+        if not chunk:
+            return
+        entries.append({
+            "start": chunk[0]["start"],
+            "end": max(chunk[-1]["end"], chunk[0]["start"] + 0.25),
+            "words": [dict(c) for c in chunk],
+        })
+        chunk.clear()
+
+    for w in words:
+        chunk.append(w)
+        span = w["end"] - chunk[0]["start"]
+        if len(chunk) >= max_words or span >= max_span or w["text"].endswith(punct):
+            flush()
+    flush()
+    return entries
+
+
+def _probe_fps_frames(video_path: Path) -> tuple[float, int]:
+    """Return (fps, total_frames) for a video via ffprobe."""
+    probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
+         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", str(video_path)],
+        capture_output=True, text=True, timeout=10,
+    )
+    fps_str = probe.stdout.strip()
+    if "/" in fps_str:
+        num, den = fps_str.split("/")
+        fps = float(num) / float(den) if float(den) else 30.0
+    else:
+        fps = float(fps_str) if fps_str else 30.0
+    dur = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(video_path)],
+        capture_output=True, text=True, timeout=10,
+    )
+    total = float(dur.stdout.strip() or 0.0)
+    return fps, int(total * fps)
+
+
+def _overlay_pillow_frames(video_path: Path, output_path: Path, width: int,
+                           height: int, make_frame) -> Path:
+    """Composite Pillow-rendered transparent frames onto the video via ffmpeg.
+    `make_frame(t)` returns raw RGBA bytes for the overlay at time t (seconds)."""
+    fps, total_frames = _probe_fps_frames(video_path)
+    cmd = [
+        "ffmpeg", "-i", str(video_path),
+        "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{width}x{height}",
+        "-r", str(fps), "-i", "pipe:0",
+        "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", "-crf", "23",
+        "-c:a", "copy", "-movflags", "+faststart", "-shortest", "-y", str(output_path),
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    for frame_idx in range(total_frames):
+        proc.stdin.write(make_frame(frame_idx / fps))
+    proc.stdin.close()
+    _, stderr = proc.communicate(timeout=600)
+    if proc.returncode != 0:
+        raise RuntimeError(f"Caption overlay failed: {stderr.decode()[-500:]}")
+    return output_path
+
+
+def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Path,
+                          width: int, height: int, font: str | None = None,
+                          speed: float = 1.0) -> Path:
+    """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
+    third, thick outline, the word being spoken popped in an accent colour.
+
+    Words are laid out right-to-left (each word drawn in its own box, so Hebrew
+    reads in the correct order and mixed digits/Latin stay upright), which also
+    makes per-word colouring trivial.
+    """
+    from PIL import Image, ImageDraw
+
+    if not entries:
+        shutil.copy2(str(video_path), str(output_path))
+        return output_path
+
+    if speed and speed != 1.0:
+        for e in entries:
+            e["start"] /= speed
+            e["end"] /= speed
+            for w in e["words"]:
+                w["start"] /= speed
+                w["end"] /= speed
+
+    font_size = max(28, height // 22)
+    pil_font = _load_caption_font(font_size, font)
+    outline = max(3, font_size // 8)
+    line_h = int(font_size * 1.28)
+    bottom_margin = int(height * 0.22)   # sit in the lower third, clear of the edge
+    max_w = int(width * 0.90)
+
+    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    space_w = measure.textlength(" ", font=pil_font)
+
+    def word_w(txt: str) -> float:
+        return measure.textlength(txt, font=pil_font)
+
+    def wrap(words: list[dict]) -> list[list[dict]]:
+        lines: list[list[dict]] = []
+        cur: list[dict] = []
+        cur_w = 0.0
+        for w in words:
+            ww = word_w(w["text"])
+            add = ww + (space_w if cur else 0)
+            if cur and cur_w + add > max_w:
+                lines.append(cur)
+                cur, cur_w = [w], ww
+            else:
+                cur.append(w)
+                cur_w += add
+        if cur:
+            lines.append(cur)
+        return lines
+
+    empty = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes("raw", "RGBA")
+
+    def make_frame(t: float) -> bytes:
+        active = None
+        for e in entries:
+            if e["start"] <= t < e["end"]:
+                active = e
+                break
+        if active is None:
+            return empty
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        lines = wrap(active["words"])
+        y = height - bottom_margin - len(lines) * line_h
+        for line in lines:
+            lw = sum(word_w(w["text"]) for w in line) + space_w * (len(line) - 1)
+            x_right = (width + lw) / 2  # right edge of the centered line
+            for w in line:              # logical order; place rightmost first (RTL)
+                ww = word_w(w["text"])
+                x = x_right - ww
+                color = _ACCENT if (w["start"] <= t < w["end"]) else _WHITE
+                d.text((x, y), w["text"], font=pil_font, fill=color,
+                       stroke_width=outline, stroke_fill=_OUTLINE)
+                x_right = x - space_w
+            y += line_h
+        return img.tobytes("raw", "RGBA")
+
+    return _overlay_pillow_frames(video_path, output_path, width, height, make_frame)
+
+
+# ---------------------------------------------------------------------------
+# Speaker-tracking crop (dynamic pan following the on-screen face)
+# ---------------------------------------------------------------------------
+
+def _face_track(video_path: Path, start: float, end: float,
+                step: float = 0.6) -> tuple[list, float]:
+    """Sample the dominant face x-fraction over the clip. Returns (samples,
+    aspect_hw) where samples is [(t_rel_sec, cx_frac_or_None), ...], or ([], 0)
+    if OpenCV / model / ffmpeg is unavailable or no face is ever found."""
+    try:
+        import cv2
+    except Exception:
+        return [], 0.0
+    if not _FACE_MODEL.exists():
+        return [], 0.0
+
+    span = max(end - start, 0.001)
+    n = max(3, min(int(span / step) + 1, 150))
+    samples: list[tuple[float, float | None]] = []
+    aspect_hw = 0.0
+    with tempfile.TemporaryDirectory(prefix="hc_track_") as tmp:
+        pattern = str(Path(tmp) / "f_%04d.png")
+        cmd = [
+            "ffmpeg", "-v", "error",
+            "-ss", str(max(0.0, start)), "-t", str(span),
+            "-i", str(video_path),
+            "-vf", f"fps={n}/{span},scale=480:-1",
+            "-frames:v", str(n), "-y", pattern,
+        ]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=180, check=True)
+        except Exception:
+            return [], 0.0
+        detector = None
+        files = sorted(Path(tmp).glob("f_*.png"))
+        for i, fp in enumerate(files):
+            img = cv2.imread(str(fp))
+            if img is None:
+                continue
+            h, w = img.shape[:2]
+            aspect_hw = h / w
+            if detector is None:
+                detector = cv2.FaceDetectorYN.create(
+                    str(_FACE_MODEL), "", (w, h), score_threshold=0.7,
+                )
+            else:
+                detector.setInputSize((w, h))
+            _, dets = detector.detect(img)
+            t_rel = span * (i + 0.5) / n
+            if dets is None or len(dets) == 0:
+                samples.append((t_rel, None))
+                continue
+            best = max(dets, key=lambda d: float(d[2]) * float(d[3]) * float(d[-1]))
+            cx = (float(best[0]) + float(best[2]) / 2) / w
+            samples.append((t_rel, cx))
+
+    if not aspect_hw or all(cx is None for _, cx in samples):
+        return [], 0.0
+    return samples, aspect_hw
+
+
+def _pan_keyframes(samples: list, cut_delta: float = 0.2,
+                   min_move: float = 0.02) -> list:
+    """Turn raw face samples into smoothed (t, cx) keyframes for a pan.
+
+    Gaps (no face) are hold-filled; small jitter within a shot is averaged out;
+    a large jump (a camera cut to another person) is preserved as a near-instant
+    snap rather than a slow pan across the frame.
+    """
+    ts = [t for t, _ in samples]
+    xs: list = [cx for _, cx in samples]
+    # forward then backward fill the None gaps
+    last = None
+    for i in range(len(xs)):
+        if xs[i] is None:
+            xs[i] = last
+        else:
+            last = xs[i]
+    nxt = None
+    for i in range(len(xs) - 1, -1, -1):
+        if xs[i] is None:
+            xs[i] = nxt
+        else:
+            nxt = xs[i]
+    if any(v is None for v in xs):
+        return []
+
+    # smooth within a shot (don't average across a cut)
+    sm = list(xs)
+    for i in range(len(xs)):
+        win = [xs[i]]
+        if i > 0 and abs(xs[i] - xs[i - 1]) < cut_delta:
+            win.append(xs[i - 1])
+        if i < len(xs) - 1 and abs(xs[i] - xs[i + 1]) < cut_delta:
+            win.append(xs[i + 1])
+        sm[i] = sum(win) / len(win)
+
+    kf: list[tuple[float, float]] = [(ts[0], sm[0])]
+    for i in range(1, len(ts)):
+        is_cut = abs(xs[i] - xs[i - 1]) >= cut_delta
+        if is_cut:
+            # snap: hold previous value right up to the cut, then jump
+            kf.append((max(ts[i] - 0.05, kf[-1][0] + 0.001), kf[-1][1]))
+            kf.append((ts[i], sm[i]))
+        elif abs(sm[i] - kf[-1][1]) > min_move:
+            kf.append((ts[i], sm[i]))
+    if kf[-1][0] < ts[-1]:
+        kf.append((ts[-1], sm[-1]))
+    return kf
+
+
+def _piecewise_expr(kfs: list) -> str:
+    """ffmpeg expression for cx(t): piecewise-linear through the keyframes."""
+    kfs = sorted(kfs)
+    expr = f"{kfs[-1][1]:.5f}"
+    for (t0, c0), (t1, c1) in reversed(list(zip(kfs, kfs[1:]))):
+        dt = max(t1 - t0, 1e-3)
+        seg = f"({c0:.5f}+({(c1 - c0):.5f})*(t-{t0:.5f})/{dt:.5f})"
+        expr = f"if(lt(t,{t1:.5f}),{seg},{expr})"
+    return f"if(lt(t,{kfs[0][0]:.5f}),{kfs[0][1]:.5f},{expr})"
+
+
+def _dynamic_crop_vf(aspect_ratio: str, keyframes: list) -> str:
+    """Crop-to-fill vf whose x offset pans over time to follow the face track."""
+    tw, th = _target_resolution(aspect_ratio)
+    r = tw / th
+    cw = f"ih*{r:.6f}"
+    cx = _piecewise_expr(keyframes)
+    # single-quote the expression values so their commas aren't parsed as filter
+    # separators; eval=frame recomputes x every frame.
+    # crop x/y expressions are evaluated per-frame (they can reference `t`), so the
+    # window pans over time. Single-quote the values so their commas aren't parsed
+    # as filtergraph separators.
+    x = f"clip(({cx})*iw-({cw})/2,0,iw-({cw}))"
+    crop = f"crop=w='{cw}':h=ih:x='{x}':y=0"
+    return f"{crop},scale={tw}:{th}"
+
+
+# ---------------------------------------------------------------------------
 # ffmpeg runner + clip extraction
 # ---------------------------------------------------------------------------
 
@@ -655,15 +1006,21 @@ def extract_clip(
     speed: float = 1.0,
     pad_seconds: float = 0.0,
     font: str | None = None,
+    crop_vf: str | None = None,
+    caption_entries: list | None = None,
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
-    Crop-to-fill is always used (never letterbox). Captions are burned via
-    libass when available, otherwise via the Pillow per-frame fallback.
+    Crop-to-fill is always used (never letterbox). `crop_vf` overrides the crop
+    filtergraph (used for the speaker-tracking dynamic pan); otherwise a static
+    crop at `crop_position` is built.
+
+    Captions: if `caption_entries` (word-level) is given, the word-highlight
+    Pillow renderer is used (heavy font, active word popped). Else `subtitles_path`
+    burns via libass when available, otherwise the plain Pillow fallback.
 
     pad_seconds defaults to 0: caption timestamps are relative to `start_time`,
-    so any pre-roll pad would desync them. Keep it 0 unless the SRT is offset to
-    match the padded start.
+    so any pre-roll pad would desync them.
     """
     padded_start = max(0, start_time - pad_seconds)
     padded_end = end_time + pad_seconds
@@ -673,14 +1030,17 @@ def extract_clip(
 
     tw, th = _target_resolution(aspect_ratio)
 
-    # Crop-to-fill for every aspect (center by default).
-    vf = _build_crop_vf(aspect_ratio, crop_position)
+    # Crop-to-fill: dynamic pan (crop_vf) if given, else static at crop_position.
+    vf = crop_vf if crop_vf else _build_crop_vf(aspect_ratio, crop_position)
+
+    # Word-highlight captions render in a second Pillow pass over the cropped clip.
+    burn_captions = bool(caption_entries)
 
     # Burn subtitles with libass BEFORE speed-up so subtitle timing matches
     # the original video timestamps (both get sped up together by setpts)
     _sub_symlink = None
     burn_with_pillow = False
-    if subtitles_path and subtitles_path.exists():
+    if not burn_captions and subtitles_path and subtitles_path.exists():
         if _HAS_SUBTITLES_FILTER:
             _sub_symlink = Path(tempfile.mktemp(suffix=".srt", prefix="hc_sub_"))
             _sub_symlink.symlink_to(subtitles_path.resolve())
@@ -702,7 +1062,7 @@ def extract_clip(
         af = None
 
     # Step 1: Extract and scale/crop the clip
-    if burn_with_pillow:
+    if burn_with_pillow or burn_captions:
         temp_clip = output_path.with_suffix(".tmp.mp4")
     else:
         temp_clip = output_path
@@ -734,8 +1094,15 @@ def extract_clip(
         if _sub_symlink and _sub_symlink.exists():
             _sub_symlink.unlink()
 
-    # Step 2: Burn subtitles with Pillow if needed
-    if burn_with_pillow:
+    # Step 2: Burn captions in a Pillow pass if needed
+    if burn_captions:
+        try:
+            _burn_captions_pillow(temp_clip, caption_entries, output_path, tw, th,
+                                  font=font, speed=speed)
+        finally:
+            if temp_clip.exists():
+                temp_clip.unlink()
+    elif burn_with_pillow:
         try:
             _burn_subtitles_pillow(temp_clip, subtitles_path, output_path, tw, th,
                                    speed=speed, font=font)
@@ -786,45 +1153,53 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
+    tw, th = _target_resolution(aspect)
     outputs: list[str] = []
-    # SRTs are a burn-in intermediate, not an output — keep them out of out_dir so
-    # only the captioned mp4s remain (no stray sidecar alongside the baked-in text).
-    with tempfile.TemporaryDirectory(prefix="hc_srt_") as tmp:
-        tmpdir = Path(tmp)
-        for clip in clips:
-            clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
-            start = float(clip["start"])
-            end = float(clip["end"])
-            output_path = out / f"{clip_id}.mp4"
+    for clip in clips:
+        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+        start = float(clip["start"])
+        end = float(clip["end"])
+        output_path = out / f"{clip_id}.mp4"
 
-            subtitles_path = None
-            if subtitles and clip.get("words"):
-                transcript = _clip_transcript(clip)
-                srt_path = tmpdir / f"{clip_id}.srt"
-                generate_srt(transcript, start, end, srt_path)
-                subtitles_path = srt_path
+        # Word-level caption entries (kept for the highlight burn-in).
+        caption_entries = None
+        if subtitles and clip.get("words"):
+            caption_entries = _caption_entries(_clip_transcript(clip), start, end)
 
-            # Crop center: an explicit clip `focus` in [0,1] wins (0=left,
-            # 0.5=center, 1=right); otherwise detect a face so an off-center
-            # speaker is framed instead of the empty background beside them.
-            focus = clip.get("focus")
-            crop_position = (
-                float(focus) if isinstance(focus, (int, float))
-                else _smart_crop_position(source, start, end, aspect)
-            )
+        # Framing: explicit `focus` [0,1] wins. Otherwise track the on-screen face
+        # over the clip — pan the crop to follow it (fixes speakers going out of
+        # frame when the camera cuts between people); if the face barely moves,
+        # settle on a single face-centered crop; no face -> center.
+        focus = clip.get("focus")
+        crop_vf = None
+        crop_position = 0.5
+        if isinstance(focus, (int, float)):
+            crop_position = float(focus)
+        elif tw < th:
+            samples, aspect_hw = _face_track(source, start, end)
+            kf = _pan_keyframes(samples) if samples else []
+            if kf:
+                spread = max(c for _, c in kf) - min(c for _, c in kf)
+                crop_w_frac = (tw / th) * aspect_hw
+                if spread > 0.08:
+                    crop_vf = _dynamic_crop_vf(aspect, kf)        # speaker-tracking pan
+                else:
+                    mid = sorted(c for _, c in kf)[len(kf) // 2]  # steady: face-centered
+                    crop_position = _crop_position_for_face(mid, crop_w_frac)
 
-            extract_clip(
-                source_video=source,
-                start_time=start,
-                end_time=end,
-                output_path=output_path,
-                aspect_ratio=aspect,
-                crop_position=crop_position,
-                subtitles_path=subtitles_path,
-                speed=speed,
-                pad_seconds=0.0,   # keep caption timing aligned with the SRT
-                font=font,
-            )
-            outputs.append(str(output_path))
+        extract_clip(
+            source_video=source,
+            start_time=start,
+            end_time=end,
+            output_path=output_path,
+            aspect_ratio=aspect,
+            crop_position=crop_position,
+            crop_vf=crop_vf,
+            caption_entries=caption_entries,
+            speed=speed,
+            pad_seconds=0.0,
+            font=font,
+        )
+        outputs.append(str(output_path))
 
     return outputs

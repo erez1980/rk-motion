@@ -7,8 +7,11 @@ Covers the two things most likely to break silently:
 
 from hebrew_chapters.render import (
     _build_crop_vf,
+    _caption_entries,
     _clip_transcript,
     _crop_position_for_face,
+    _dynamic_crop_vf,
+    _pan_keyframes,
     _parse_srt,
     _srt_time,
     _target_resolution,
@@ -66,6 +69,55 @@ def test_crop_position_degenerate_widths_are_center():
     # A crop as wide as the source (or wider) can't recenter — stay centered.
     assert _crop_position_for_face(0.2, 1.0) == 0.5
     assert _crop_position_for_face(0.2, 1.5) == 0.5
+
+
+# --- speaker-tracking pan ------------------------------------------------
+
+def test_pan_keyframes_snaps_on_cut():
+    # steady on the left, then a hard cut to the right (a camera switch).
+    samples = [(i * 0.5, 0.30) for i in range(6)] + [(3.0 + i * 0.5, 0.75) for i in range(6)]
+    kf = _pan_keyframes(samples)
+    xs = [c for _, c in kf]
+    assert min(xs) < 0.35 and max(xs) > 0.70  # both shots represented
+    ts = [t for t, _ in kf]
+    gaps = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+    assert any(g < 0.1 for g in gaps)  # a near-instant snap, not a slow pan
+
+
+def test_pan_keyframes_steady_is_minimal():
+    samples = [(i * 0.5, 0.5) for i in range(10)]
+    assert len(_pan_keyframes(samples)) <= 2  # no spurious keyframes when static
+
+
+def test_pan_keyframes_fills_gaps():
+    # None = no face detected that frame; must be hold-filled, not dropped.
+    kf = _pan_keyframes([(0.0, 0.4), (0.5, None), (1.0, None), (1.5, 0.6)])
+    assert kf and all(c is not None for _, c in kf)
+
+
+def test_dynamic_crop_vf_pans_over_time():
+    vf = _dynamic_crop_vf("9:16", [(0.0, 0.3), (2.0, 0.7)])
+    assert vf.startswith("crop=") and vf.endswith("scale=1080:1920")
+    assert "t" in vf  # x expression references time -> the crop pans
+
+
+# --- caption entries (word highlight) ------------------------------------
+
+def test_caption_entries_keep_word_timings():
+    clip = {
+        "id": "c", "start": 10.0, "end": 20.0,
+        "words": [
+            {"t": 0.0, "d": 0.4, "w": "שלום"},
+            {"t": 0.5, "d": 0.4, "w": "עולם"},
+            {"t": 1.1, "d": 0.4, "w": "טוב."},
+        ],
+    }
+    entries = _caption_entries(_clip_transcript(clip), 10.0, 20.0)
+    assert entries
+    words = [w for e in entries for w in e["words"]]
+    assert [w["text"] for w in words] == ["שלום", "עולם", "טוב."]
+    # times are clip-relative (first word at ~0), so highlighting lines up with t.
+    assert abs(words[0]["start"]) < 0.01
 
 
 # --- SRT timing ----------------------------------------------------------
