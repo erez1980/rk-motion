@@ -899,13 +899,19 @@ def _face_track(video_path: Path, start: float, end: float,
 
 
 def _pan_keyframes(samples: list, cut_delta: float = 0.2,
-                   min_move: float = 0.02) -> list:
-    """Turn raw face samples into smoothed (t, cx) keyframes for a pan.
+                   min_dwell: float = 1.2) -> list:
+    """Turn raw face samples into (t, cx) keyframes for a stable pan.
 
-    Gaps (no face) are hold-filled; small jitter within a shot is averaged out;
-    a large jump (a camera cut to another person) is preserved as a near-instant
-    snap rather than a slow pan across the frame.
+    The framing must only MOVE for a speaker change that lasts — chasing every
+    quick back-and-forth camera cut looks jumpy. So: fill gaps (no face), split
+    into shots at big jumps, then iteratively merge any shot shorter than
+    `min_dwell` into its longer neighbour (the crop holds through brief flashes).
+    Each surviving shot is a constant crop position; transitions between them are
+    near-instant snaps. Result: locked framing that only re-frames when a speaker
+    genuinely holds the camera.
     """
+    import statistics
+
     ts = [t for t, _ in samples]
     xs: list = [cx for _, cx in samples]
     # forward then backward fill the None gaps
@@ -924,27 +930,43 @@ def _pan_keyframes(samples: list, cut_delta: float = 0.2,
     if any(v is None for v in xs):
         return []
 
-    # smooth within a shot (don't average across a cut)
-    sm = list(xs)
-    for i in range(len(xs)):
-        win = [xs[i]]
-        if i > 0 and abs(xs[i] - xs[i - 1]) < cut_delta:
-            win.append(xs[i - 1])
-        if i < len(xs) - 1 and abs(xs[i] - xs[i + 1]) < cut_delta:
-            win.append(xs[i + 1])
-        sm[i] = sum(win) / len(win)
+    # Split into shots at hard cuts (big horizontal jumps).
+    shots: list[list] = []  # [t_start, t_end, [cx samples]]
+    seg_start = 0
+    for i in range(1, len(xs)):
+        if abs(xs[i] - xs[i - 1]) >= cut_delta:
+            shots.append([ts[seg_start], ts[i], xs[seg_start:i]])
+            seg_start = i
+    shots.append([ts[seg_start], ts[-1], xs[seg_start:]])
+    shots = [[t0, t1, statistics.median(v)] for t0, t1, v in shots]
 
-    kf: list[tuple[float, float]] = [(ts[0], sm[0])]
-    for i in range(1, len(ts)):
-        is_cut = abs(xs[i] - xs[i - 1]) >= cut_delta
-        if is_cut:
-            # snap: hold previous value right up to the cut, then jump
-            kf.append((max(ts[i] - 0.05, kf[-1][0] + 0.001), kf[-1][1]))
-            kf.append((ts[i], sm[i]))
-        elif abs(sm[i] - kf[-1][1]) > min_move:
-            kf.append((ts[i], sm[i]))
-    if kf[-1][0] < ts[-1]:
-        kf.append((ts[-1], sm[-1]))
+    # Merge shots shorter than min_dwell into their longer neighbour, so brief
+    # flashes don't move the crop. Repeat until every shot is long enough.
+    def dur(s):
+        return s[1] - s[0]
+
+    while len(shots) > 1:
+        i = min(range(len(shots)), key=lambda k: dur(shots[k]))
+        if dur(shots[i]) >= min_dwell:
+            break
+        if i == 0:
+            j = 1
+        elif i == len(shots) - 1:
+            j = len(shots) - 2
+        else:
+            j = i - 1 if dur(shots[i - 1]) >= dur(shots[i + 1]) else i + 1
+        shots[j][0] = min(shots[i][0], shots[j][0])  # extend neighbour over the flash
+        shots[j][1] = max(shots[i][1], shots[j][1])  # keep neighbour's cx
+        shots.pop(i)
+
+    shots.sort()
+    for k in range(1, len(shots)):   # restore exact contiguity for clean snaps
+        shots[k][0] = shots[k - 1][1]
+
+    kf: list[tuple[float, float]] = []
+    for t0, t1, cx in shots:
+        kf.append((t0, cx))   # constant across the shot; boundary with the next
+        kf.append((t1, cx))   # shot shares a timestamp -> near-instant snap
     return kf
 
 

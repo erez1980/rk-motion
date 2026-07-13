@@ -89,6 +89,17 @@ def test_pan_keyframes_steady_is_minimal():
     assert len(_pan_keyframes(samples)) <= 2  # no spurious keyframes when static
 
 
+def test_pan_keyframes_ignores_rapid_flicker():
+    # 3s locked on the left, then a rapid A/B flicker every 0.3s. The crop must
+    # NOT chase the flicker (that was the jumpy bug) — at most one settle.
+    steady = [(i * 0.3, 0.30) for i in range(10)]
+    flicker = [(3.0 + k * 0.3, 0.75 if k % 2 else 0.30) for k in range(7)]
+    kf = _pan_keyframes(steady + flicker)
+    xs = [c for _, c in kf]
+    snaps = sum(1 for i in range(1, len(xs)) if abs(xs[i] - xs[i - 1]) > 0.1)
+    assert snaps <= 1
+
+
 def test_pan_keyframes_fills_gaps():
     # None = no face detected that frame; must be hold-filled, not dropped.
     kf = _pan_keyframes([(0.0, 0.4), (0.5, None), (1.0, None), (1.5, 0.6)])
