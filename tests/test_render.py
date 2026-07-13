@@ -89,6 +89,35 @@ def test_pan_keyframes_steady_is_minimal():
     assert len(_pan_keyframes(samples)) <= 2  # no spurious keyframes when static
 
 
+def test_pan_keyframes_follows_isolated_sustained_cut():
+    # long shot A, an isolated ~1.25s cut to B, then back to A -> B IS followed
+    # (this is the clip-6 case: the crop must move to frame the other speaker).
+    a = [(i * 0.25, 0.30) for i in range(20)]
+    b = [(5.0 + i * 0.25, 0.75) for i in range(5)]
+    a2 = [(6.25 + i * 0.25, 0.30) for i in range(20)]
+    xs = [c for _, c in _pan_keyframes(a + b + a2)]
+    assert max(xs) > 0.70  # followed the sustained cut to B
+
+
+def test_pan_keyframes_burst_does_not_alternate():
+    # A rapid A/B/A/B exchange must collapse to a single held position, never a
+    # back-and-forth bounce (the jumpiness). At most one excursion up.
+    a = [(i * 0.25, 0.20) for i in range(12)]
+    ex = []
+    t = 3.0
+    for _ in range(5):  # 5 rapid A/B swaps, ~0.75s each
+        for _ in range(3):
+            ex.append((t, 0.85))
+            t += 0.25
+        for _ in range(3):
+            ex.append((t, 0.20))
+            t += 0.25
+    a2 = [(t + i * 0.25, 0.20) for i in range(12)]
+    xs = [c for _, c in _pan_keyframes(a + ex + a2)]
+    ups = sum(1 for i in range(1, len(xs)) if xs[i] - xs[i - 1] > 0.1)
+    assert ups <= 1  # no alternating bounce
+
+
 def test_pan_keyframes_ignores_rapid_flicker():
     # 3s locked on the left, then a rapid A/B flicker every 0.3s. The crop must
     # NOT chase the flicker (that was the jumpy bug) — at most one settle.

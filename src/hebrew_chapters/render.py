@@ -842,10 +842,14 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
 # ---------------------------------------------------------------------------
 
 def _face_track(video_path: Path, start: float, end: float,
-                step: float = 0.6) -> tuple[list, float]:
+                step: float = 0.25) -> tuple[list, float]:
     """Sample the dominant face x-fraction over the clip. Returns (samples,
     aspect_hw) where samples is [(t_rel_sec, cx_frac_or_None), ...], or ([], 0)
-    if OpenCV / model / ffmpeg is unavailable or no face is ever found."""
+    if OpenCV / model / ffmpeg is unavailable or no face is ever found.
+
+    Sampled ~4x/sec so a real ~0.6s shot registers as multiple samples (and gets
+    followed) while a single-frame detector glitch stays a lone sample (ignored).
+    """
     try:
         import cv2
     except Exception:
@@ -854,7 +858,7 @@ def _face_track(video_path: Path, start: float, end: float,
         return [], 0.0
 
     span = max(end - start, 0.001)
-    n = max(3, min(int(span / step) + 1, 150))
+    n = max(3, min(int(span / step) + 1, 500))
     samples: list[tuple[float, float | None]] = []
     aspect_hw = 0.0
     with tempfile.TemporaryDirectory(prefix="hc_track_") as tmp:
@@ -898,23 +902,38 @@ def _face_track(video_path: Path, start: float, end: float,
     return samples, aspect_hw
 
 
-def _pan_keyframes(samples: list, cut_delta: float = 0.2,
-                   min_dwell: float = 1.2) -> list:
+def _dominant_position(values: list, prev: float, tol: float) -> float:
+    """Dominant crop position among `values`: cluster by `tol`, pick the biggest
+    cluster (ties broken toward the one nearest `prev` for continuity)."""
+    import statistics
+    s = sorted(values)
+    groups: list[list[float]] = [[s[0]]]
+    for v in s[1:]:
+        if v - groups[-1][-1] <= tol:
+            groups[-1].append(v)
+        else:
+            groups.append([v])
+    best = max(groups, key=lambda g: (len(g), -abs(statistics.median(g) - prev)))
+    return statistics.median(best)
+
+
+def _pan_keyframes(samples: list, cut_delta: float = 0.12,
+                   min_run: int = 2) -> list:
     """Turn raw face samples into (t, cx) keyframes for a stable pan.
 
-    The framing must only MOVE for a speaker change that lasts — chasing every
-    quick back-and-forth camera cut looks jumpy. So: fill gaps (no face), split
-    into shots at big jumps, then iteratively merge any shot shorter than
-    `min_dwell` into its longer neighbour (the crop holds through brief flashes).
-    Each surviving shot is a constant crop position; transitions between them are
-    near-instant snaps. Result: locked framing that only re-frames when a speaker
-    genuinely holds the camera.
+    The crop should FOLLOW a genuine camera cut to another speaker, but must not
+    chase isolated single-sample blips (detector noise, or a sub-second flash) —
+    that was the jumpiness. So we group consecutive samples into runs at the same
+    position and only COMMIT a move to a new position when its run lasts at least
+    `min_run` samples (a real, sustained shot). Shorter runs are transient and
+    inherit the last committed position (the crop holds). Committed positions are
+    piecewise-constant with a near-instant snap between them.
     """
     import statistics
 
     ts = [t for t, _ in samples]
     xs: list = [cx for _, cx in samples]
-    # forward then backward fill the None gaps
+    # forward then backward fill the None (no-face) gaps by holding
     last = None
     for i in range(len(xs)):
         if xs[i] is None:
@@ -930,43 +949,51 @@ def _pan_keyframes(samples: list, cut_delta: float = 0.2,
     if any(v is None for v in xs):
         return []
 
-    # Split into shots at hard cuts (big horizontal jumps).
-    shots: list[list] = []  # [t_start, t_end, [cx samples]]
-    seg_start = 0
-    for i in range(1, len(xs)):
-        if abs(xs[i] - xs[i - 1]) >= cut_delta:
-            shots.append([ts[seg_start], ts[i], xs[seg_start:i]])
-            seg_start = i
-    shots.append([ts[seg_start], ts[-1], xs[seg_start:]])
-    shots = [[t0, t1, statistics.median(v)] for t0, t1, v in shots]
-
-    # Merge shots shorter than min_dwell into their longer neighbour, so brief
-    # flashes don't move the crop. Repeat until every shot is long enough.
-    def dur(s):
-        return s[1] - s[0]
-
-    while len(shots) > 1:
-        i = min(range(len(shots)), key=lambda k: dur(shots[k]))
-        if dur(shots[i]) >= min_dwell:
-            break
-        if i == 0:
-            j = 1
-        elif i == len(shots) - 1:
-            j = len(shots) - 2
+    # Group consecutive samples into runs at (roughly) the same position.
+    runs: list[list] = []  # [t_start, [values]]
+    for t, x in zip(ts, xs):
+        if runs and abs(x - statistics.median(runs[-1][1])) < cut_delta:
+            runs[-1][1].append(x)
         else:
-            j = i - 1 if dur(shots[i - 1]) >= dur(shots[i + 1]) else i + 1
-        shots[j][0] = min(shots[i][0], shots[j][0])  # extend neighbour over the flash
-        shots[j][1] = max(shots[i][1], shots[j][1])  # keep neighbour's cx
-        shots.pop(i)
+            runs.append([t, [x]])
+    runs_r = [(t0, statistics.median(v), len(v)) for t0, v in runs]
 
-    shots.sort()
-    for k in range(1, len(shots)):   # restore exact contiguity for clean snaps
-        shots[k][0] = shots[k - 1][1]
+    # Build committed positions. A run that persists as a clearly SUSTAINED shot
+    # (>= stable_len samples, ~1.5s) is followed — the crop moves to frame that
+    # speaker. Everything else is a BUSY region (rapid cuts / a multi-person
+    # exchange): collapse the whole contiguous busy region to its DOMINANT face
+    # position and hold that one value across it. This keeps the crop on a real
+    # person (never the empty gap) without bouncing: clip-2's flurry collapses to
+    # the main speaker, clip-6's exchange to its dominant participant. Busy regions
+    # shorter than min_run samples are ignored as detector noise (hold).
+    stable_len = 6
+    committed: list[tuple[float, float]] = [(runs_r[0][0], runs_r[0][1])]
+    i = 1
+    while i < len(runs_r):
+        t0, cx, cnt = runs_r[i]
+        if cnt >= stable_len:
+            if abs(cx - committed[-1][1]) >= cut_delta:
+                committed.append((t0, cx))  # sustained shot -> follow it
+            i += 1
+            continue
+        j = i
+        bvals: list[float] = []
+        while j < len(runs_r) and runs_r[j][2] < stable_len:
+            bvals += [runs_r[j][1]] * runs_r[j][2]
+            j += 1
+        if len(bvals) >= min_run:
+            dom = _dominant_position(bvals, committed[-1][1], cut_delta)
+            if abs(dom - committed[-1][1]) >= cut_delta:
+                committed.append((t0, dom))
+        i = j
 
+    # Piecewise-constant keyframes with a near-instant snap at each commit.
     kf: list[tuple[float, float]] = []
-    for t0, t1, cx in shots:
-        kf.append((t0, cx))   # constant across the shot; boundary with the next
-        kf.append((t1, cx))   # shot shares a timestamp -> near-instant snap
+    for t, cx in committed:
+        if kf:
+            kf.append((max(t - 0.001, kf[-1][0] + 0.001), kf[-1][1]))  # hold, then snap
+        kf.append((t, cx))
+    kf.append((ts[-1], committed[-1][1]))
     return kf
 
 
