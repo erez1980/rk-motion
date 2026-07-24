@@ -125,6 +125,11 @@ the `sofit-mcp` binary if it's in a venv):
 
 **Claude Code** — `claude mcp add sofit -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/sofit-mcp`
 
+Prefer natural-language skills over raw MCP tools? Ready-made Claude Code skills live in
+[`skills/`](skills/) — one per service (`sofit-transcribe`, `sofit-kit`, `sofit-clips`,
+`sofit-captions`, `sofit-trim`) plus a `sofit` router. Copy them into `~/.claude/skills/`
+and invoke by name, e.g. `/sofit-clips`.
+
 Then just ask: *"Transcribe ~/Downloads/ep.mp4"* → wait → *"Now give me Spotify
 sofit and Hebrew show notes for it."*
 
