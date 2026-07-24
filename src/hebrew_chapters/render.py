@@ -634,6 +634,35 @@ _WHITE = (255, 255, 255, 255)
 _OUTLINE = (0, 0, 0, 255)
 
 
+def _is_ltr_word(w: dict) -> bool:
+    """A word is LTR if it has Latin letters/digits and no Hebrew — e.g. an
+    English brand embedded in a Hebrew line ("OpenAI", "Thoma")."""
+    text = w.get("text", "")
+    has_hebrew = any("֐" <= c <= "׿" for c in text)
+    has_latin = any(c.isascii() and c.isalnum() for c in text)
+    return has_latin and not has_hebrew
+
+
+def _bidi_word_order(words: list[dict]) -> list[dict]:
+    """Reorder one caption line (logical order) into visual left-to-right for a
+    base-RTL line: reverse the word sequence, but keep runs of consecutive LTR
+    words (a multi-word English brand like "Thoma Bravo") in their own order so
+    they don't come out reversed. Hebrew-only lines are simply reversed, as
+    before. Internal glyph shaping of each word is still Pillow/libraqm's job.
+    """
+    runs: list[list] = []  # [is_ltr, [words]]
+    for w in words:
+        ltr = _is_ltr_word(w)
+        if runs and runs[-1][0] == ltr:
+            runs[-1][1].append(w)
+        else:
+            runs.append([ltr, [w]])
+    out: list[dict] = []
+    for ltr, run in reversed(runs):
+        out.extend(run if ltr else list(reversed(run)))
+    return out
+
+
 def _load_caption_font(size: int, font: str | None = None):
     """Load a heavy Hebrew-capable caption font at `size`. Prefers an explicit
     override, then the bundled Rubik (pushed to its Black weight), then system
@@ -822,15 +851,14 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
         lines = wrap(active["words"])
         y = height - bottom_margin - len(lines) * line_h
         for line in lines:
-            lw = sum(word_w(w["text"]) for w in line) + space_w * (len(line) - 1)
-            x_right = (width + lw) / 2  # right edge of the centered line
-            for w in line:              # logical order; place rightmost first (RTL)
-                ww = word_w(w["text"])
-                x = x_right - ww
+            order = _bidi_word_order(line)  # visual left-to-right (base RTL)
+            lw = sum(word_w(w["text"]) for w in order) + space_w * (len(order) - 1)
+            x = (width - lw) / 2  # left edge of the centered line
+            for w in order:
                 color = _ACCENT if (w["start"] <= t < w["end"]) else _WHITE
                 d.text((x, y), w["text"], font=pil_font, fill=color,
                        stroke_width=outline, stroke_fill=_OUTLINE)
-                x_right = x - space_w
+                x += word_w(w["text"]) + space_w
             y += line_h
         return img.tobytes("raw", "RGBA")
 

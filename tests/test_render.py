@@ -6,6 +6,7 @@ Covers the two things most likely to break silently:
 """
 
 from hebrew_chapters.render import (
+    _bidi_word_order,
     _build_crop_vf,
     _caption_entries,
     _clip_transcript,
@@ -17,6 +18,30 @@ from hebrew_chapters.render import (
     _target_resolution,
     generate_srt,
 )
+
+
+# --- bidi word order (visual left-to-right, base RTL) --------------------
+
+def _t(*texts):
+    return [{"text": s, "start": 0, "end": 1} for s in texts]
+
+
+def test_bidi_pure_hebrew_reverses():
+    # Hebrew-only line: visual L->R is the logical order reversed.
+    out = [w["text"] for w in _bidi_word_order(_t("שלום", "עולם", "טוב"))]
+    assert out == ["טוב", "עולם", "שלום"]
+
+
+def test_bidi_keeps_multiword_latin_run_in_order():
+    # "זה Thoma Bravo כזה" — the Latin run must NOT reverse to "Bravo Thoma".
+    out = [w["text"] for w in _bidi_word_order(_t("זה", "Thoma", "Bravo", "כזה"))]
+    # visual L->R: כזה, then the LTR run in order (Thoma, Bravo), then זה
+    assert out == ["כזה", "Thoma", "Bravo", "זה"]
+
+
+def test_bidi_single_latin_token_between_hebrew():
+    out = [w["text"] for w in _bidi_word_order(_t("את", "OpenAI", "אהבתי"))]
+    assert out == ["אהבתי", "OpenAI", "את"]
 
 
 # --- crop-to-fill --------------------------------------------------------
