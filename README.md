@@ -136,7 +136,7 @@ chapters and Hebrew show notes for it."*
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
   `--titler {api,claude-cli}`, `--shownotes`, `--quotes`, `--clips-json PATH`,
-  `--render-clips DIR`, `--aspect`, `--out`, `--no-cache`.
+  `--render-clips DIR`, `--render-from PATH`, `--only ID`, `--aspect`, `--out`, `--no-cache`.
 
 ### Render social clips directly (no external tool)
 `--render-clips DIR` turns each pull-quote into a vertical (9:16) clip with burned-in
@@ -155,6 +155,20 @@ center on a detected face — so a speaker sitting off to one side is framed ins
 of the empty background beside them. When there's no clear face (a wide two-shot,
 backs of heads) it stays centered. To override, set a clip's `focus` to a value in
 `[0,1]` (`0`=left, `0.5`=center, `1`=right) in the clips JSON.
+
+**Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
+word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
+*without re-transcribing* and re-render, keeping the karaoke timing aligned:
+
+1. Save a clips.json once: `chapters episode.mp4 --clips-json clips.json`
+2. Correct it. From the Claude app, the MCP tool `correct_clip(clips.json, find, replace)`
+   fixes every clip by default (recurring names appear in many) — pass `clip_id` to
+   scope to one — and re-renders the affected clips. A multi-token find collapses to the
+   replacement, merging the tokens' time span so the highlight stays in sync.
+3. Or render a corrected clips.json yourself: `chapters --render-from clips.json --render-clips out`
+   (add `--only clip-3` for a single clip). This is the **only** render path that honors
+   corrections — plain `--render-clips` regenerates from the transcript and will warn you
+   if a clips.json is sitting nearby.
 
 ### Feeding a social-clip renderer
 `--clips-json PATH` writes a clip spec for a downstream vertical-clip renderer (e.g. a

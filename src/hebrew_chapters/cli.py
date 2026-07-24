@@ -21,7 +21,9 @@ from . import __version__
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="chapters", description="Hebrew podcast episode kit.")
-    p.add_argument("media", help="an mp3/mp4 file, an RSS feed URL, a YouTube URL, or a direct audio URL")
+    p.add_argument("media", nargs="?",
+                   help="an mp3/mp4 file, an RSS feed URL, a YouTube URL, or a direct audio URL "
+                   "(optional when --render-from is used)")
     p.add_argument("--episode", type=int, default=1,
                    help="which episode from an RSS feed (1 = first/latest item); ignored for files")
     p.add_argument("--list-episodes", action="store_true",
@@ -61,6 +63,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--render-clips", metavar="DIR",
                    help="render each pull-quote to DIR as a vertical (9:16) clip with burned "
                    "Hebrew captions (needs the [render] extra + ffmpeg)")
+    p.add_argument("--render-from", metavar="PATH",
+                   help="render clips from an existing (possibly corrected) clips.json, skipping "
+                   "transcription; renders into --render-clips DIR or the clips.json's folder")
+    p.add_argument("--only", metavar="ID",
+                   help="with --render-from, render just one clip by id (e.g. clip-3)")
     p.add_argument("--aspect", default="9:16", help="aspect ratio for --render-clips (default 9:16)")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
@@ -78,10 +85,73 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
         print(f"\n# {kind}\n{body}")
 
 
+def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None) -> int:
+    """Render clips from a saved (possibly corrected) clips.json, no transcription.
+    Output goes to `out_dir` if given, else the clips.json's own folder."""
+    import json
+    from pathlib import Path
+
+    try:
+        from . import render  # noqa: F401
+    except ImportError:
+        print("error: --render-from needs the render extra: pip install 'hebrew-chapters[render]'",
+              file=sys.stderr)
+        return 1
+    try:
+        doc = json.loads(Path(clips_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"error: cannot read clips json {clips_path}: {e}", file=sys.stderr)
+        return 1
+
+    video = (doc.get("source") or {}).get("video")
+    clips = doc.get("clips") or []
+    if only:
+        clips = [c for c in clips if c.get("id") == only]
+        if not clips:
+            print(f"error: clip '{only}' not found in {clips_path}", file=sys.stderr)
+            return 1
+    if not clips:
+        print(f"error: no clips in {clips_path}", file=sys.stderr)
+        return 1
+    if not video or not os.path.exists(video):
+        print(f"error: source video not found: {video}", file=sys.stderr)
+        return 1
+
+    out = out_dir or os.path.dirname(os.path.abspath(clips_path)) or "."
+    from . import render
+    outs = render.render_clips(video, clips, out, aspect=aspect)
+    print(f"rendered {len(outs)} clip(s) to {out}", file=sys.stderr)
+    return 0
+
+
+def _warn_if_corrections_would_be_lost(media_path: str, out_dir: str) -> None:
+    """Best-effort heads-up: --render-clips regenerates clips from the transcript
+    (a fresh LLM call), so it silently discards caption corrections saved in a
+    clips.json. If one is lying around, point the user at --render-from."""
+    import glob
+    stem = os.path.splitext(media_path)[0]
+    candidates = [stem + ".clips.json"]
+    for d in {out_dir, os.path.dirname(media_path) or ".", "."}:
+        candidates += glob.glob(os.path.join(d, "*clips*.json"))
+    if any(os.path.exists(c) for c in candidates):
+        print("note: a clips.json exists nearby; --render-clips regenerates from the "
+              "transcript and ignores caption corrections — use --render-from <clips.json> "
+              "to keep them.", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
     from . import feed
+
+    # Render from an existing clips.json and exit — no key or transcription
+    # needed. This is the ONLY render path that honors caption corrections.
+    if args.render_from:
+        return _render_from(args.render_from, args.render_clips, args.aspect, args.only)
+
+    if not args.media:
+        print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
+        return 1
 
     # List a feed's episodes and exit — no key or transcription needed.
     if args.list_episodes:
@@ -197,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"warning: clips-json failed: {e}", file=sys.stderr)
             failed += 1
     if args.render_clips:
+        _warn_if_corrections_would_be_lost(media_path, args.render_clips)
         try:
             from . import render
             clips = generate.make_clips(segments, titler=args.titler)

@@ -124,7 +124,85 @@ def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "")
         return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
     clips = generate.make_clips(segs, titler="api")
     outs = render.render_clips(path, clips, out_dir, aspect=aspect)
-    return {"clips": len(outs), "files": outs}
+    result = {"clips": len(outs), "files": outs}
+    # This path regenerates clips from the transcript, so it ignores any caption
+    # corrections saved in a clips.json. Flag it so the fix isn't silently lost.
+    stem = os.path.splitext(path)[0]
+    if os.path.exists(stem + ".clips.json"):
+        result["note"] = ("a clips.json exists for this media; render_clips regenerates "
+                          "from the transcript and ignores caption corrections — use "
+                          "correct_clip / render from the clips.json to keep them.")
+    return result
+
+
+@mcp.tool()
+def correct_clip(clips_json: str, find: str, replace: str,
+                 clip_id: str = "", aspect: str = "9:16", out_dir: str = "") -> dict:
+    """Fix a caption typo in a saved clips.json and re-render the affected clip(s),
+    preserving per-word karaoke timing (a multi-token find like the three tokens
+    'OpenAI' transcribes into collapses to one, merging their time span).
+
+    By DEFAULT the fix applies to EVERY clip — recurring brand names show up in
+    many; pass clip_id to scope to a single clip. Renders FIRST, then atomically
+    rewrites clips.json only if the render succeeds, so a failure leaves the file
+    intact. Needs the [render] extra + ffmpeg. Returns n_replaced, the affected
+    clip ids, before/after caption text (so you can confirm), and output paths.
+    """
+    import json
+    from pathlib import Path
+
+    from . import corrections
+
+    p = Path(clips_json)
+    try:
+        doc = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return {"error": f"cannot read clips json {clips_json}: {e}"}
+    clips = doc.get("clips") or []
+    video = (doc.get("source") or {}).get("video")
+    if not video or not os.path.exists(video):
+        return {"error": f"source video not found: {video}"}
+
+    cid = clip_id or None
+
+    def _cap(clip: dict) -> str:
+        return " ".join(w.get("w", "") for w in clip.get("words", []))
+
+    before = {c.get("id"): _cap(c) for c in clips if cid is None or c.get("id") == cid}
+    try:
+        n, affected = corrections.correct_clips(clips, find, replace, clip_id=cid)
+    except ValueError as e:
+        return {"error": str(e)}
+    if n == 0:
+        return {"n_replaced": 0, "clips_affected": [],
+                "message": f"'{find}' not found — nothing changed, clips.json untouched"}
+
+    try:
+        from . import render
+    except ImportError:
+        return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
+
+    out = out_dir or os.path.dirname(os.path.abspath(clips_json)) or "."
+    to_render = [c for c in clips if c.get("id") in set(affected)]
+    # Render FIRST — if it fails, the on-disk clips.json is never touched.
+    try:
+        outs = render.render_clips(video, to_render, out, aspect=aspect)
+    except Exception as e:  # noqa: BLE001 - surface render failure, keep file intact
+        return {"error": f"render failed, clips.json unchanged: {e}"}
+
+    # Render succeeded -> persist atomically (temp file + os.replace).
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, p)
+
+    after = {c.get("id"): _cap(c) for c in clips if c.get("id") in set(affected)}
+    return {
+        "n_replaced": n,
+        "clips_affected": affected,
+        "before_caption": {k: before.get(k) for k in affected},
+        "after_caption": after,
+        "output_paths": outs,
+    }
 
 
 def main() -> None:
