@@ -160,7 +160,10 @@ backs of heads) it stays centered. To override, set a clip's `focus` to a value 
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
 *without re-transcribing* and re-render, keeping the karaoke timing aligned:
 
-1. Save a clips.json once: `chapters episode.mp4 --clips-json clips.json`
+1. Render once — the spec is saved automatically. `chapters episode.mp4 --render-clips out`
+   drops `out/episode.clips.json` (named after the media, next to the `clip-N.mp4` files it
+   just rendered) so the spec and its clips travel together. (Pass `--clips-json PATH` to
+   choose your own path. Re-running `--render-clips` won't overwrite a spec you've corrected.)
 2. Correct it. From the Claude app, the MCP tool `correct_clip(clips.json, find, replace)`
    fixes every clip by default (recurring names appear in many) — pass `clip_id` to
    scope to one — and re-renders the affected clips. A multi-token find collapses to the

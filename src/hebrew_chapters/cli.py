@@ -124,21 +124,6 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
     return 0
 
 
-def _warn_if_corrections_would_be_lost(media_path: str, out_dir: str) -> None:
-    """Best-effort heads-up: --render-clips regenerates clips from the transcript
-    (a fresh LLM call), so it silently discards caption corrections saved in a
-    clips.json. If one is lying around, point the user at --render-from."""
-    import glob
-    stem = os.path.splitext(media_path)[0]
-    candidates = [stem + ".clips.json"]
-    for d in {out_dir, os.path.dirname(media_path) or ".", "."}:
-        candidates += glob.glob(os.path.join(d, "*clips*.json"))
-    if any(os.path.exists(c) for c in candidates):
-        print("note: a clips.json exists nearby; --render-clips regenerates from the "
-              "transcript and ignores caption corrections — use --render-from <clips.json> "
-              "to keep them.", file=sys.stderr)
-
-
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
@@ -252,33 +237,50 @@ def main(argv: list[str] | None = None) -> int:
         except generate.GenerationError as e:
             print(f"warning: quotes failed: {e}", file=sys.stderr)
             failed += 1
-    if args.clips_json:
+    # Social clips: generate the spec ONCE so a saved clips.json exactly matches
+    # the rendered mp4s (same ids/ranges). When rendering without an explicit
+    # --clips-json, the spec is dropped next to the clips as
+    # <render_dir>/<media_stem>.clips.json — so the spec and its clips travel
+    # together and it's ready for a later correct_clip / --render-from.
+    if args.clips_json or args.render_clips:
+        import json
+        from pathlib import Path
+        clips = None
         try:
-            import json
-            from pathlib import Path
-            doc = {
-                "schema_version": 1,
-                "source": {"video": os.path.abspath(media_path)},
-                "clips": generate.make_clips(segments, titler=args.titler),
-            }
-            Path(args.clips_json).write_text(json.dumps(doc, ensure_ascii=False, indent=2))
-            print(f"wrote {args.clips_json} ({len(doc['clips'])} clips)", file=sys.stderr)
-        except generate.GenerationError as e:
-            print(f"warning: clips-json failed: {e}", file=sys.stderr)
-            failed += 1
-    if args.render_clips:
-        _warn_if_corrections_would_be_lost(media_path, args.render_clips)
-        try:
-            from . import render
             clips = generate.make_clips(segments, titler=args.titler)
-            outs = render.render_clips(media_path, clips, args.render_clips, aspect=args.aspect)
-            print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
         except generate.GenerationError as e:
-            print(f"warning: render-clips failed: {e}", file=sys.stderr)
+            print(f"warning: clip generation failed: {e}", file=sys.stderr)
             failed += 1
-        except ImportError:
-            print("error: --render-clips needs the render extra: pip install 'hebrew-chapters[render]'", file=sys.stderr)
-            failed += 1
+        if clips is not None:
+            doc = {"schema_version": 1,
+                   "source": {"video": os.path.abspath(media_path)},
+                   "clips": clips}
+            json_path = args.clips_json
+            if not json_path and args.render_clips:
+                stem = os.path.splitext(os.path.basename(media_path))[0]
+                json_path = os.path.join(args.render_clips, stem + ".clips.json")
+            if json_path:
+                p = Path(json_path)
+                # Explicit --clips-json always writes; an auto path is written only
+                # if absent, so re-running --render-clips never clobbers a spec you
+                # may have corrected.
+                if args.clips_json or not p.exists():
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+                    print(f"wrote {json_path} ({len(clips)} clips)", file=sys.stderr)
+                else:
+                    print(f"note: kept existing {json_path} (may contain corrections); "
+                          f"rendering freshly-generated clips, which may differ. To render "
+                          f"the saved spec instead: chapters --render-from {json_path}",
+                          file=sys.stderr)
+            if args.render_clips:
+                try:
+                    from . import render
+                    outs = render.render_clips(media_path, clips, args.render_clips, aspect=args.aspect)
+                    print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
+                except ImportError:
+                    print("error: --render-clips needs the render extra: pip install 'hebrew-chapters[render]'", file=sys.stderr)
+                    failed += 1
     return 1 if failed else 0
 
 

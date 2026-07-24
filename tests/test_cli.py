@@ -60,3 +60,59 @@ def test_render_from_only_missing_id_errors(tmp_path):
 
 def test_media_required_without_render_from():
     assert cli.main([]) == 1
+
+
+class _Seg:
+    start = 0.0
+    text = ""
+    words = []
+    index = 0
+
+    def __init__(self, end):
+        self.end = end
+
+
+def _stub_pipeline(monkeypatch, clips):
+    """Stub transcription + generation + render so --render-clips runs offline."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    import hebrew_chapters.generate as g
+    import hebrew_chapters.render as r
+    import hebrew_chapters.transcribe as t
+    monkeypatch.setattr(t, "transcribe", lambda *a, **k: [_Seg(1.0)])
+    monkeypatch.setattr(g, "make_chapters", lambda *a, **k: [])  # default output; keep it cheap
+    monkeypatch.setattr(g, "make_clips", lambda *a, **k: clips)
+    rendered = {}
+    monkeypatch.setattr(r, "render_clips",
+                        lambda v, c, out, aspect="9:16", **k:
+                        (rendered.__setitem__("clips", c)
+                         or [f"{out}/{x['id']}.mp4" for x in c]))
+    return rendered
+
+
+def test_render_clips_autowrites_default_spec(monkeypatch, tmp_path):
+    media = tmp_path / "WS203_EDIT.mp4"
+    media.write_bytes(b"x")
+    clips = [{"id": "clip-1", "start": 0, "end": 1, "hook": "h",
+              "focus": None, "words": [{"t": 0, "d": 0.3, "w": "א"}]}]
+    rendered = _stub_pipeline(monkeypatch, clips)
+    out = tmp_path / "WS203"
+    rc = cli.main([str(media), "--render-clips", str(out)])
+    assert rc == 0
+    spec = out / "WS203_EDIT.clips.json"          # derived from media stem, in render dir
+    assert spec.exists()
+    doc = json.loads(spec.read_text(encoding="utf-8"))
+    assert doc["clips"] == clips and doc["source"]["video"] == str(media)
+    assert rendered["clips"] == clips             # rendered the SAME spec it saved
+
+
+def test_render_clips_keeps_existing_corrected_spec(monkeypatch, tmp_path):
+    media = tmp_path / "WS203_EDIT.mp4"
+    media.write_bytes(b"x")
+    out = tmp_path / "WS203"
+    out.mkdir()
+    spec = out / "WS203_EDIT.clips.json"
+    spec.write_text('{"corrected":true}', encoding="utf-8")  # pretend user corrected it
+    _stub_pipeline(monkeypatch, [{"id": "clip-1", "words": []}])
+    rc = cli.main([str(media), "--render-clips", str(out)])
+    assert rc == 0
+    assert spec.read_text(encoding="utf-8") == '{"corrected":true}'  # NOT clobbered
