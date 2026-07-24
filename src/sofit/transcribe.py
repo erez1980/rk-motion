@@ -36,7 +36,7 @@ class Segment:
 
 def _cache_dir() -> Path:
     base = os.environ.get("XDG_CACHE_HOME") or os.path.join(Path.home(), ".cache")
-    d = Path(base) / "hebrew-chapters"
+    d = Path(base) / "sofit"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from hebrew_chapters import feed
+from sofit import feed
 
 RSS = b"""<?xml version="1.0"?>
 <rss version="2.0"><channel>

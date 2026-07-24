@@ -1,5 +1,5 @@
 [project]
-name = "hebrew-chapters"
+name = "sofit-cli"
 version = "0.1.0"
 description = "Auto-generate chapters, show notes, and pull-quotes for Hebrew podcasts (mp3/mp4) from a local transcript."
 readme = "README.md"
@@ -18,12 +18,12 @@ render = ["pillow>=10", "python-bidi>=0.4"]
 crop = ["opencv-python-headless>=4.9"]  # face-aware crop centering (optional)
 
 [project.scripts]
-chapters = "hebrew_chapters.cli:main"
-chapters-mcp = "hebrew_chapters.mcp_server:main"
+sofit = "sofit.cli:main"
+sofit-mcp = "sofit.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hebrew_chapters"]
+packages = ["src/sofit"]

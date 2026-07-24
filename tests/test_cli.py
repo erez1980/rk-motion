@@ -2,7 +2,7 @@
 
 import json
 
-from hebrew_chapters import cli
+from sofit import cli
 
 
 def _doc(tmp_path):
@@ -18,7 +18,7 @@ def _doc(tmp_path):
 
 
 def _no_transcribe(monkeypatch):
-    import hebrew_chapters.transcribe as t
+    import sofit.transcribe as t
 
     def boom(*a, **k):
         raise AssertionError("transcription must not run for --render-from")
@@ -28,7 +28,7 @@ def _no_transcribe(monkeypatch):
 def test_render_from_skips_transcription(monkeypatch, tmp_path):
     p = _doc(tmp_path)
     _no_transcribe(monkeypatch)
-    import hebrew_chapters.render as r
+    import sofit.render as r
     rendered = {}
     monkeypatch.setattr(r, "render_clips",
                         lambda v, clips, out, aspect="9:16", **k:
@@ -42,7 +42,7 @@ def test_render_from_skips_transcription(monkeypatch, tmp_path):
 def test_render_from_only_filters_one_clip(monkeypatch, tmp_path):
     p = _doc(tmp_path)
     _no_transcribe(monkeypatch)
-    import hebrew_chapters.render as r
+    import sofit.render as r
     rendered = {}
     monkeypatch.setattr(r, "render_clips",
                         lambda v, clips, out, aspect="9:16", **k:
@@ -75,9 +75,9 @@ class _Seg:
 def _stub_pipeline(monkeypatch, clips):
     """Stub transcription + generation + render so --render-clips runs offline."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
-    import hebrew_chapters.generate as g
-    import hebrew_chapters.render as r
-    import hebrew_chapters.transcribe as t
+    import sofit.generate as g
+    import sofit.render as r
+    import sofit.transcribe as t
     monkeypatch.setattr(t, "transcribe", lambda *a, **k: [_Seg(1.0)])
     monkeypatch.setattr(g, "make_chapters", lambda *a, **k: [])  # default output; keep it cheap
     monkeypatch.setattr(g, "make_clips", lambda *a, **k: clips)

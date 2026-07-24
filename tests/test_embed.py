@@ -1,8 +1,8 @@
 """Test the ffmetadata builder (pure). The ffmpeg call itself is exercised
 manually / in integration, not in the unit suite."""
 
-from hebrew_chapters.embed import build_ffmetadata, _escape
-from hebrew_chapters.generate import Chapter
+from sofit.embed import build_ffmetadata, _escape
+from sofit.generate import Chapter
 
 
 def test_ffmetadata_chapter_blocks():

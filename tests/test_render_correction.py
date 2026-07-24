@@ -16,7 +16,7 @@ def test_corrected_latin_token_burns_into_caption(tmp_path):
     # Pixel-exact bidi ORDER via OCR is deferred; this proves the mixed
     # Hebrew+Latin caption renders into the band — which a file-exists check
     # (the thing the review flagged) cannot.
-    from hebrew_chapters import corrections, render
+    from sofit import corrections, render
 
     src = tmp_path / "src.mp4"
     subprocess.run(

@@ -20,7 +20,7 @@ from . import __version__
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="chapters", description="Hebrew podcast episode kit.")
+    p = argparse.ArgumentParser(prog="sofit", description="Hebrew podcast episode kit.")
     p.add_argument("media", nargs="?",
                    help="an mp3/mp4 file, an RSS feed URL, a YouTube URL, or a direct audio URL "
                    "(optional when --render-from is used)")
@@ -76,7 +76,7 @@ def _parser() -> argparse.ArgumentParser:
                    help="logo corner (default top-left)")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
-    p.add_argument("--version", action="version", version=f"hebrew-chapters {__version__}")
+    p.add_argument("--version", action="version", version=f"sofit {__version__}")
     return p
 
 
@@ -100,7 +100,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
     try:
         from . import render  # noqa: F401
     except ImportError:
-        print("error: --render-from needs the render extra: pip install 'hebrew-chapters[render]'",
+        print("error: --render-from needs the render extra: pip install 'sofit-cli[render]'",
               file=sys.stderr)
         return 1
     try:
@@ -287,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
                                                aspect=args.aspect, logo=args.logo, logo_pos=args.logo_pos)
                     print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
                 except ImportError:
-                    print("error: --render-clips needs the render extra: pip install 'hebrew-chapters[render]'", file=sys.stderr)
+                    print("error: --render-clips needs the render extra: pip install 'sofit-cli[render]'", file=sys.stderr)
                     failed += 1
     return 1 if failed else 0
 

@@ -5,7 +5,7 @@ than an MCP call should block. So the pipeline is split across tools: start
 transcription in the background, poll its status, then generate the (fast) kit
 once the transcript is cached.
 
-Run:  chapters-mcp        (stdio transport)
+Run:  sofit-mcp        (stdio transport)
 Wire it into Claude Desktop / Claude Code as an MCP server (see README).
 """
 
@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from . import format as fmt
 from . import generate, transcribe
 
-mcp = FastMCP("hebrew-chapters")
+mcp = FastMCP("sofit")
 
 # cache_key -> {"status": "running"|"done"|"error", "error": str|None}
 _jobs: dict[str, dict] = {}
@@ -123,7 +123,7 @@ def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "",
     try:
         from . import render
     except ImportError:
-        return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
+        return {"error": "install the render extra: pip install 'sofit-cli[render]'"}
     clips = generate.make_clips(segs, titler="api")
     outs = render.render_clips(path, clips, out_dir, aspect=aspect,
                                logo=logo or None, logo_pos=logo_pos)
@@ -184,7 +184,7 @@ def correct_clip(clips_json: str, find: str, replace: str,
     try:
         from . import render
     except ImportError:
-        return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
+        return {"error": "install the render extra: pip install 'sofit-cli[render]'"}
 
     out = out_dir or os.path.dirname(os.path.abspath(clips_json)) or "."
     to_render = [c for c in clips if c.get("id") in set(affected)]

@@ -10,9 +10,9 @@ import json
 
 import pytest
 
-import hebrew_chapters.generate as gen
-from hebrew_chapters.generate import GenerationError, make_chapters
-from hebrew_chapters.transcribe import Segment, Word
+import sofit.generate as gen
+from sofit.generate import GenerationError, make_chapters
+from sofit.transcribe import Segment, Word
 
 
 def _seg(i, start, text):

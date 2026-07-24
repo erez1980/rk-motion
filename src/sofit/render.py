@@ -1,10 +1,10 @@
 """Render vertical (or any-aspect) video clips with burned Hebrew captions.
 
 Self-contained port of SocialClipper's clipper.py video-rendering path, adapted
-for hebrew-chapters. No dependency on socialclipper.
+for sofit. No dependency on socialclipper.
 
 The public entry point is `render_clips`. It takes a source video and a list of
-clip dicts in the hebrew-chapters clips.json shape and writes one cropped-to-fill
+clip dicts in the sofit clips.json shape and writes one cropped-to-fill
 mp4 per clip with the clip's Hebrew word timings burned in as captions.
 
 Stack: stdlib + ffmpeg/ffprobe (external) + Pillow. python-bidi is used when
@@ -1211,7 +1211,7 @@ def extract_clip(
 def _clip_transcript(clip: dict) -> dict:
     """Synthesize the transcript shape the caption functions expect from a clip.
 
-    hebrew-chapters clips carry word timings relative to the clip start:
+    sofit clips carry word timings relative to the clip start:
         {"t": <sec from clip start>, "d": <dur sec>, "w": <word text>}
     The caption code expects one segment with ABSOLUTE word start/end/text, so
     we offset each word by the clip's absolute start.
@@ -1268,7 +1268,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
 
     # Env-var default so a logo can be set once and applied to every render
     # without passing --logo each time. An explicit logo always wins.
-    logo = logo or os.environ.get("HEBREW_CHAPTERS_LOGO") or None
+    logo = logo or os.environ.get("SOFIT_LOGO") or None
     logo_dir = None
     logo_ready = None
     if logo:

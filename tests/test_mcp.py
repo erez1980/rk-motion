@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from hebrew_chapters import mcp_server as m  # noqa: E402
+from sofit import mcp_server as m  # noqa: E402
 
 
 def test_generate_kit_errors_when_not_transcribed(tmp_path):
@@ -52,7 +52,7 @@ def _clips_doc(tmp_path):
 
 
 def _stub_render(monkeypatch):
-    import hebrew_chapters.render as r
+    import sofit.render as r
     calls = {}
     monkeypatch.setattr(r, "render_clips",
                         lambda v, clips, out, aspect="9:16", **k:
@@ -84,7 +84,7 @@ def test_correct_clip_scoped_to_one(monkeypatch, tmp_path):
 
 
 def test_correct_clip_not_found_no_render_no_write(monkeypatch, tmp_path):
-    import hebrew_chapters.render as r
+    import sofit.render as r
     p = _clips_doc(tmp_path)
     orig = p.read_text(encoding="utf-8")
     flag = {"rendered": False}
@@ -97,7 +97,7 @@ def test_correct_clip_not_found_no_render_no_write(monkeypatch, tmp_path):
 
 
 def test_correct_clip_render_failure_keeps_file(monkeypatch, tmp_path):
-    import hebrew_chapters.render as r
+    import sofit.render as r
     p = _clips_doc(tmp_path)
     orig = p.read_text(encoding="utf-8")
 

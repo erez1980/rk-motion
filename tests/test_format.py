@@ -3,14 +3,14 @@
 
 import json
 
-from hebrew_chapters.format import (
+from sofit.format import (
     LRM,
     fmt_timestamp,
     render_chapters_md,
     render_chapters_podcast_json,
     render_chapters_youtube,
 )
-from hebrew_chapters.generate import Chapter
+from sofit.generate import Chapter
 
 
 def test_fmt_timestamp():

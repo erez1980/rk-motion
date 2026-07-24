@@ -7,7 +7,7 @@ Covers the two things most likely to break silently:
 
 import pytest
 
-from hebrew_chapters.render import (
+from sofit.render import (
     _bidi_word_order,
     _build_crop_vf,
     _prep_logo,
@@ -206,9 +206,9 @@ def test_prep_logo_trims_transparent_margins(tmp_path):
 
 
 def test_render_clips_logo_env_default(monkeypatch, tmp_path):
-    # HEBREW_CHAPTERS_LOGO applies a logo without passing --logo/logo=.
-    import hebrew_chapters.render as r
-    monkeypatch.setenv("HEBREW_CHAPTERS_LOGO", "/tmp/mylogo.png")
+    # SOFIT_LOGO applies a logo without passing --logo/logo=.
+    import sofit.render as r
+    monkeypatch.setenv("SOFIT_LOGO", "/tmp/mylogo.png")
     captured = {}
     monkeypatch.setattr(r, "_prep_logo", lambda p, d: captured.setdefault("logo", p))
     monkeypatch.setattr(r, "extract_clip", lambda **k: None)

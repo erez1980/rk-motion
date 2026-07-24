@@ -1,4 +1,4 @@
-# hebrew-chapters
+# sofit
 
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
@@ -14,7 +14,7 @@ pennies per episode.
 ## Install
 
 ```bash
-pip install hebrew-chapters
+pip install sofit-cli
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
@@ -31,28 +31,28 @@ hit a decode error (`brew install ffmpeg` / `apt install ffmpeg`).
 
 ```bash
 # Chapters to stdout
-chapters episode.mp3
+sofit episode.mp3
 
 # From an RSS feed — processes the latest episode (item 1)
-chapters https://feeds.example.com/show.xml --shownotes --out latest
-chapters https://feeds.example.com/show.xml --episode 3      # a specific episode
-chapters --list-episodes https://feeds.example.com/show.xml  # see the feed first
-# From a YouTube URL (needs the youtube extra: pip install 'hebrew-chapters[youtube]')
-chapters https://www.youtube.com/watch?v=VIDEO_ID --shownotes --out episode
-# (a direct audio URL works too: chapters https://.../episode.mp3)
+sofit https://feeds.example.com/show.xml --shownotes --out latest
+sofit https://feeds.example.com/show.xml --episode 3      # a specific episode
+sofit --list-episodes https://feeds.example.com/show.xml  # see the feed first
+# From a YouTube URL (needs the youtube extra: pip install 'sofit-cli[youtube]')
+sofit https://www.youtube.com/watch?v=VIDEO_ID --shownotes --out episode
+# (a direct audio URL works too: sofit https://.../episode.mp3)
 
 # Video podcast + show notes + pull-quotes
-chapters episode.mp4 --shownotes --quotes
+sofit episode.mp4 --shownotes --quotes
 
 # YouTube: paste the .txt into your video description (0:00-first, no bidi marks)
-chapters episode.mp4 --format youtube --out episode
+sofit episode.mp4 --format youtube --out episode
 
 # Podcast apps via RSS: Podcasting 2.0 chapters JSON to host + reference in your feed
 #   <podcast:chapters url="…/episode.chapters.json" type="application/json+chapters" />
-chapters episode.mp4 --format podcast --out episode
+sofit episode.mp4 --format podcast --out episode
 
 # Podcast apps via the file (Apple Podcasts etc.): embed markers into the audio
-chapters episode.mp4 --embed-into episode.m4a   # writes episode.chapters.m4a
+sofit episode.mp4 --embed-into episode.m4a   # writes episode.chapters.m4a
 ```
 
 ### Making chapters show up everywhere
@@ -84,7 +84,7 @@ media ─▶ faster-whisper (local, cached) ─▶ transcript
                                               │
               ┌───────────────────────────────┼───────────────┐
               ▼                                ▼               ▼
-        Claude: chapters            Claude: show notes   Claude: quotes
+        Claude: sofit            Claude: show notes   Claude: quotes
 ```
 
 The transcript is cached (keyed by file hash + model + version), so re-runs and
@@ -100,7 +100,7 @@ An MCP server lets any MCP-capable client (Claude Desktop, Claude Code, Cursor�
 drive the tool in natural language.
 
 ```bash
-pip install "hebrew-chapters[mcp]"     # adds the MCP server
+pip install "sofit-cli[mcp]"     # adds the MCP server
 ```
 
 Because transcription takes tens of minutes, it's split across three tools so no
@@ -110,28 +110,28 @@ single call blocks: **`transcribe_episode(path)`** starts it in the background,
 once the transcript is cached.
 
 **Claude Desktop** — add to `claude_desktop_config.json` (use the absolute path to
-the `chapters-mcp` binary if it's in a venv):
+the `sofit-mcp` binary if it's in a venv):
 
 ```json
 {
   "mcpServers": {
-    "hebrew-chapters": {
-      "command": "/path/to/.venv/bin/chapters-mcp",
+    "sofit": {
+      "command": "/path/to/.venv/bin/sofit-mcp",
       "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
     }
   }
 }
 ```
 
-**Claude Code** — `claude mcp add hebrew-chapters -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/chapters-mcp`
+**Claude Code** — `claude mcp add sofit -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/sofit-mcp`
 
 Then just ask: *"Transcribe ~/Downloads/ep.mp4"* → wait → *"Now give me Spotify
-chapters and Hebrew show notes for it."*
+sofit and Hebrew show notes for it."*
 
 ## Notes
 
 - Input: a local mp3/mp4 file, an RSS feed URL (add `--episode N`, default latest;
-  `--list-episodes` to inspect), a YouTube URL (needs `pip install 'hebrew-chapters[youtube]'`),
+  `--list-episodes` to inspect), a YouTube URL (needs `pip install 'sofit-cli[youtube]'`),
   or a direct audio URL — all cached after first fetch.
 - `--model` (default: ivrit-ai turbo), `--lang` (default `he`), `--max-chapters`,
   `--format {md,txt,youtube,spotify,podcast}`, `--embed-into AUDIO`,
@@ -143,14 +143,14 @@ chapters and Hebrew show notes for it."*
 Hebrew captions, written to `DIR`. Crop-to-fill (no letterbox); captions come from the
 per-word timings; RTL rendered correctly. Needs the render extra + ffmpeg:
 ```bash
-pip install 'hebrew-chapters[render]'
-chapters episode.mp4 --render-clips clips_out --aspect 9:16
+pip install 'sofit-cli[render]'
+sofit episode.mp4 --render-clips clips_out --aspect 9:16
 ```
 Also exposed as the MCP `render_clips` tool for the Claude-app interface. (Rendering
 logic is self-contained here — no dependency on any other tool.)
 
 **Framing.** By default the crop is centered. With the optional `crop` extra
-(`pip install 'hebrew-chapters[crop]'`, adds OpenCV) each clip is auto-cropped to
+(`pip install 'sofit-cli[crop]'`, adds OpenCV) each clip is auto-cropped to
 center on a detected face — so a speaker sitting off to one side is framed instead
 of the empty background beside them. When there's no clear face (a wide two-shot,
 backs of heads) it stays centered. To override, set a clip's `focus` to a value in
@@ -164,16 +164,16 @@ the captions, the bottom platform UI, and TikTok's right-side buttons); change w
 `--logo-pos {top-left,top-right,bottom-left,bottom-right}`. Also a `logo` param on the
 `render_clips` / `correct_clip` MCP tools.
 ```bash
-chapters episode.mp4 --render-clips out --logo weeklysync.png
+sofit episode.mp4 --render-clips out --logo weeklysync.png
 ```
 To brand every render without passing the flag, set it once:
-`export HEBREW_CHAPTERS_LOGO=/path/to/weeklysync.png` (an explicit `--logo` still wins).
+`export SOFIT_LOGO=/path/to/weeklysync.png` (an explicit `--logo` still wins).
 
 **Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
 *without re-transcribing* and re-render, keeping the karaoke timing aligned:
 
-1. Render once — the spec is saved automatically. `chapters episode.mp4 --render-clips out`
+1. Render once — the spec is saved automatically. `sofit episode.mp4 --render-clips out`
    drops `out/episode.clips.json` (named after the media, next to the `clip-N.mp4` files it
    just rendered) so the spec and its clips travel together. (Pass `--clips-json PATH` to
    choose your own path. Re-running `--render-clips` won't overwrite a spec you've corrected.)
@@ -181,7 +181,7 @@ word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Corr
    fixes every clip by default (recurring names appear in many) — pass `clip_id` to
    scope to one — and re-renders the affected clips. A multi-token find collapses to the
    replacement, merging the tokens' time span so the highlight stays in sync.
-3. Or render a corrected clips.json yourself: `chapters --render-from clips.json --render-clips out`
+3. Or render a corrected clips.json yourself: `sofit --render-from clips.json --render-clips out`
    (add `--only clip-3` for a single clip). This is the **only** render path that honors
    corrections — plain `--render-clips` regenerates from the transcript and will warn you
    if a clips.json is sitting nearby.
@@ -191,10 +191,10 @@ word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Corr
 Remotion app): each pull-quote becomes `{id, start, end, hook, focus, words}` where cut
 times (`start`/`end`) are absolute episode seconds and caption `words[].t` are relative
 to the clip start. The renderer crops to 9:16, burns Hebrew captions from `words`, and
-adds a hook/branding card. `hebrew-chapters` finds and times the moments; it does not
+adds a hook/branding card. `sofit` finds and times the moments; it does not
 render video.
 ```bash
-chapters episode.mp4 --clips-json clips.json
+sofit episode.mp4 --clips-json clips.json
 ```
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.

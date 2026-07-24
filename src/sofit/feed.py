@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 AUDIO_EXT = (".mp3", ".mp4", ".m4a", ".wav", ".aac", ".ogg", ".opus")
-_UA = {"User-Agent": "hebrew-chapters"}
+_UA = {"User-Agent": "sofit"}
 
 
 class FeedError(RuntimeError):
@@ -40,7 +40,7 @@ def is_youtube(url: str) -> bool:
 
 def _cache_dir() -> Path:
     base = os.environ.get("XDG_CACHE_HOME") or os.path.join(Path.home(), ".cache")
-    d = Path(base) / "hebrew-chapters" / "downloads"
+    d = Path(base) / "sofit" / "downloads"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -86,7 +86,7 @@ def download_youtube(url: str) -> str:
     try:
         import yt_dlp
     except ImportError as e:
-        raise FeedError("YouTube support needs yt-dlp — install: pip install 'hebrew-chapters[youtube]'") from e
+        raise FeedError("YouTube support needs yt-dlp — install: pip install 'sofit-cli[youtube]'") from e
 
     key = hashlib.sha256(url.encode()).hexdigest()[:32]
     d = _cache_dir()

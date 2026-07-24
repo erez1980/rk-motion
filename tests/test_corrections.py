@@ -2,7 +2,7 @@
 
 import pytest
 
-from hebrew_chapters.corrections import apply_correction, correct_clips
+from sofit.corrections import apply_correction, correct_clips
 
 
 def _w(t, d, w):
