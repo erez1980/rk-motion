@@ -1266,6 +1266,9 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
+    # Env-var default so a logo can be set once and applied to every render
+    # without passing --logo each time. An explicit logo always wins.
+    logo = logo or os.environ.get("HEBREW_CHAPTERS_LOGO") or None
     logo_dir = None
     logo_ready = None
     if logo:

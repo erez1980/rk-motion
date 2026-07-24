@@ -205,6 +205,18 @@ def test_prep_logo_trims_transparent_margins(tmp_path):
     assert trimmed.size == (40, 20)  # cropped to the opaque block
 
 
+def test_render_clips_logo_env_default(monkeypatch, tmp_path):
+    # HEBREW_CHAPTERS_LOGO applies a logo without passing --logo/logo=.
+    import hebrew_chapters.render as r
+    monkeypatch.setenv("HEBREW_CHAPTERS_LOGO", "/tmp/mylogo.png")
+    captured = {}
+    monkeypatch.setattr(r, "_prep_logo", lambda p, d: captured.setdefault("logo", p))
+    monkeypatch.setattr(r, "extract_clip", lambda **k: None)
+    r.render_clips("v.mp4", [{"id": "clip-1", "focus": 0.5, "start": 0, "end": 1, "words": []}],
+                   str(tmp_path), subtitles=False)
+    assert captured["logo"] == "/tmp/mylogo.png"
+
+
 # --- SRT timing ----------------------------------------------------------
 
 def test_srt_time_format():

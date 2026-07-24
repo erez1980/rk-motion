@@ -166,6 +166,8 @@ the captions, the bottom platform UI, and TikTok's right-side buttons); change w
 ```bash
 chapters episode.mp4 --render-clips out --logo weeklysync.png
 ```
+To brand every render without passing the flag, set it once:
+`export HEBREW_CHAPTERS_LOGO=/path/to/weeklysync.png` (an explicit `--logo` still wins).
 
 **Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
