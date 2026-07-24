@@ -94,6 +94,28 @@ prompt tweaks skip re-transcribing.
 > transcription is roughly real-time; use a smaller `--model` (e.g. `base`) or a GPU
 > to go faster. Pass any faster-whisper size name or HF ct2 repo id to `--model`.
 
+## Drive it in natural language (Claude Code skills)
+
+Ready-made [Claude Code](https://claude.com/claude-code) skills run sofit from any directory —
+one per service, plus a `sofit` router that walks the full pipeline. Install by copying the
+folders into `~/.claude/skills/`, then invoke by name (e.g. `/sofit-clips`):
+
+```bash
+cp -R skills/sofit* ~/.claude/skills/
+```
+
+| Skill | Does |
+|---|---|
+| `/sofit` | full pipeline + router to the sub-skills below |
+| `/sofit-transcribe` | local faster-whisper transcription (cached, one-time) |
+| `/sofit-kit` | chapters + Hebrew show notes + pull-quotes for descriptions |
+| `/sofit-clips` | suggest → pick → render captioned 9:16 social clips |
+| `/sofit-captions` | fix caption typos, timing-preserving, then re-render |
+| `/sofit-trim` | cut a moment out of a finished clip |
+
+The skills live in [`skills/`](skills/); each `SKILL.md` has a `Home` block with paths to
+personalize for your machine. See [`skills/README.md`](skills/README.md) for details.
+
 ## Run it from an AI app (MCP)
 
 An MCP server lets any MCP-capable client (Claude Desktop, Claude Code, Cursor…)
@@ -124,11 +146,6 @@ the `sofit-mcp` binary if it's in a venv):
 ```
 
 **Claude Code** — `claude mcp add sofit -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/sofit-mcp`
-
-Prefer natural-language skills over raw MCP tools? Ready-made Claude Code skills live in
-[`skills/`](skills/) — one per service (`sofit-transcribe`, `sofit-kit`, `sofit-clips`,
-`sofit-captions`, `sofit-trim`) plus a `sofit` router. Copy them into `~/.claude/skills/`
-and invoke by name, e.g. `/sofit-clips`.
 
 Then just ask: *"Transcribe ~/Downloads/ep.mp4"* → wait → *"Now give me Spotify
 sofit and Hebrew show notes for it."*
