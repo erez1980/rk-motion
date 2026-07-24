@@ -1085,6 +1085,8 @@ def extract_clip(
     font: str | None = None,
     crop_vf: str | None = None,
     caption_entries: list | None = None,
+    logo: str | None = None,
+    logo_pos: str = "top-left",
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
@@ -1144,13 +1146,25 @@ def extract_clip(
     else:
         temp_clip = output_path
 
-    cmd = [
-        "ffmpeg",
-        "-ss", str(padded_start),
-        "-i", str(source_video),
-        "-t", str(duration),
-        "-vf", vf,
-    ]
+    cmd = ["ffmpeg", "-ss", str(padded_start), "-i", str(source_video)]
+    if logo and os.path.exists(logo):
+        # Overlay a fixed logo AFTER the crop (so it doesn't pan with the face
+        # track) and before captions. Sized to a fraction of frame width, inset
+        # from the chosen corner; the logo PNG's aspect is preserved.
+        lw = round(tw * 0.22)
+        m = round(tw * 0.04)
+        pos = {
+            "top-left": f"{m}:{m}",
+            "top-right": f"W-w-{m}:{m}",
+            "bottom-left": f"{m}:H-h-{m}",
+            "bottom-right": f"W-w-{m}:H-h-{m}",
+        }.get(logo_pos, f"{m}:{m}")
+        fc = (f"[0:v]{vf}[base];[1:v]scale={lw}:-1[lg];"
+              f"[base][lg]overlay={pos}:format=auto[v]")
+        cmd += ["-loop", "1", "-i", str(logo), "-t", str(duration),
+                "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"]
+    else:
+        cmd += ["-t", str(duration), "-vf", vf]
     if af:
         cmd += ["-af", af]
     cmd += [
@@ -1220,15 +1234,43 @@ def _clip_transcript(clip: dict) -> dict:
     }
 
 
+def _prep_logo(logo_path: str, work_dir: str) -> str | None:
+    """Trim a logo PNG to its opaque bounding box (the source often has big
+    transparent margins) so it sits tight in the corner. Returns the trimmed
+    path, or None if it can't be read."""
+    try:
+        from PIL import Image
+    except Exception:
+        return logo_path  # no Pillow: use as-is, ffmpeg still overlays it
+    try:
+        im = Image.open(logo_path).convert("RGBA")
+    except Exception:
+        return None
+    bbox = im.getchannel("A").getbbox()  # bounds of non-transparent pixels
+    if bbox:
+        im = im.crop(bbox)
+    out = Path(work_dir) / "_logo_trimmed.png"
+    im.save(out)
+    return str(out)
+
+
 def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  aspect: str = "9:16", subtitles: bool = True,
-                 speed: float = 1.0, font: str | None = None) -> list[str]:
+                 speed: float = 1.0, font: str | None = None,
+                 logo: str | None = None, logo_pos: str = "top-left") -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
-    burned Hebrew captions from the clip's word timings. Returns the list of
-    output paths."""
+    burned Hebrew captions from the clip's word timings. If `logo` is given, it's
+    trimmed once and overlaid in the `logo_pos` corner of every clip. Returns the
+    list of output paths."""
     source = Path(video_path)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+
+    logo_dir = None
+    logo_ready = None
+    if logo:
+        logo_dir = tempfile.mkdtemp(prefix="hc_logo_")
+        logo_ready = _prep_logo(logo, logo_dir)
 
     tw, th = _target_resolution(aspect)
     outputs: list[str] = []
@@ -1276,7 +1318,11 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
             speed=speed,
             pad_seconds=0.0,
             font=font,
+            logo=logo_ready,
+            logo_pos=logo_pos,
         )
         outputs.append(str(output_path))
 
+    if logo_dir:
+        shutil.rmtree(logo_dir, ignore_errors=True)
     return outputs

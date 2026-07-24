@@ -85,6 +85,7 @@ def _stub_pipeline(monkeypatch, clips):
     monkeypatch.setattr(r, "render_clips",
                         lambda v, c, out, aspect="9:16", **k:
                         (rendered.__setitem__("clips", c)
+                         or rendered.update(k)
                          or [f"{out}/{x['id']}.mp4" for x in c]))
     return rendered
 
@@ -116,3 +117,16 @@ def test_render_clips_keeps_existing_corrected_spec(monkeypatch, tmp_path):
     rc = cli.main([str(media), "--render-clips", str(out)])
     assert rc == 0
     assert spec.read_text(encoding="utf-8") == '{"corrected":true}'  # NOT clobbered
+
+
+def test_logo_flag_passes_through_to_render(monkeypatch, tmp_path):
+    media = tmp_path / "WS203_EDIT.mp4"
+    media.write_bytes(b"x")
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"x")
+    rendered = _stub_pipeline(monkeypatch, [{"id": "clip-1", "words": []}])
+    rc = cli.main([str(media), "--render-clips", str(tmp_path / "o"),
+                   "--logo", str(logo), "--logo-pos", "top-right"])
+    assert rc == 0
+    assert rendered["logo"] == str(logo)
+    assert rendered["logo_pos"] == "top-right"

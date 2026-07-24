@@ -110,11 +110,13 @@ def generate_kit(
 
 
 @mcp.tool()
-def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "") -> dict:
+def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "",
+                 logo: str = "", logo_pos: str = "top-left") -> dict:
     """Render each pull-quote of an already-transcribed episode to a vertical
-    (default 9:16) clip with burned Hebrew captions, written to out_dir. Requires
-    the transcript cached (call transcribe_episode first), the [render] extra
-    installed, and ffmpeg. Returns the output file paths."""
+    (default 9:16) clip with burned Hebrew captions, written to out_dir. Pass
+    `logo` (a transparent PNG path) to overlay it in the `logo_pos` corner of
+    every clip. Requires the transcript cached (call transcribe_episode first),
+    the [render] extra installed, and ffmpeg. Returns the output file paths."""
     segs = transcribe.cached_segments(path, model or transcribe.DEFAULT_MODEL)
     if segs is None:
         return {"error": "not transcribed yet — call transcribe_episode(path) first"}
@@ -123,7 +125,8 @@ def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "")
     except ImportError:
         return {"error": "install the render extra: pip install 'hebrew-chapters[render]'"}
     clips = generate.make_clips(segs, titler="api")
-    outs = render.render_clips(path, clips, out_dir, aspect=aspect)
+    outs = render.render_clips(path, clips, out_dir, aspect=aspect,
+                               logo=logo or None, logo_pos=logo_pos)
     result = {"clips": len(outs), "files": outs}
     # This path regenerates clips from the transcript, so it ignores any caption
     # corrections saved in a clips.json. Flag it so the fix isn't silently lost.
@@ -137,7 +140,8 @@ def render_clips(path: str, out_dir: str, aspect: str = "9:16", model: str = "")
 
 @mcp.tool()
 def correct_clip(clips_json: str, find: str, replace: str,
-                 clip_id: str = "", aspect: str = "9:16", out_dir: str = "") -> dict:
+                 clip_id: str = "", aspect: str = "9:16", out_dir: str = "",
+                 logo: str = "", logo_pos: str = "top-left") -> dict:
     """Fix a caption typo in a saved clips.json and re-render the affected clip(s),
     preserving per-word karaoke timing (a multi-token find like the three tokens
     'OpenAI' transcribes into collapses to one, merging their time span).
@@ -186,7 +190,8 @@ def correct_clip(clips_json: str, find: str, replace: str,
     to_render = [c for c in clips if c.get("id") in set(affected)]
     # Render FIRST — if it fails, the on-disk clips.json is never touched.
     try:
-        outs = render.render_clips(video, to_render, out, aspect=aspect)
+        outs = render.render_clips(video, to_render, out, aspect=aspect,
+                                   logo=logo or None, logo_pos=logo_pos)
     except Exception as e:  # noqa: BLE001 - surface render failure, keep file intact
         return {"error": f"render failed, clips.json unchanged: {e}"}
 

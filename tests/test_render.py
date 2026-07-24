@@ -5,9 +5,12 @@ Covers the two things most likely to break silently:
   * clip-relative word timings convert to correct SRT times
 """
 
+import pytest
+
 from hebrew_chapters.render import (
     _bidi_word_order,
     _build_crop_vf,
+    _prep_logo,
     _caption_entries,
     _clip_transcript,
     _crop_position_for_face,
@@ -183,6 +186,23 @@ def test_caption_entries_keep_word_timings():
     assert [w["text"] for w in words] == ["שלום", "עולם", "טוב."]
     # times are clip-relative (first word at ~0), so highlighting lines up with t.
     assert abs(words[0]["start"]) < 0.01
+
+
+# --- logo prep -----------------------------------------------------------
+
+def test_prep_logo_trims_transparent_margins(tmp_path):
+    PIL = pytest.importorskip("PIL")
+    from PIL import Image
+    # 200x200 fully transparent with a 40x20 opaque block at (30,50)
+    im = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+    for x in range(30, 70):
+        for y in range(50, 70):
+            im.putpixel((x, y), (255, 0, 0, 255))
+    src = tmp_path / "logo.png"
+    im.save(src)
+    out = _prep_logo(str(src), str(tmp_path))
+    trimmed = Image.open(out)
+    assert trimmed.size == (40, 20)  # cropped to the opaque block
 
 
 # --- SRT timing ----------------------------------------------------------

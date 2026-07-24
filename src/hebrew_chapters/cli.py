@@ -69,6 +69,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--only", metavar="ID",
                    help="with --render-from, render just one clip by id (e.g. clip-3)")
     p.add_argument("--aspect", default="9:16", help="aspect ratio for --render-clips (default 9:16)")
+    p.add_argument("--logo", metavar="PATH",
+                   help="overlay a logo (PNG, transparent) on every rendered clip")
+    p.add_argument("--logo-pos", default="top-left",
+                   choices=["top-left", "top-right", "bottom-left", "bottom-right"],
+                   help="logo corner (default top-left)")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
     p.add_argument("--version", action="version", version=f"hebrew-chapters {__version__}")
@@ -85,7 +90,8 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
         print(f"\n# {kind}\n{body}")
 
 
-def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None) -> int:
+def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None,
+                 logo: str | None = None, logo_pos: str = "top-left") -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -119,7 +125,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
 
     out = out_dir or os.path.dirname(os.path.abspath(clips_path)) or "."
     from . import render
-    outs = render.render_clips(video, clips, out, aspect=aspect)
+    outs = render.render_clips(video, clips, out, aspect=aspect, logo=logo, logo_pos=logo_pos)
     print(f"rendered {len(outs)} clip(s) to {out}", file=sys.stderr)
     return 0
 
@@ -132,7 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     # Render from an existing clips.json and exit — no key or transcription
     # needed. This is the ONLY render path that honors caption corrections.
     if args.render_from:
-        return _render_from(args.render_from, args.render_clips, args.aspect, args.only)
+        return _render_from(args.render_from, args.render_clips, args.aspect, args.only,
+                            logo=args.logo, logo_pos=args.logo_pos)
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
@@ -276,7 +283,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.render_clips:
                 try:
                     from . import render
-                    outs = render.render_clips(media_path, clips, args.render_clips, aspect=args.aspect)
+                    outs = render.render_clips(media_path, clips, args.render_clips,
+                                               aspect=args.aspect, logo=args.logo, logo_pos=args.logo_pos)
                     print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
                 except ImportError:
                     print("error: --render-clips needs the render extra: pip install 'hebrew-chapters[render]'", file=sys.stderr)

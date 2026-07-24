@@ -156,6 +156,17 @@ of the empty background beside them. When there's no clear face (a wide two-shot
 backs of heads) it stays centered. To override, set a clip's `focus` to a value in
 `[0,1]` (`0`=left, `0.5`=center, `1`=right) in the clips JSON.
 
+**Logo / watermark.** `--logo PATH` overlays a logo (a transparent PNG) on every
+rendered clip, fixed in a corner (it doesn't pan with the face tracking). It's trimmed
+to its opaque bounds and sized to the frame, so a source PNG with big transparent margins
+still sits tight. Default corner is top-left (the safest spot on 9:16 — clear of the face,
+the captions, the bottom platform UI, and TikTok's right-side buttons); change with
+`--logo-pos {top-left,top-right,bottom-left,bottom-right}`. Also a `logo` param on the
+`render_clips` / `correct_clip` MCP tools.
+```bash
+chapters episode.mp4 --render-clips out --logo weeklysync.png
+```
+
 **Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
 *without re-transcribing* and re-render, keeping the karaoke timing aligned:
