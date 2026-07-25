@@ -783,6 +783,45 @@ def _overlay_pillow_frames(video_path: Path, output_path: Path, width: int,
     return output_path
 
 
+def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
+    """Wrap the hook card, shrinking the font until it fits 2 lines.
+
+    Returns (pil_font, space_width, lines, size) where lines is a list of lists of
+    {"text": tok}.
+
+    Real hooks are whole sentences (7-11 words). At the headline size those wrap to
+    3-4 lines and blanket the speaker's face — seen on the first WS203 batch. Two
+    lines keeps the frame readable; a very long hook bottoms out at the floor size
+    and is allowed to take a third line rather than shrinking into illegibility.
+    """
+    from PIL import Image, ImageDraw
+
+    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    toks = hook.split()[:12]  # cap length so it never walls off the frame
+    size = max(34, height // 16)
+    floor = max(22, height // 28)
+    while True:
+        f = _load_caption_font(size, font)
+        space_w = measure.textlength(" ", font=f)
+        lines: list[list[dict]] = []
+        cur: list[dict] = []
+        cur_w = 0.0
+        for tok in toks:
+            ww = measure.textlength(tok, font=f)
+            add = ww + (space_w if cur else 0)
+            if cur and cur_w + add > max_w:
+                lines.append(cur)
+                cur, cur_w = [{"text": tok}], ww
+            else:
+                cur.append({"text": tok})
+                cur_w += add
+        if cur:
+            lines.append(cur)
+        if len(lines) <= 2 or size <= floor:
+            return f, space_w, lines, size
+        size -= 2
+
+
 def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Path,
                           width: int, height: int, font: str | None = None,
                           speed: float = 1.0, hook: str | None = None,
@@ -850,25 +889,10 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     space_w_hook = 0.0
     top_margin = int(height * 0.16)
     if hook and hook.strip():
-        hook_font_size = max(34, height // 16)  # larger than captions (height // 22)
-        hook_font = _load_caption_font(hook_font_size, font)
-        hook_outline = max(4, hook_font_size // 7)
-        hook_line_h = int(hook_font_size * 1.3)
-        space_w_hook = measure.textlength(" ", font=hook_font)
-        cur: list[dict] = []
-        cur_w = 0.0
-        for tok in hook.split()[:12]:  # cap length so it never walls off the frame
-            wd = {"text": tok}
-            ww = measure.textlength(tok, font=hook_font)
-            add = ww + (space_w_hook if cur else 0)
-            if cur and cur_w + add > max_w:
-                hook_lines.append(cur)
-                cur, cur_w = [wd], ww
-            else:
-                cur.append(wd)
-                cur_w += add
-        if cur:
-            hook_lines.append(cur)
+        hook_font, space_w_hook, hook_lines, hook_size = _fit_hook_card(
+            hook, height, max_w, font)
+        hook_outline = max(3, hook_size // 7)
+        hook_line_h = int(hook_size * 1.3)
 
     def hook_w(txt: str) -> float:
         return measure.textlength(txt, font=hook_font)

@@ -218,6 +218,23 @@ def test_render_clips_passes_hook_when_card_on(monkeypatch, tmp_path):
     assert captured[-1]["hook"] is None
 
 
+def test_hook_card_shrinks_to_two_lines():
+    # A whole-sentence hook must not blanket the speaker's face: the card shrinks
+    # until it fits 2 lines. (The first WS203 batch rendered 4-line cards over the
+    # face — this is that regression.)
+    pytest.importorskip("PIL")
+    from sofit.render import _fit_hook_card
+    long_hook = "Lovable שווה 8 מיליארד. Wix שווה 2. איך זה הגיוני?"
+    _, _, lines, size = _fit_hook_card(long_hook, 1920, int(1080 * 0.90))
+    assert len(lines) <= 2
+    assert size < max(34, 1920 // 16)  # shrank from the headline size
+
+    # A short hook keeps the full headline size.
+    _, _, short_lines, short_size = _fit_hook_card("למה כולם טועים?", 1920, int(1080 * 0.90))
+    assert len(short_lines) == 1
+    assert short_size == max(34, 1920 // 16)
+
+
 def test_render_clips_hook_variant_picks_alt_and_suffixes_output(monkeypatch, tmp_path):
     # hook_variant=N uses hook_variants[N-1] and writes <id>.hookN.mp4, so A/B
     # renders of the same clip don't overwrite each other.
