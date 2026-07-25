@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -1316,13 +1317,17 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  aspect: str = "9:16", subtitles: bool = True,
                  speed: float = 1.0, font: str | None = None,
                  logo: str | None = None, logo_pos: str = "top-left",
-                 hook_card: bool = True) -> list[str]:
+                 hook_card: bool = True, hook_variant: int = 0) -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
     burned Hebrew captions from the clip's word timings. If `logo` is given, it's
     trimmed once and overlaid in the `logo_pos` corner of every clip. When
     `hook_card` is set, each clip's `hook` is burned large in the upper third for
-    the opening ~1.8s (a caption-first hook for muted viewers). Returns the list of
-    output paths."""
+    the opening ~1.8s (a caption-first hook for muted viewers).
+
+    `hook_variant` picks which hook line the card uses: 0 = the primary `hook`
+    (default), N>0 = `hook_variants[N-1]` from the clip spec, written to
+    `<id>.hookN.mp4` so A/B renders of the same clip don't overwrite each other.
+    Returns the list of output paths."""
     source = Path(video_path)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -1342,7 +1347,21 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
         clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
         start = float(clip["start"])
         end = float(clip["end"])
-        output_path = out / f"{clip_id}.mp4"
+
+        # Hook line for the card: primary, or an alternate for A/B testing. An
+        # out-of-range variant falls back to the primary rather than rendering
+        # a silently card-less clip.
+        hook_text = clip.get("hook")
+        suffix = ""
+        if hook_variant > 0:
+            alts = clip.get("hook_variants") or []
+            if hook_variant <= len(alts):
+                hook_text = alts[hook_variant - 1]
+                suffix = f".hook{hook_variant}"
+            else:
+                print(f"warning: {clip_id} has no hook variant {hook_variant}; "
+                      "using the primary hook", file=sys.stderr)
+        output_path = out / f"{clip_id}{suffix}.mp4"
 
         # Word-level caption entries (kept for the highlight burn-in).
         caption_entries = None
@@ -1384,7 +1403,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
             font=font,
             logo=logo_ready,
             logo_pos=logo_pos,
-            hook=(clip.get("hook") if hook_card else None),
+            hook=(hook_text if hook_card else None),
         )
         outputs.append(str(output_path))
 

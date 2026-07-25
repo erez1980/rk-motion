@@ -29,9 +29,11 @@ POOL_SYSTEM = (
     "DISTINCT moments across the whole episode. Each clip MUST: (1) OPEN with a hook "
     "in its first sentence — a question, a bold/contrarian claim, a surprising fact, "
     "or a strong emotional moment; (2) be a COMPLETE, self-contained thought with a "
-    "payoff; (3) run about 20-60s. Return ONLY a JSON array "
+    "payoff; (3) run about 20-45s. Return ONLY a JSON array "
     '[{{"title":str,"hook_type":str,"score":int,"reason":str,"quote_start":str,'
-    '"quote_end":str}}]. title = a punchy Hebrew hook line; hook_type = one of '
+    '"quote_end":str,"hook_variants":[str,str]}}]. title = a punchy Hebrew hook line; '
+    "hook_variants = exactly 2 ALTERNATE Hebrew hook lines for the same moment, each a "
+    "DIFFERENT angle from title (for A/B testing which opener holds viewers); hook_type = one of "
     "question|bold_claim|surprise|emotion|story; score = 1-10 opening strength; "
     "reason = one short English line on why it would perform; quote_start = first ~4 "
     "words of the hook (verbatim); quote_end = last ~4 words of the payoff (verbatim). "
@@ -69,16 +71,22 @@ def cmd_pool(video, out, n, titler):
                 continue
             es = gen._locate(it.get("quote_end", ""), segs, ss.index) or ss
             st = ss.words[0].start if ss.words else ss.start
+            hooked = gen._hook_word_start(ss, it.get("quote_start", ""))
+            if hooked is not None and hooked > st:
+                st = hooked  # open ON the hook, not the filler before it
             en = es.words[-1].end if es.words else es.end
             en = min(en, audio_end)
             if en - st < 18:
                 continue
-            if en - st > 90:
-                en = st + 90
+            if en - st > 45:
+                en = st + 45
             out_rows.append({
                 "start": round(st, 3), "end": round(en, 3), "score": sc,
                 "hook": it["title"].strip(), "type": it.get("hook_type", ""),
                 "reason": (it.get("reason") or "").strip(),
+                "hook_variants": [v.strip() for v in (it.get("hook_variants") or [])
+                                  if isinstance(v, str) and v.strip()
+                                  and v.strip() != it["title"].strip()][:2],
             })
         if not out_rows:
             raise gen.GenerationError("no candidates met the bar")
@@ -113,7 +121,8 @@ def cmd_build(video, pool_path, pick, out):
         c = cands[n - 1]  # 1-based, matches the pool table
         clips.append({
             "id": f"clip-{n}", "start": c["start"], "end": c["end"],
-            "hook": c["hook"], "focus": None,
+            "hook": c["hook"], "hook_variants": c.get("hook_variants") or [],
+            "focus": None,
             "words": gen._clip_words(segs, c["start"], c["end"]),
         })
     out = out or os.path.splitext(video)[0] + ".clips.json"

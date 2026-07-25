@@ -197,6 +197,16 @@ frame itself stops the scroll, not a spoken line. It's on by default (the hook t
 from the clip spec, so editing `hook` in the clips.json and re-rendering changes the card);
 turn it off with `--no-hook-card`, or the `hook_card` param on the MCP render tools.
 
+**A/B-testing hooks.** Each clip also carries `hook_variants` — 2 alternate opener lines
+taking a different angle from the primary (if the hook is a question, an alternate might be
+a bold claim or a surprising number). Render one with `--hook-variant N` (1-based; `0` is the
+primary). Variant renders are written to `<id>.hookN.mp4` so they sit alongside the original
+instead of overwriting it — post them and let the retention curve pick the winner.
+```bash
+sofit --render-from clips.json --render-clips out --only clip-3                   # primary hook
+sofit --render-from clips.json --render-clips out --only clip-3 --hook-variant 1  # -> clip-3.hook1.mp4
+```
+
 **Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
 *without re-transcribing* and re-render, keeping the karaoke timing aligned:

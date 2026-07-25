@@ -218,6 +218,37 @@ def test_render_clips_passes_hook_when_card_on(monkeypatch, tmp_path):
     assert captured[-1]["hook"] is None
 
 
+def test_render_clips_hook_variant_picks_alt_and_suffixes_output(monkeypatch, tmp_path):
+    # hook_variant=N uses hook_variants[N-1] and writes <id>.hookN.mp4, so A/B
+    # renders of the same clip don't overwrite each other.
+    import sofit.render as r
+    captured = []
+    monkeypatch.setattr(r, "extract_clip", lambda **k: captured.append(k))
+    clip = {"id": "clip-1", "hook": "ראשי", "hook_variants": ["חלופה א", "חלופה ב"],
+            "focus": 0.5, "start": 0, "end": 1, "words": []}
+
+    outs = r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False, hook_variant=2)
+    assert captured[-1]["hook"] == "חלופה ב"
+    assert outs[0].endswith("clip-1.hook2.mp4")
+
+    outs = r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False)  # primary
+    assert captured[-1]["hook"] == "ראשי"
+    assert outs[0].endswith("clip-1.mp4")
+
+
+def test_render_clips_out_of_range_variant_falls_back_to_primary(monkeypatch, tmp_path):
+    # Asking for a variant the clip doesn't have must render the primary hook,
+    # not a silently card-less clip.
+    import sofit.render as r
+    captured = []
+    monkeypatch.setattr(r, "extract_clip", lambda **k: captured.append(k))
+    clip = {"id": "clip-1", "hook": "ראשי", "hook_variants": [],
+            "focus": 0.5, "start": 0, "end": 1, "words": []}
+    outs = r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False, hook_variant=3)
+    assert captured[-1]["hook"] == "ראשי"
+    assert outs[0].endswith("clip-1.mp4")  # no bogus .hook3 suffix
+
+
 def test_render_clips_logo_env_default(monkeypatch, tmp_path):
     # SOFIT_LOGO applies a logo without passing --logo/logo=.
     import sofit.render as r

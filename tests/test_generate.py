@@ -145,6 +145,25 @@ def test_make_quotes_drops_weak_and_short(monkeypatch):
     assert quotes[0].text == "טוב"
 
 
+def test_make_quotes_keeps_hook_variants(monkeypatch):
+    # Alternates are captured, capped at 2, and the primary is never duplicated
+    # into the variant list (nor are blanks).
+    _stub_claude(monkeypatch, [
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור",
+         "hook_variants": ["גרסה א", "  ", "טוב", "גרסה ב", "גרסה ג"]},
+    ])
+    q = gen.make_quotes(SEGMENTS)[0]
+    assert q.variants == ("גרסה א", "גרסה ב")
+
+
+def test_make_quotes_variants_default_empty(monkeypatch):
+    # A model that omits hook_variants must not break selection.
+    _stub_claude(monkeypatch, [
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+    ])
+    assert gen.make_quotes(SEGMENTS)[0].variants == ()
+
+
 def _wseg(i, start, tokens, step=0.5):
     """Segment with one Word per token (the real transcript shape)."""
     words = [Word(start + n * step, start + n * step + 0.4, t) for n, t in enumerate(tokens)]

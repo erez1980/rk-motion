@@ -54,12 +54,24 @@ median **1.12s** of filler avoided, p90 1.9s, max 5.6s. Verified captions stay i
 `_clip_words` re-bases at the snapped word (`t = 0.0`).
 - `generate.py` (`_hook_word_start`, `make_quotes`)
 
+### 6. Hook variants (A/B the opener) ✅
+Selection now also returns 2 ALTERNATE hook lines per clip, each deliberately a different
+angle from the primary (question vs bold claim vs surprising number), stored as
+`hook_variants` in the spec. `--hook-variant N` (1-based; 0 = primary) renders with an
+alternate and writes `<id>.hookN.mp4`, so A/B renders sit side by side instead of
+overwriting. Out-of-range variants warn and fall back to the primary. This closes the
+research's core improvement loop: same moment, different openers, let the retention curve
+decide.
+- `generate.py` (`Quote.variants`, `make_quotes`, `make_clips`), `render.py`, `cli.py`,
+  `mcp_server.py`, `skills/sofit/clips.py`
+
+All six roadmap items from the 2026-07-25 research pass are shipped.
+
 ## Proposed (next)
 
-### 6. Hook variants
-Generate 2-3 alternative hook lines per clip so a creator can A/B them against the
-platform's retention curve (the research's core improvement loop). Would need a
-`hook_variants` field in the spec plus a render flag to pick one.
+Nothing queued. The natural next input is real performance data: once clips with different
+hooks have run on TikTok/Reels/Shorts, feed the retention numbers back in and let the
+scorer learn from what actually held viewers, rather than from research priors.
 
 ## Explicitly NOT doing
 - Flashy transitions / VFX / animated backgrounds. Multiple senior editors flag these

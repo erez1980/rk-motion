@@ -35,6 +35,9 @@ class Quote:
     start: float
     end: float
     text: str
+    # Alternate hook lines for the same moment, to A/B against the retention
+    # curve. `text` stays the primary. Tuple so the default is safely immutable.
+    variants: tuple[str, ...] = ()
 
 
 class GenerationError(RuntimeError):
@@ -231,7 +234,11 @@ def make_quotes(
         "closes that gap, not a fragment; (3) run about 20-45 seconds. Return ONLY a "
         "JSON array: "
         '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
-        '"quote_end": str}]. title = a punchy Hebrew hook line for the clip. hook_type '
+        '"quote_end": str, "hook_variants": [str, str]}]. title = a punchy Hebrew hook '
+        "line for the clip. hook_variants = exactly 2 ALTERNATE Hebrew hook lines for "
+        "the same moment, each taking a DIFFERENT angle from title (e.g. if title is a "
+        "question, make one a bold claim and one a surprising number/fact) — they are "
+        "for A/B testing which opener holds viewers. hook_type "
         "= one of question|bold_claim|surprise|emotion|story. score = 1-10 for how "
         "strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
         "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM. "
@@ -266,7 +273,14 @@ def make_quotes(
                 continue  # too short for a hook + payoff — drop (bug: tiny clips)
             if end - start > max_sec:
                 end = start + max_sec  # clamp runaway clips
-            quotes.append(Quote(start=start, end=end, text=item["title"].strip()))
+            title = item["title"].strip()
+            # Alternate hooks are optional and model-supplied: keep only non-empty
+            # strings that differ from the primary, cap at 2.
+            variants = tuple(
+                v.strip() for v in (item.get("hook_variants") or [])
+                if isinstance(v, str) and v.strip() and v.strip() != title
+            )[:2]
+            quotes.append(Quote(start=start, end=end, text=title, variants=variants))
         if not quotes:
             raise GenerationError("no clips met the hook-strength / length bar")
         return quotes
@@ -311,6 +325,7 @@ def make_clips(segments: list[Segment], titler: str = "api") -> list[dict]:
             "start": round(q.start, 3),
             "end": round(q.end, 3),
             "hook": q.text,
+            "hook_variants": list(q.variants),
             "focus": None,
             "words": _clip_words(segments, q.start, q.end),
         })

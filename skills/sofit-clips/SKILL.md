@@ -39,6 +39,8 @@ Present the table; ask which numbers to render. Build the spec from the picks:
 - Each clip opens with its `hook` burned large in the upper third for ~1.8s
   (caption-first hook for muted viewers, since most scroll on mute). Off with
   `--no-hook-card`; to change it, edit `hook` in the clips.json and re-render.
+- A/B the opener: each clip carries `hook_variants` (2 alternates). Render one with
+  `--hook-variant N` (1-based) — it writes `<id>.hookN.mp4` alongside the original.
 - This `--render-from` path is the ONLY one that honors caption fixes (`/sofit-captions`); plain `--render-clips` regenerates from the transcript.
 
 ## Gotchas (learned the hard way)
