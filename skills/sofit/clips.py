@@ -26,17 +26,10 @@ from sofit import generate as gen
 POOL_SYSTEM = (
     "You are picking a POOL of candidate short-form clips from a Hebrew podcast "
     "(Reels/TikTok/Shorts) for a human to choose from. Find the {n} strongest, most "
-    "DISTINCT moments across the whole episode. Each clip MUST: (1) OPEN with a hook "
-    "in its first sentence — a question, a bold/contrarian claim, a surprising fact, "
-    "or a strong emotional moment; (2) be a COMPLETE, self-contained thought with a "
-    "payoff; (3) run about 20-45s. Return ONLY a JSON array "
+    "DISTINCT moments across the whole episode. " + gen.CLIP_RULES + " Return ONLY a JSON array "
     '[{{"title":str,"hook_type":str,"score":int,"reason":str,"quote_start":str,'
-    '"quote_end":str,"hook_variants":[str,str]}}]. title = a punchy Hebrew hook line; '
-    "hook_variants = exactly 2 ALTERNATE Hebrew hook lines for the same moment, each a "
-    "DIFFERENT angle from title (for A/B testing which opener holds viewers); hook_type = one of "
-    "question|bold_claim|surprise|emotion|story; score = 1-10 opening strength; "
-    "reason = one short English line on why it would perform; quote_start = first ~4 "
-    "words of the hook (verbatim); quote_end = last ~4 words of the payoff (verbatim). "
+    '"quote_end":str,"hook_variants":[str,str]}}]. ' + gen.CLIP_FIELDS +
+    " reason = one short English line on why it would perform. "
     "Cover different topics. Only include clips you would score 7 or higher."
 )
 
@@ -60,33 +53,17 @@ def cmd_pool(video, out, n, titler):
             raise gen.GenerationError("expected an array")
         out_rows = []
         for it in obj:
-            try:
-                sc = int(it.get("score", 0))
-            except (TypeError, ValueError):
-                sc = 0
-            if sc < 7:
+            # Score gate, hook snap, length bar and variant cleanup all live in
+            # resolve_clip_item — shared with make_quotes so they can't drift.
+            q = gen.resolve_clip_item(it, segs, audio_end)
+            if q is None:
                 continue
-            ss = gen._locate(it.get("quote_start", ""), segs, 0)
-            if ss is None:
-                continue
-            es = gen._locate(it.get("quote_end", ""), segs, ss.index) or ss
-            st = ss.words[0].start if ss.words else ss.start
-            hooked = gen._hook_word_start(ss, it.get("quote_start", ""))
-            if hooked is not None and hooked > st:
-                st = hooked  # open ON the hook, not the filler before it
-            en = es.words[-1].end if es.words else es.end
-            en = min(en, audio_end)
-            if en - st < 18:
-                continue
-            if en - st > 45:
-                en = st + 45
             out_rows.append({
-                "start": round(st, 3), "end": round(en, 3), "score": sc,
-                "hook": it["title"].strip(), "type": it.get("hook_type", ""),
+                "start": round(q.start, 3), "end": round(q.end, 3),
+                "score": int(it.get("score", 0)), "hook": q.text,
+                "type": it.get("hook_type", ""),
                 "reason": (it.get("reason") or "").strip(),
-                "hook_variants": [v.strip() for v in (it.get("hook_variants") or [])
-                                  if isinstance(v, str) and v.strip()
-                                  and v.strip() != it["title"].strip()][:2],
+                "hook_variants": list(q.variants),
             })
         if not out_rows:
             raise gen.GenerationError("no candidates met the bar")

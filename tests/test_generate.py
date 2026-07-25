@@ -145,6 +145,30 @@ def test_make_quotes_drops_weak_and_short(monkeypatch):
     assert quotes[0].text == "טוב"
 
 
+def test_resolve_clip_item_is_the_shared_contract():
+    # resolve_clip_item is the single selection path (make_quotes AND the skill's
+    # candidate pool call it), so pin its gates directly — they drifted once when
+    # the two were parallel copies.
+    segs = [
+        _wseg(0, 10.0, ["אז", "למה", "כולם", "טועים"]),
+        _wseg(1, 200.0, ["וזאת", "הסיבה"]),
+    ]
+    end_of_audio = segs[-1].end
+    item = {"title": "כותרת", "score": 9, "quote_start": "למה כולם טועים",
+            "quote_end": "וזאת הסיבה", "hook_variants": ["חלופה"]}
+
+    q = gen.resolve_clip_item(item, segs, end_of_audio)
+    assert q.start == pytest.approx(10.5)          # snapped past "אז"
+    assert q.end - q.start == pytest.approx(45.0)  # clamped to max_sec
+    assert q.variants == ("חלופה",)
+
+    assert gen.resolve_clip_item({**item, "score": 3}, segs, end_of_audio) is None   # weak
+    assert gen.resolve_clip_item({**item, "quote_end": "למה כולם"},               # too short
+                                 segs, end_of_audio) is None
+    assert gen.resolve_clip_item({**item, "quote_start": "לא קיים"},              # unlocatable
+                                 segs, end_of_audio) is None
+
+
 def test_make_quotes_keeps_hook_variants(monkeypatch):
     # Alternates are captured, capped at 2, and the primary is never duplicated
     # into the variant list (nor are blanks).

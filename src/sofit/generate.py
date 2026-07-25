@@ -24,6 +24,32 @@ from .transcribe import Segment
 CLAUDE_MODEL = "claude-sonnet-5"
 
 
+# What makes a good short-form clip, and what each JSON field means. Shared by the
+# one-shot selector (`make_quotes`) and the skill's candidate-pool generator so the
+# two prompts can't drift on the contract — they already did once, with the pool
+# asking for 20-60s clips while the code clamped them at 45.
+CLIP_RULES = (
+    "Each clip MUST: (1) OPEN with a hook in its VERY FIRST sentence — a question, a "
+    "bold or contrarian claim, a surprising fact, or a strong emotional moment — that "
+    "stops the scroll within ~3 seconds. The strongest hooks open a CURIOSITY GAP: "
+    "they raise a question in the viewer's mind that the clip has not yet answered, so "
+    "they must keep watching to close it. Score highest when the hook is the first "
+    "thing said, not buried after throat-clearing. (2) be a COMPLETE, self-contained "
+    "thought with a payoff that closes that gap, not a fragment; (3) run about 20-45 "
+    "seconds."
+)
+
+CLIP_FIELDS = (
+    "title = a punchy Hebrew hook line for the clip. hook_variants = exactly 2 "
+    "ALTERNATE Hebrew hook lines for the same moment, each taking a DIFFERENT angle "
+    "from title (e.g. if title is a question, make one a bold claim and one a "
+    "surprising number/fact) — they are for A/B testing which opener holds viewers. "
+    "hook_type = one of question|bold_claim|surprise|emotion|story. score = 1-10 for "
+    "how strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
+    "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM."
+)
+
+
 @dataclass
 class Chapter:
     start: float
@@ -158,6 +184,55 @@ def _hook_word_start(seg: Segment, quote: str) -> float | None:
     return seg.words[owner[pos]].start
 
 
+def resolve_clip_item(item: dict, segments: list[Segment], audio_end: float,
+                      min_sec: float = 18.0, max_sec: float = 45.0,
+                      min_score: int = 7) -> Quote | None:
+    """Turn one model-proposed clip into a timed `Quote`, or None if it misses the bar.
+
+    Takes `{title, score, quote_start, quote_end, hook_variants}` and applies, in
+    order: the hook-strength gate, quote->segment location, the hook-word snap (so
+    second zero is the hook, not the throat-clearing before it), the length gates,
+    and the variant cleanup.
+
+    Shared by `make_quotes` and the skill's candidate-pool generator. Those two
+    grew as parallel copies and silently drifted apart (the pool kept a 90s cap and
+    never got the hook snap), so the selection rules live here, once.
+    """
+    try:
+        score = int(item.get("score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    if score < min_score:
+        return None  # weak hook — drop
+
+    start_seg = _locate(item.get("quote_start", ""), segments, 0)
+    if start_seg is None:
+        return None  # can't place it; skip
+    end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index) or start_seg
+
+    start = start_seg.words[0].start if start_seg.words else start_seg.start
+    # Open ON the hook: skip any throat-clearing that precedes it in the same
+    # segment. Only ever moves forward, never into the previous sentence.
+    hooked = _hook_word_start(start_seg, item.get("quote_start", ""))
+    if hooked is not None and hooked > start:
+        start = hooked
+
+    end = min(end_seg.words[-1].end if end_seg.words else end_seg.end, audio_end)
+    if end - start < min_sec:
+        return None  # too short for a hook + payoff
+    if end - start > max_sec:
+        end = start + max_sec  # clamp runaway clips
+
+    title = (item.get("title") or "").strip()
+    # Alternate hooks are optional and model-supplied: keep only non-empty strings
+    # that differ from the primary, cap at 2.
+    variants = tuple(
+        v.strip() for v in (item.get("hook_variants") or [])
+        if isinstance(v, str) and v.strip() and v.strip() != title
+    )[:2]
+    return Quote(start=start, end=end, text=title, variants=variants)
+
+
 def make_chapters(segments: list[Segment], max_chapters: int = 12, titler: str = "api") -> list[Chapter]:
     if not segments:
         return []
@@ -224,63 +299,20 @@ def make_quotes(
     audio_end = segments[-1].end
     system = (
         "You select scroll-stopping short-form clips from a Hebrew podcast (for "
-        "Reels / TikTok / Shorts). Each clip MUST: (1) OPEN with a hook in its VERY "
-        "FIRST sentence — a question, a bold or contrarian claim, a surprising fact, "
-        "or a strong emotional moment — that stops the scroll within ~3 seconds. The "
-        "strongest hooks open a CURIOSITY GAP: they raise a question in the viewer's "
-        "mind that the clip has not yet answered, so they must keep watching to close "
-        "it. Score highest when the hook is the first thing said, not buried after "
-        "throat-clearing. (2) be a COMPLETE, self-contained thought with a payoff that "
-        "closes that gap, not a fragment; (3) run about 20-45 seconds. Return ONLY a "
-        "JSON array: "
+        "Reels / TikTok / Shorts). " + CLIP_RULES + " Return ONLY a JSON array: "
         '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
-        '"quote_end": str, "hook_variants": [str, str]}]. title = a punchy Hebrew hook '
-        "line for the clip. hook_variants = exactly 2 ALTERNATE Hebrew hook lines for "
-        "the same moment, each taking a DIFFERENT angle from title (e.g. if title is a "
-        "question, make one a bold claim and one a surprising number/fact) — they are "
-        "for A/B testing which opener holds viewers. hook_type "
-        "= one of question|bold_claim|surprise|emotion|story. score = 1-10 for how "
-        "strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
-        "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM. "
-        "Only include clips you would score 7 or higher."
+        '"quote_end": str, "hook_variants": [str, str]}]. ' + CLIP_FIELDS +
+        " Only include clips you would score 7 or higher."
     )
     user = f"Transcript segments:\n{_numbered(segments)}"
 
     def validate(obj):
         if not isinstance(obj, list):
             raise GenerationError("expected an array")
-        quotes: list[Quote] = []
-        for item in obj:
-            try:
-                score = int(item.get("score", 0))
-            except (TypeError, ValueError):
-                score = 0
-            if score < min_score:
-                continue  # weak hook — drop
-            start_seg = _locate(item.get("quote_start", ""), segments, 0)
-            if start_seg is None:
-                continue  # can't place it; skip
-            end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index) or start_seg
-            start = start_seg.words[0].start if start_seg.words else start_seg.start
-            # Open ON the hook: skip any throat-clearing that precedes it in the
-            # same segment, so second zero is the hook. Only ever moves forward.
-            hooked = _hook_word_start(start_seg, item.get("quote_start", ""))
-            if hooked is not None and hooked > start:
-                start = hooked
-            end = end_seg.words[-1].end if end_seg.words else end_seg.end
-            end = min(end, audio_end)
-            if end - start < min_sec:
-                continue  # too short for a hook + payoff — drop (bug: tiny clips)
-            if end - start > max_sec:
-                end = start + max_sec  # clamp runaway clips
-            title = item["title"].strip()
-            # Alternate hooks are optional and model-supplied: keep only non-empty
-            # strings that differ from the primary, cap at 2.
-            variants = tuple(
-                v.strip() for v in (item.get("hook_variants") or [])
-                if isinstance(v, str) and v.strip() and v.strip() != title
-            )[:2]
-            quotes.append(Quote(start=start, end=end, text=title, variants=variants))
+        quotes = [q for q in (
+            resolve_clip_item(item, segments, audio_end, min_sec, max_sec, min_score)
+            for item in obj
+        ) if q is not None]
         if not quotes:
             raise GenerationError("no clips met the hook-strength / length bar")
         return quotes

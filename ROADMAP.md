@@ -67,6 +67,17 @@ decide.
 
 All six roadmap items from the 2026-07-25 research pass are shipped.
 
+### Cleanup: one selection path, one prompt contract ✅
+Building the above exposed the reason the pool had drifted: `make_quotes` and the skill's
+candidate-pool generator were parallel copies of the same selection logic *and* the same
+prompt contract. Both are now single-sourced in `generate.py`:
+- `resolve_clip_item(item, segments, audio_end, ...) -> Quote | None` — the score gate,
+  quote→segment location, hook-word snap, length gates, and variant cleanup, in one place.
+  Returns the existing `Quote` type, so no new type was needed. Pool logic: 28 lines → 12.
+- `CLIP_RULES` / `CLIP_FIELDS` — the clip-quality contract and JSON field meanings, composed
+  into both prompts. This is the exact drift that let the pool ask for 20-60s clips while
+  the code clamped at 45.
+
 ## Proposed (next)
 
 Nothing queued. The natural next input is real performance data: once clips with different
