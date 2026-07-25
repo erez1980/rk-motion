@@ -91,6 +91,9 @@ Present the table; ask which numbers to render. Then build the spec from the pic
   corrections; `--render-clips` on the episode regenerates from the transcript.
 - Rendering is slow (per-frame Pillow caption pass, seconds+ per clip) — run in background.
 - Logo is set-once via `export SOFIT_LOGO="$LOGO"` (then `--logo` is optional).
+- Each clip opens with its `hook` burned large in the upper third for ~1.8s
+  (caption-first hook for muted viewers). Off with `--no-hook-card`; edit `hook`
+  in the clips.json and re-render to change it.
 
 ### 5. Fix a caption typo (conversational, timing-preserving)
 Edits word TEXT only, never the karaoke timing. Episode-wide by default (recurring names

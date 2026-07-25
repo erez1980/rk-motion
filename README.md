@@ -191,6 +191,12 @@ sofit episode.mp4 --render-clips out --logo weeklysync.png
 To brand every render without passing the flag, set it once:
 `export SOFIT_LOGO=/path/to/weeklysync.png` (an explicit `--logo` still wins).
 
+**Opening hook card.** Most short-form viewers scroll on mute, so each clip opens with
+its `hook` burned large and high-contrast in the upper third for the first ~1.8s — the
+frame itself stops the scroll, not a spoken line. It's on by default (the hook text comes
+from the clip spec, so editing `hook` in the clips.json and re-rendering changes the card);
+turn it off with `--no-hook-card`, or the `hook_card` param on the MCP render tools.
+
 **Fixing caption typos.** Transcription isn't perfect — it occasionally mangles a
 word or an English brand name (e.g. `OpenAI` → `אופן-איי-איי`). Correct captions
 *without re-transcribing* and re-render, keeping the karaoke timing aligned:
@@ -220,5 +226,10 @@ sofit episode.mp4 --clips-json clips.json
 ```
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.
+
+## Roadmap
+
+Planned work, grounded in what's currently working for short-form social video, is
+tracked in [ROADMAP.md](ROADMAP.md).
 
 MIT licensed.

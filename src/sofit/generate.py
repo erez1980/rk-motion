@@ -184,7 +184,7 @@ def make_quotes(
     segments: list[Segment],
     titler: str = "api",
     min_sec: float = 18.0,
-    max_sec: float = 90.0,
+    max_sec: float = 45.0,
     min_score: int = 7,
 ) -> list[Quote]:
     """Select scroll-stopping short-form clips. Each must open with a hook and be a
@@ -197,11 +197,15 @@ def make_quotes(
     audio_end = segments[-1].end
     system = (
         "You select scroll-stopping short-form clips from a Hebrew podcast (for "
-        "Reels / TikTok / Shorts). Each clip MUST: (1) OPEN with a hook in its first "
-        "sentence — a question, a bold or contrarian claim, a surprising fact, or a "
-        "strong emotional moment — that stops the scroll within ~3 seconds; (2) be a "
-        "COMPLETE, self-contained thought with a payoff, not a fragment; (3) run about "
-        "20-60 seconds. Return ONLY a JSON array: "
+        "Reels / TikTok / Shorts). Each clip MUST: (1) OPEN with a hook in its VERY "
+        "FIRST sentence — a question, a bold or contrarian claim, a surprising fact, "
+        "or a strong emotional moment — that stops the scroll within ~3 seconds. The "
+        "strongest hooks open a CURIOSITY GAP: they raise a question in the viewer's "
+        "mind that the clip has not yet answered, so they must keep watching to close "
+        "it. Score highest when the hook is the first thing said, not buried after "
+        "throat-clearing. (2) be a COMPLETE, self-contained thought with a payoff that "
+        "closes that gap, not a fragment; (3) run about 20-45 seconds. Return ONLY a "
+        "JSON array: "
         '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
         '"quote_end": str}]. title = a punchy Hebrew hook line for the clip. hook_type '
         "= one of question|bold_claim|surprise|emotion|story. score = 1-10 for how "

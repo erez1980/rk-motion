@@ -36,6 +36,9 @@ Present the table; ask which numbers to render. Build the spec from the picks:
 - Output `<out_dir>/clip-N.mp4` (ids match the pool numbers). Copy to ~/Downloads as `WS<episode>_clip-N.mp4`.
 - Per-frame Pillow caption pass ⇒ seconds+ per clip; run in background.
 - Set-once logo: `export SOFIT_LOGO="$LOGO"` (then `--logo` optional). `--logo-pos {top-left,top-right,bottom-left,bottom-right}`.
+- Each clip opens with its `hook` burned large in the upper third for ~1.8s
+  (caption-first hook for muted viewers, since most scroll on mute). Off with
+  `--no-hook-card`; to change it, edit `hook` in the clips.json and re-render.
 - This `--render-from` path is the ONLY one that honors caption fixes (`/sofit-captions`); plain `--render-clips` regenerates from the transcript.
 
 ## Gotchas (learned the hard way)

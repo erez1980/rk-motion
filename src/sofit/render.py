@@ -784,17 +784,22 @@ def _overlay_pillow_frames(video_path: Path, output_path: Path, width: int,
 
 def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Path,
                           width: int, height: int, font: str | None = None,
-                          speed: float = 1.0) -> Path:
+                          speed: float = 1.0, hook: str | None = None,
+                          hook_dur: float = 1.8) -> Path:
     """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
     third, thick outline, the word being spoken popped in an accent colour.
 
     Words are laid out right-to-left (each word drawn in its own box, so Hebrew
     reads in the correct order and mixed digits/Latin stay upright), which also
     makes per-word colouring trivial.
+
+    If `hook` is given, its text is drawn LARGE in the upper third for the first
+    `hook_dur` seconds — a caption-first hook card, so a muted scroller (~85% of
+    short-form viewers) is stopped by the frame, not a spoken line.
     """
     from PIL import Image, ImageDraw
 
-    if not entries:
+    if not entries and not hook:
         shutil.copy2(str(video_path), str(output_path))
         return output_path
 
@@ -836,30 +841,81 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
             lines.append(cur)
         return lines
 
+    # Opening hook card: big bold text up top for the first hook_dur seconds.
+    # Precompute the wrapped lines once (the text is static).
+    hook_lines: list[list[dict]] = []
+    hook_font = None
+    hook_line_h = hook_outline = 0
+    space_w_hook = 0.0
+    top_margin = int(height * 0.16)
+    if hook and hook.strip():
+        hook_font_size = max(34, height // 16)  # larger than captions (height // 22)
+        hook_font = _load_caption_font(hook_font_size, font)
+        hook_outline = max(4, hook_font_size // 7)
+        hook_line_h = int(hook_font_size * 1.3)
+        space_w_hook = measure.textlength(" ", font=hook_font)
+        cur: list[dict] = []
+        cur_w = 0.0
+        for tok in hook.split()[:12]:  # cap length so it never walls off the frame
+            wd = {"text": tok}
+            ww = measure.textlength(tok, font=hook_font)
+            add = ww + (space_w_hook if cur else 0)
+            if cur and cur_w + add > max_w:
+                hook_lines.append(cur)
+                cur, cur_w = [wd], ww
+            else:
+                cur.append(wd)
+                cur_w += add
+        if cur:
+            hook_lines.append(cur)
+
+    def hook_w(txt: str) -> float:
+        return measure.textlength(txt, font=hook_font)
+
     empty = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes("raw", "RGBA")
 
     def make_frame(t: float) -> bytes:
+        img = None
+        d = None
+
+        if hook_lines and t < hook_dur:
+            img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            d = ImageDraw.Draw(img)
+            y = top_margin
+            for line in hook_lines:
+                order = _bidi_word_order(line)  # visual left-to-right (base RTL)
+                lw = sum(hook_w(w["text"]) for w in order) + space_w_hook * (len(order) - 1)
+                x = (width - lw) / 2
+                for w in order:
+                    d.text((x, y), w["text"], font=hook_font, fill=_WHITE,
+                           stroke_width=hook_outline, stroke_fill=_OUTLINE)
+                    x += hook_w(w["text"]) + space_w_hook
+                y += hook_line_h
+
         active = None
         for e in entries:
             if e["start"] <= t < e["end"]:
                 active = e
                 break
-        if active is None:
+        if active is not None:
+            if img is None:
+                img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+                d = ImageDraw.Draw(img)
+            lines = wrap(active["words"])
+            y = height - bottom_margin - len(lines) * line_h
+            for line in lines:
+                order = _bidi_word_order(line)  # visual left-to-right (base RTL)
+                lw = sum(word_w(w["text"]) for w in order) + space_w * (len(order) - 1)
+                x = (width - lw) / 2  # left edge of the centered line
+                for w in order:
+                    color = _ACCENT if (w["start"] <= t < w["end"]) else _WHITE
+                    d.text((x, y), w["text"], font=pil_font, fill=color,
+                           stroke_width=outline, stroke_fill=_OUTLINE)
+                    x += word_w(w["text"]) + space_w
+                y += line_h
+
+        if img is None:
             return empty
-        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        lines = wrap(active["words"])
-        y = height - bottom_margin - len(lines) * line_h
-        for line in lines:
-            order = _bidi_word_order(line)  # visual left-to-right (base RTL)
-            lw = sum(word_w(w["text"]) for w in order) + space_w * (len(order) - 1)
-            x = (width - lw) / 2  # left edge of the centered line
-            for w in order:
-                color = _ACCENT if (w["start"] <= t < w["end"]) else _WHITE
-                d.text((x, y), w["text"], font=pil_font, fill=color,
-                       stroke_width=outline, stroke_fill=_OUTLINE)
-                x += word_w(w["text"]) + space_w
-            y += line_h
         return img.tobytes("raw", "RGBA")
 
     return _overlay_pillow_frames(video_path, output_path, width, height, make_frame)
@@ -1087,6 +1143,7 @@ def extract_clip(
     caption_entries: list | None = None,
     logo: str | None = None,
     logo_pos: str = "top-left",
+    hook: str | None = None,
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
@@ -1112,8 +1169,9 @@ def extract_clip(
     # Crop-to-fill: dynamic pan (crop_vf) if given, else static at crop_position.
     vf = crop_vf if crop_vf else _build_crop_vf(aspect_ratio, crop_position)
 
-    # Word-highlight captions render in a second Pillow pass over the cropped clip.
-    burn_captions = bool(caption_entries)
+    # Word-highlight captions (and/or the opening hook card) render in a second
+    # Pillow pass over the cropped clip.
+    burn_captions = bool(caption_entries) or bool(hook and hook.strip())
 
     # Burn subtitles with libass BEFORE speed-up so subtitle timing matches
     # the original video timestamps (both get sped up together by setpts)
@@ -1188,8 +1246,8 @@ def extract_clip(
     # Step 2: Burn captions in a Pillow pass if needed
     if burn_captions:
         try:
-            _burn_captions_pillow(temp_clip, caption_entries, output_path, tw, th,
-                                  font=font, speed=speed)
+            _burn_captions_pillow(temp_clip, caption_entries or [], output_path, tw, th,
+                                  font=font, speed=speed, hook=hook)
         finally:
             if temp_clip.exists():
                 temp_clip.unlink()
@@ -1257,11 +1315,14 @@ def _prep_logo(logo_path: str, work_dir: str) -> str | None:
 def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  aspect: str = "9:16", subtitles: bool = True,
                  speed: float = 1.0, font: str | None = None,
-                 logo: str | None = None, logo_pos: str = "top-left") -> list[str]:
+                 logo: str | None = None, logo_pos: str = "top-left",
+                 hook_card: bool = True) -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
     burned Hebrew captions from the clip's word timings. If `logo` is given, it's
-    trimmed once and overlaid in the `logo_pos` corner of every clip. Returns the
-    list of output paths."""
+    trimmed once and overlaid in the `logo_pos` corner of every clip. When
+    `hook_card` is set, each clip's `hook` is burned large in the upper third for
+    the opening ~1.8s (a caption-first hook for muted viewers). Returns the list of
+    output paths."""
     source = Path(video_path)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -1323,6 +1384,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
             font=font,
             logo=logo_ready,
             logo_pos=logo_pos,
+            hook=(clip.get("hook") if hook_card else None),
         )
         outputs.append(str(output_path))
 

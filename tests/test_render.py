@@ -205,6 +205,19 @@ def test_prep_logo_trims_transparent_margins(tmp_path):
     assert trimmed.size == (40, 20)  # cropped to the opaque block
 
 
+def test_render_clips_passes_hook_when_card_on(monkeypatch, tmp_path):
+    # The clip's `hook` reaches extract_clip by default (caption-first hook card),
+    # and is suppressed when hook_card=False.
+    import sofit.render as r
+    captured = []
+    monkeypatch.setattr(r, "extract_clip", lambda **k: captured.append(k))
+    clip = {"id": "clip-1", "hook": "בדיקה", "focus": 0.5, "start": 0, "end": 1, "words": []}
+    r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False)
+    assert captured[-1]["hook"] == "בדיקה"
+    r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False, hook_card=False)
+    assert captured[-1]["hook"] is None
+
+
 def test_render_clips_logo_env_default(monkeypatch, tmp_path):
     # SOFIT_LOGO applies a logo without passing --logo/logo=.
     import sofit.render as r
