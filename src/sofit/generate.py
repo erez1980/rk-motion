@@ -131,6 +131,30 @@ def _locate(quote: str, segments: list[Segment], start_from: int) -> Segment | N
     return None
 
 
+def _hook_word_start(seg: Segment, quote: str) -> float | None:
+    """Start time of the word where `quote` begins inside `seg`, or None.
+
+    `_locate` resolves the segment; a segment often opens with throat-clearing
+    ("אז...", "כן, אה") before the actual hook, so starting the clip at the
+    segment start puts the hook a beat late — exactly what kills retention in the
+    first seconds. Matching on the punctuation-stripped concatenation (same
+    normalization as `_locate`) finds the hook's own first word.
+    """
+    needle = _norm(quote).replace(" ", "")
+    if not needle or not seg.words:
+        return None
+    flat = ""
+    owner: list[int] = []  # flat char position -> index in seg.words
+    for i, w in enumerate(seg.words):
+        t = _norm(w.text).replace(" ", "")
+        flat += t
+        owner.extend([i] * len(t))
+    pos = flat.find(needle[:24])  # first few words are enough to place it
+    if pos < 0:
+        return None
+    return seg.words[owner[pos]].start
+
+
 def make_chapters(segments: list[Segment], max_chapters: int = 12, titler: str = "api") -> list[Chapter]:
     if not segments:
         return []
@@ -231,6 +255,11 @@ def make_quotes(
                 continue  # can't place it; skip
             end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index) or start_seg
             start = start_seg.words[0].start if start_seg.words else start_seg.start
+            # Open ON the hook: skip any throat-clearing that precedes it in the
+            # same segment, so second zero is the hook. Only ever moves forward.
+            hooked = _hook_word_start(start_seg, item.get("quote_start", ""))
+            if hooked is not None and hooked > start:
+                start = hooked
             end = end_seg.words[-1].end if end_seg.words else end_seg.end
             end = min(end, audio_end)
             if end - start < min_sec:

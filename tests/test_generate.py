@@ -145,6 +145,51 @@ def test_make_quotes_drops_weak_and_short(monkeypatch):
     assert quotes[0].text == "טוב"
 
 
+def _wseg(i, start, tokens, step=0.5):
+    """Segment with one Word per token (the real transcript shape)."""
+    words = [Word(start + n * step, start + n * step + 0.4, t) for n, t in enumerate(tokens)]
+    return Segment(index=i, start=start, end=words[-1].end, text=" ".join(tokens), words=words)
+
+
+def test_make_quotes_opens_on_the_hook_not_the_throat_clearing(monkeypatch):
+    # The hook sits mid-segment, after filler. Second zero must be the hook, so
+    # the clip start snaps to the hook's own first word (11.5), not the segment
+    # start (10.0) — otherwise the hook lands a beat late and retention dies.
+    segs = [
+        _wseg(0, 10.0, ["אז", "כן", "אה", "למה", "כולם", "טועים", "בזה"]),
+        _wseg(1, 40.0, ["וזאת", "הסיבה", "האמיתית"]),
+    ]
+    _stub_claude(monkeypatch, [
+        {"title": "הוק", "score": 9, "quote_start": "למה כולם טועים",
+         "quote_end": "וזאת הסיבה האמיתית"},
+    ])
+    assert gen.make_quotes(segs)[0].start == pytest.approx(11.5)
+
+
+def test_make_quotes_keeps_start_when_hook_is_already_first(monkeypatch):
+    # No filler to skip: the start must not move (the snap only goes forward).
+    segs = [
+        _wseg(0, 10.0, ["למה", "כולם", "טועים", "בזה"]),
+        _wseg(1, 40.0, ["וזאת", "הסיבה", "האמיתית"]),
+    ]
+    _stub_claude(monkeypatch, [
+        {"title": "הוק", "score": 9, "quote_start": "למה כולם טועים",
+         "quote_end": "וזאת הסיבה האמיתית"},
+    ])
+    assert gen.make_quotes(segs)[0].start == pytest.approx(10.0)
+
+
+def test_hook_word_start_matches_across_punctuation():
+    # Matching ignores punctuation (same normalization as _locate).
+    seg = _wseg(0, 5.0, ["אז,", "טוב", "—", "למה", "כולם", "טועים?"])
+    assert gen._hook_word_start(seg, "למה כולם טועים") == pytest.approx(6.5)
+
+
+def test_hook_word_start_none_when_absent():
+    seg = _wseg(0, 5.0, ["שלום", "עולם"])
+    assert gen._hook_word_start(seg, "משהו אחר לגמרי") is None
+
+
 def test_make_quotes_raises_when_none_qualify(monkeypatch):
     _stub_claude(monkeypatch, [
         {"title": "חלש", "score": 3, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},

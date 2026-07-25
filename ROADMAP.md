@@ -43,12 +43,18 @@ Falls out of #1: the card renders from the clip spec's `hook`, so testing a diff
 is a one-line edit to the clips.json plus `--render-from ... --only clip-N` - no
 re-selection, no re-transcription.
 
-## Proposed (next)
+### 5. Retention-shaped trimming: second zero IS the hook ✅
+`make_quotes` located the hook's *segment* and started the clip at that segment's first
+word, so any throat-clearing in the same segment ("אז... כן, אה,") played before the hook -
+burning a chunk of the decisive first seconds. New `_hook_word_start` matches the hook
+phrase against the segment's punctuation-stripped word concatenation and snaps `start` to
+the hook's own first word. Forward-only, so it never pulls in earlier speech.
+Measured on the real WS203 transcript (676 matching segments, simulating a hook at word 4):
+median **1.12s** of filler avoided, p90 1.9s, max 5.6s. Verified captions stay in sync -
+`_clip_words` re-bases at the snapped word (`t = 0.0`).
+- `generate.py` (`_hook_word_start`, `make_quotes`)
 
-### 5. Retention-shaped clip trimming
-Nothing currently enforces that the *strongest line* is at t=0 after the moment is picked -
-the hook sentence can start a beat late. Consider snapping `start` to the first word of the
-hook sentence so second zero is the hook.
+## Proposed (next)
 
 ### 6. Hook variants
 Generate 2-3 alternative hook lines per clip so a creator can A/B them against the
