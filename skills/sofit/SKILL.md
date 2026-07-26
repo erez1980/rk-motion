@@ -71,6 +71,14 @@ Fast (cached transcript). Paste chapters into the episode description.
 "$SOFIT" "<episode.mp4>" --format youtube --titler claude-cli                          # YouTube
 ```
 
+### 2.5 Trend playbook — staleness check before cutting clips
+Short-form technique moves slowly, so this is a check, not a ritual. If
+`~/Documents/Last30Days/short-form-video-hooks-retention-and-captions-raw-v3.md` is newer
+than ~30 days, skip the research and apply the playbook in `/sofit-clips`. If it's older or
+missing, run `/last30days short form video hooks retention and captions` and update that
+playbook with what CHANGED. Most current rules are already enforced in code (hook snap,
+20-45s, hook card, karaoke captions, hook variants) — see `/sofit-clips` for which.
+
 ### 3. Candidate pool → user picks (suggest → pick → render — the standing flow)
 NEVER auto-render the whole pool. Generate candidates, show the table, let the user pick.
 ```bash

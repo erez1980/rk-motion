@@ -19,6 +19,45 @@ LOGO="/Users/navotv/Downloads/logo weekly-01.png"   # Weekly Sync wordmark (tran
 
 Needs the transcript cached (run `/sofit-transcribe` first if not).
 
+## 0. Refresh the trend playbook — ONLY if stale
+
+Short-form technique moves slowly (the 2026-07-25 pass found the best playbooks were
+evergreen 2024-25 videos; the last-7-day layer was hiring posts and generic tips), so
+this is a staleness check, not a per-episode ritual. Run it:
+
+```bash
+ls -l ~/Documents/Last30Days/short-form-video-hooks-retention-and-captions-raw-v3.md
+```
+
+- **Newer than ~30 days** → skip the research, apply the playbook below. Say one line:
+  "playbook is N days old, skipping research."
+- **Older than ~30 days, or missing** → run
+  `/last30days short form video hooks retention and captions`, then update the playbook
+  below with anything that actually CHANGED. Do not rewrite it to restate the same rules
+  in new words — the point is catching a shift, not regenerating prose.
+
+If the research contradicts a **code-enforced** rule below, that is a tool change (say so
+and open it as work), not something to fix by hand at cut time.
+
+## Current playbook (from /last30days, 2026-07-25)
+
+Enforced in code — nothing to do at cut time, they happen automatically:
+| Rule | Where |
+|---|---|
+| Clip opens ON the hook (no throat-clearing before it) | `generate.py` word-snap |
+| 20-45s clip length | `resolve_clip_item` length bar |
+| Caption-first hook card, first ~1.8s, auto-fit to 2 lines | `render.py` `_fit_hook_card` |
+| Word-by-word karaoke captions, white + outline, lower-middle third | `render.py` |
+| 2 alternate hooks per clip for A/B | `--hook-variant N` |
+
+Needs judgment when picking from the pool — the tool can't decide these:
+- **Prefer a curiosity gap**: an opener posing a question the clip hasn't answered yet.
+  Hard numbers ("44% צועקים נציג") and contrarian claims ("זה בולשיט") both work.
+- **Keep the visual layer plain.** Senior editors consistently say flashy transitions and
+  VFX date fast; story and hard cuts win. Don't add motion for its own sake.
+- **A/B the opener when a clip matters** rather than agonizing over one line — render 2
+  variants and let the retention curve decide.
+
 ## 1. Candidate pool → user picks
 ```bash
 "$PY" "$SKILL/clips.py" pool "<episode.mp4>"          # writes <episode>.pool.json + a numbered table
