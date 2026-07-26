@@ -237,6 +237,16 @@ sofit episode.mp4 --clips-json clips.json
 - Chapter timestamps come from Whisper, never the LLM — Claude only picks which
   segment a chapter starts on, and that choice is validated.
 
+**Learning from what actually worked.** Clip selection starts from short-form research
+priors, but the honest signal is your own numbers. Record each posted clip:
+```bash
+python skills/sofit/clips.py log WS203 clip-5 "<hook posted>" --platform tiktok --retention 47
+```
+Once the log has 8+ rows, pool generation includes the best- and worst-performing real
+hooks in its prompt and weights them over the priors. Below 8 it stays quiet — "what
+worked" over three posts is noise. The log lives at `~/Documents/sofit-performance.jsonl`
+(outside the repo; override with `SOFIT_PERF_LOG`).
+
 ## Roadmap
 
 Planned work, grounded in what's currently working for short-form social video, is

@@ -82,6 +82,22 @@ Present the table; ask which numbers to render. Build the spec from the picks:
   `--hook-variant N` (1-based) — it writes `<id>.hookN.mp4` alongside the original.
 - This `--render-from` path is the ONLY one that honors caption fixes (`/sofit-captions`); plain `--render-clips` regenerates from the transcript.
 
+## 3. Log how they performed (closes the loop)
+After posting, record the numbers — this is the ONLY step that turns priors into real
+signal, and the data is perishable (unrecorded, which hook won is gone).
+```bash
+"$PY" "$SKILL/clips.py" log WS203 clip-5 "<the hook that was posted>" \
+  --platform tiktok --views 12400 --retention 47
+```
+- `--retention` (percent watched) is the signal that matters; views are confounded by
+  posting time and follower count. Log it when the platform gives it to you.
+- Use `--variant N` when you posted an alternate hook, so A/B results stay attributable.
+- Appends to `~/Documents/sofit-performance.jsonl` (outside the repo — it is public).
+  Override with `SOFIT_PERF_LOG`.
+- At **8+ rows** pool generation starts including the best/worst real hooks in its prompt
+  and weighting them over research priors. Below that it stays silent on purpose — "what
+  worked" over 3 posts is noise. Each `log` prints how many rows are still needed.
+
 ## Gotchas (learned the hard way)
 - **Verify with a real rendered frame** — `ffmpeg -ss T -i clip.mp4 -frames:v 1 f.png` and look. Especially Hebrew RTL.
 - **Face crop** needs the `crop` extra (opencv, installed); holds through rapid cuts (won't chase every camera cut); falls back to center if no face.

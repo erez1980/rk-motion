@@ -14,8 +14,10 @@ actually matches the segment it selected.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from .transcribe import Segment
 
@@ -48,6 +50,64 @@ CLIP_FIELDS = (
     "how strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
     "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM."
 )
+
+
+# Feedback loop: which posted clips actually held viewers.
+# Kept OUTSIDE the repo — these are real business numbers and the repo is public.
+PERF_LOG = os.environ.get("SOFIT_PERF_LOG") or str(
+    Path.home() / "Documents" / "sofit-performance.jsonl")
+MIN_PERF_ROWS = 8  # below this, "what worked" is noise, not signal
+
+
+def _perf_rows(path: str | None = None) -> list[dict]:
+    """Rows from the performance log that carry a hook and at least one metric."""
+    p = Path(path or PERF_LOG)
+    if not p.exists():
+        return []
+    rows = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            r = json.loads(line)
+        except json.JSONDecodeError:
+            continue  # skip a malformed line rather than lose the whole log
+        if r.get("hook") and (r.get("retention") is not None or r.get("views") is not None):
+            rows.append(r)
+    return rows
+
+
+def performance_hint(path: str | None = None, n: int = 3,
+                     min_rows: int = MIN_PERF_ROWS) -> str:
+    """Prompt block naming the hooks that over- and under-performed on real posts,
+    or "" when there isn't enough logged data for that to mean anything.
+
+    Ranked by retention when logged, falling back to views — retention is the
+    honest signal, since views are confounded by posting time and follower count.
+
+    Deliberately dumb: the model just sees real examples. No scoring model, no
+    weights to maintain. If the log grows enough that per-hook-type stats would
+    beat few-shot examples, that's the time to build something smarter.
+    """
+    rows = _perf_rows(path)
+    if len(rows) < min_rows:
+        return ""
+    rows.sort(key=lambda r: (r.get("retention") if r.get("retention") is not None else -1,
+                             r.get("views") or 0), reverse=True)
+
+    def fmt(r):
+        m = f"{r['retention']}% retention" if r.get("retention") is not None \
+            else f"{r['views']} views"
+        return f'  - "{r["hook"]}" ({m})'
+
+    best = "\n".join(fmt(r) for r in rows[:n])
+    worst = "\n".join(fmt(r) for r in reversed(rows[-n:]))
+    return (
+        f"\n\nREAL PERFORMANCE from {len(rows)} posted clips of this show — weight "
+        "these over your priors.\nHooks that held viewers:\n" + best +
+        "\nHooks that lost them:\n" + worst +
+        "\nFavour what the winners have in common; avoid what the losers share."
+    )
 
 
 @dataclass
@@ -302,7 +362,7 @@ def make_quotes(
         "Reels / TikTok / Shorts). " + CLIP_RULES + " Return ONLY a JSON array: "
         '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
         '"quote_end": str, "hook_variants": [str, str]}]. ' + CLIP_FIELDS +
-        " Only include clips you would score 7 or higher."
+        " Only include clips you would score 7 or higher." + performance_hint()
     )
     user = f"Transcript segments:\n{_numbered(segments)}"
 

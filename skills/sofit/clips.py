@@ -45,7 +45,7 @@ def _segments(video):
 def cmd_pool(video, out, n, titler):
     segs = _segments(video)
     audio_end = segs[-1].end
-    system = POOL_SYSTEM.format(n=n)
+    system = POOL_SYSTEM.format(n=n) + gen.performance_hint()
     user = f"Transcript segments:\n{gen._numbered(segs)}"
 
     def validate(obj):
@@ -108,6 +108,25 @@ def cmd_build(video, pool_path, pick, out):
     print(f"wrote {out} ({len(clips)} clips: {nums})")
 
 
+def cmd_log(episode, clip, hook, platform, views, retention, variant, path):
+    """Append one posted clip's numbers to the performance log."""
+    row = {"date": __import__("datetime").date.today().isoformat(), "episode": episode,
+           "clip": clip, "variant": variant, "platform": platform, "hook": hook}
+    if views is not None:
+        row["views"] = views
+    if retention is not None:
+        row["retention"] = retention
+    p = path or gen.PERF_LOG
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    rows = gen._perf_rows(p)
+    need = max(0, gen.MIN_PERF_ROWS - len(rows))
+    print(f"logged -> {p} ({len(rows)} rows)")
+    print(f"{need} more row(s) until pool generation starts learning from these."
+          if need else "pool generation is now learning from these.")
+
+
 def main():
     p = argparse.ArgumentParser(prog="clips.py")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -121,9 +140,21 @@ def main():
     bp.add_argument("pool")
     bp.add_argument("--pick", required=True, help="comma-separated candidate numbers, e.g. 2,4,7")
     bp.add_argument("--out")
+    lp = sub.add_parser("log", help="record how a posted clip performed")
+    lp.add_argument("episode")
+    lp.add_argument("clip", help="clip id, e.g. clip-5")
+    lp.add_argument("hook", help="the hook line that was actually posted")
+    lp.add_argument("--platform", default="")
+    lp.add_argument("--views", type=int)
+    lp.add_argument("--retention", type=float, help="percent watched (the better signal)")
+    lp.add_argument("--variant", type=int, default=0)
+    lp.add_argument("--path")
     a = p.parse_args()
     if a.cmd == "pool":
         cmd_pool(a.video, a.out, a.n, a.titler)
+    elif a.cmd == "log":
+        cmd_log(a.episode, a.clip, a.hook, a.platform, a.views, a.retention,
+                a.variant, a.path)
     else:
         cmd_build(a.video, a.pool, a.pick, a.out)
 

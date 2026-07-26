@@ -266,3 +266,35 @@ def test_claude_cli_missing_binary_raises(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda _: None)
     with pytest.raises(GenerationError):
         gen._call_claude_cli("sys", "user", "model")
+
+
+def _perf(tmp_path, rows):
+    p = tmp_path / "perf.jsonl"
+    p.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    return str(p)
+
+
+def test_performance_hint_silent_until_enough_data(tmp_path):
+    # Below the row threshold the loop must say nothing — "what worked" over 3
+    # posts is noise, and a confident-sounding hint would be worse than none.
+    rows = [{"hook": f"h{i}", "retention": 50} for i in range(3)]
+    assert gen.performance_hint(_perf(tmp_path, rows)) == ""
+    assert gen.performance_hint(str(tmp_path / "nope.jsonl")) == ""
+
+
+def test_performance_hint_ranks_by_retention(tmp_path):
+    rows = [{"hook": f"mid{i}", "retention": 40} for i in range(6)]
+    rows.append({"hook": "WINNER", "retention": 88})
+    rows.append({"hook": "LOSER", "retention": 4})
+    hint = gen.performance_hint(_perf(tmp_path, rows), n=1)
+    held, lost = hint.split("Hooks that lost them:")
+    assert "WINNER" in held and "WINNER" not in lost
+    assert "LOSER" in lost and "LOSER" not in held
+
+
+def test_performance_hint_survives_a_bad_line(tmp_path):
+    # One corrupt line must not lose the whole log.
+    p = tmp_path / "perf.jsonl"
+    good = [json.dumps({"hook": f"h{i}", "views": 100 + i}) for i in range(8)]
+    p.write_text("\n".join(good[:4] + ["{not json"] + good[4:]), encoding="utf-8")
+    assert "REAL PERFORMANCE from 8 posted clips" in gen.performance_hint(str(p))
