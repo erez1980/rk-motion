@@ -84,7 +84,7 @@ media ─▶ faster-whisper (local, cached) ─▶ transcript
                                               │
               ┌───────────────────────────────┼───────────────┐
               ▼                                ▼               ▼
-        Claude: sofit            Claude: show notes   Claude: quotes
+        Claude: chapters         Claude: show notes   Claude: quotes
 ```
 
 The transcript is cached (keyed by file hash + model + version), so re-runs and
@@ -148,7 +148,7 @@ the `sofit-mcp` binary if it's in a venv):
 **Claude Code** — `claude mcp add sofit -e ANTHROPIC_API_KEY=sk-ant-... -- /path/to/.venv/bin/sofit-mcp`
 
 Then just ask: *"Transcribe ~/Downloads/ep.mp4"* → wait → *"Now give me Spotify
-sofit and Hebrew show notes for it."*
+chapters and Hebrew show notes for it."*
 
 ## Notes
 
