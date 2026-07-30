@@ -356,3 +356,22 @@ def test_generate_srt_punctuation_flush(tmp_path):
     generate_srt(tr, 0.0, 10.0, srt)
     entries = _parse_srt(srt)
     assert len(entries) == 2  # split on the two sentence-final periods
+
+
+def test_hook_card_height_is_budgeted_not_line_counted():
+    # The card must stay inside a height budget rather than a line-count target:
+    # a line-count cap over-shrank long hooks, and compensating with the floor
+    # pushed a 15-word hook to 4 lines across the speaker's eyes (WS204 clip-5).
+    pytest.importorskip("PIL")
+    from sofit.render import _fit_hook_card
+    h, max_w = 1920, int(1080 * 0.90)
+    budget = int(h * 0.16)
+    for hook in [
+        "פעם ראשונה ב-20 שנה: גוגל שורפת מזומן",                                  # short
+        "פייבר איבדה רבע ממשתמשיה בשנה — היום היא שווה פחות מהמזומן שלה",          # medium
+        "כל החנויות בארץ הפכו למחסן קדמי של עלי אקספרס — פיתחתי תוסף שחושף את זה",  # long
+    ]:
+        _, _, lines, size = _fit_hook_card(hook, h, max_w)
+        assert [w["text"] for L in lines for w in L] == hook.split()  # complete
+        assert len(lines) * int(size * 1.3) <= budget                 # inside budget
+        assert size >= max(22, h // 28)                               # above the floor

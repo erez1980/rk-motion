@@ -802,9 +802,16 @@ def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
     # which destroys the hook. Shrinking is the only lever; the floor bounds it.
     toks = hook.split()
     size = max(34, height // 16)
-    # Floor chosen so a 15-word hook lands at 3 legible lines rather than being
-    # squeezed toward 2 and coming out smaller than the body captions.
-    floor = max(22, height // 25)
+    floor = max(22, height // 28)
+    # The constraint that actually matters is how much of the frame the card
+    # covers, so budget its HEIGHT rather than its line count. Line-count targets
+    # were a bad proxy: capping at 2 lines over-shrank long hooks, and raising the
+    # floor to compensate pushed a 15-word hook to 4 lines across the speaker's
+    # eyes. A height budget lets a short hook keep the full headline size on 2
+    # lines while a long one settles at 3 smaller ones. 0.16 measured against the
+    # real WS203/WS204 hooks: short hooks land on 2 big lines, 15-word ones on 3
+    # readable lines, and nothing is squeezed to the floor.
+    budget = int(height * 0.16)
     while True:
         f = _load_caption_font(size, font)
         space_w = measure.textlength(" ", font=f)
@@ -822,7 +829,7 @@ def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
                 cur_w += add
         if cur:
             lines.append(cur)
-        if len(lines) <= 2 or size <= floor:
+        if len(lines) * int(size * 1.3) <= budget or size <= floor:
             return f, space_w, lines, size
         size -= 2
 
