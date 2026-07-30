@@ -25,6 +25,12 @@ from .transcribe import Segment
 # (Sonnet 5 is a good cost/quality default; bump to Opus for hardest cases.)
 CLAUDE_MODEL = "claude-sonnet-5"
 
+# `claude -p` wall clock. Generous by default: a 66-min episode asking for 8
+# candidate clips with 2 hook variants each ran past the old 300s and died with a
+# traceback mid-pipeline. Raised as TimeoutError (not GenerationError) so it fails
+# fast instead of burning a second attempt on the retry path.
+CLI_TIMEOUT = int(os.environ.get("SOFIT_CLI_TIMEOUT") or 900)
+
 
 # What makes a good short-form clip, and what each JSON field means. Shared by the
 # one-shot selector (`make_quotes`) and the skill's candidate-pool generator so the
@@ -157,10 +163,19 @@ def _call_claude_cli(system: str, user: str, model: str) -> str:
 
     if not shutil.which("claude"):
         raise GenerationError("claude CLI not found — install Claude Code or use --titler api")
-    proc = subprocess.run(
-        ["claude", "-p", "--append-system-prompt", system, "--output-format", "text"],
-        input=user, capture_output=True, text=True, timeout=300,
-    )
+    try:
+        proc = subprocess.run(
+            ["claude", "-p", "--append-system-prompt", system, "--output-format", "text"],
+            input=user, capture_output=True, text=True, timeout=CLI_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        # 300s was too tight for real work: a 66-min episode (981 segments) asking
+        # for 8 clips x 3 hook lines each blew through it. Raise SOFIT_CLI_TIMEOUT
+        # for longer episodes, or ask for fewer candidates.
+        raise TimeoutError(
+            f"claude CLI exceeded {CLI_TIMEOUT}s. Raise SOFIT_CLI_TIMEOUT, ask for "
+            "fewer candidates (--n), or use --titler api."
+        ) from None
     if proc.returncode != 0:
         raise GenerationError(f"claude CLI failed: {(proc.stderr or '').strip()[:200]}")
     return proc.stdout.strip()

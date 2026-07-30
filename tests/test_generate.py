@@ -298,3 +298,30 @@ def test_performance_hint_survives_a_bad_line(tmp_path):
     good = [json.dumps({"hook": f"h{i}", "views": 100 + i}) for i in range(8)]
     p.write_text("\n".join(good[:4] + ["{not json"] + good[4:]), encoding="utf-8")
     assert "REAL PERFORMANCE from 8 posted clips" in gen.performance_hint(str(p))
+
+
+def test_cli_timeout_fails_fast_without_retrying(monkeypatch):
+    # A `claude -p` timeout must surface immediately, not burn a second attempt on
+    # the retry path (that is 2x the wall clock for a call already too slow).
+    import subprocess
+    monkeypatch.setattr(gen.shutil if hasattr(gen, "shutil") else subprocess, "which",
+                        lambda _: "/usr/bin/claude", raising=False)
+    calls = {"n": 0}
+
+    def boom(*a, **k):
+        calls["n"] += 1
+        raise subprocess.TimeoutExpired(cmd="claude", timeout=gen.CLI_TIMEOUT)
+
+    monkeypatch.setattr(subprocess, "run", boom)
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/claude")
+    with pytest.raises(TimeoutError, match="SOFIT_CLI_TIMEOUT"):
+        gen.call_claude_json("sys", "usr", lambda o: o, titler="claude-cli")
+    assert calls["n"] == 1  # exactly one attempt
+
+
+def test_cli_timeout_is_configurable(monkeypatch):
+    import importlib
+    monkeypatch.setenv("SOFIT_CLI_TIMEOUT", "1234")
+    assert int(importlib.reload(gen).CLI_TIMEOUT) == 1234
+    monkeypatch.delenv("SOFIT_CLI_TIMEOUT")
+    importlib.reload(gen)  # restore the default for the rest of the suite
