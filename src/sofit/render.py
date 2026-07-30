@@ -797,9 +797,14 @@ def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
     from PIL import Image, ImageDraw
 
     measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    toks = hook.split()[:12]  # cap length so it never walls off the frame
+    # NEVER truncate. A word cap used to live here and it silently cut the payoff
+    # off long hooks mid-clause on WS204 ("...ואף אחד לא" — losing "היה שם לב"),
+    # which destroys the hook. Shrinking is the only lever; the floor bounds it.
+    toks = hook.split()
     size = max(34, height // 16)
-    floor = max(22, height // 28)
+    # Floor chosen so a 15-word hook lands at 3 legible lines rather than being
+    # squeezed toward 2 and coming out smaller than the body captions.
+    floor = max(22, height // 25)
     while True:
         f = _load_caption_font(size, font)
         space_w = measure.textlength(" ", font=f)

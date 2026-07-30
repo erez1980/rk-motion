@@ -218,10 +218,10 @@ def test_render_clips_passes_hook_when_card_on(monkeypatch, tmp_path):
     assert captured[-1]["hook"] is None
 
 
-def test_hook_card_shrinks_to_two_lines():
+def test_hook_card_shrinks_instead_of_blanketing_the_frame():
     # A whole-sentence hook must not blanket the speaker's face: the card shrinks
-    # until it fits 2 lines. (The first WS203 batch rendered 4-line cards over the
-    # face — this is that regression.)
+    # rather than stacking 4 lines. (The first WS203 batch rendered 4-line cards
+    # over the face — this is that regression.)
     pytest.importorskip("PIL")
     from sofit.render import _fit_hook_card
     long_hook = "Lovable שווה 8 מיליארד. Wix שווה 2. איך זה הגיוני?"
@@ -233,6 +233,20 @@ def test_hook_card_shrinks_to_two_lines():
     _, _, short_lines, short_size = _fit_hook_card("למה כולם טועים?", 1920, int(1080 * 0.90))
     assert len(short_lines) == 1
     assert short_size == max(34, 1920 // 16)
+
+
+def test_hook_card_never_truncates_a_long_hook():
+    # WS204 regression: a word cap silently cut the payoff off 15-word hooks
+    # mid-clause ("...ואף אחד לא", losing "היה שם לב"), which destroys the hook.
+    # Every word must survive; the card shrinks (and may take a 3rd line) instead.
+    pytest.importorskip("PIL")
+    from sofit.render import _fit_hook_card
+    hook = "היית יכול לערבב את הצוותים של שלוש חברות סייבר ואף אחד לא היה שם לב"
+    _, _, lines, size = _fit_hook_card(hook, 1920, int(1080 * 0.90))
+    rendered = [w["text"] for line in lines for w in line]
+    assert rendered == hook.split()          # nothing dropped
+    assert len(lines) <= 3                   # still not a wall of text
+    assert size >= max(22, 1920 // 25)       # and not shrunk below the floor
 
 
 def test_render_clips_hook_variant_picks_alt_and_suffixes_output(monkeypatch, tmp_path):
