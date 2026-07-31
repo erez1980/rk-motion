@@ -99,6 +99,12 @@ signal, and the data is perishable (unrecorded, which hook won is gone).
   worked" over 3 posts is noise. Each `log` prints how many rows are still needed.
 
 ## Gotchas (learned the hard way)
+- **Spot-check every NUMBER against what was actually said.** Hebrew number words
+  confuse the transcriber (שלושה/שישה), and numbers are exactly what makes a clip
+  credible. WS204 rendered "3 מיליארד" where Navot said 6, and the wrong figure had
+  already spread to the hook variant and the show notes. When a number is the point
+  of the clip, confirm it before publishing — and fix it in the caption, the
+  hook_variants, the pool file and the show notes, not just the caption.
 - **Verify with a real rendered frame** — `ffmpeg -ss T -i clip.mp4 -frames:v 1 f.png` and look. Especially Hebrew RTL.
 - **Face crop** needs the `crop` extra (opencv, installed); holds through rapid cuts (won't chase every camera cut); falls back to center if no face.
 - **Two-person / wide shots**: only one person fits a 9:16 crop — set a clip's `focus` [0,1] in the clips.json to override.

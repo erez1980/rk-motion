@@ -630,6 +630,22 @@ def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
 # ---------------------------------------------------------------------------
 
 _BUNDLED_FONT = Path(__file__).parent / "data" / "fonts" / "Rubik.ttf"
+
+# Platform safe areas. TikTok and Reels are the SAME video format (1080x1920 9:16) —
+# what differs is how much of the frame their UI covers. Measured against a real
+# render: captions at 0.90 width come within 54px of the edge, which slides under
+# TikTok's right-hand like/comment/share rail (~120px). Bottom clearance (22%)
+# already clears both platforms' bottom chrome, so only the width changes.
+# (caption_width_frac, caption_bottom_frac, logo_edge_frac)
+# The logo fraction is vertical and generous on purpose: at the old 4% (43px on a
+# 1080-wide frame) the wordmark rendered UNDER the iPhone status-bar clock on Reels.
+# It has to clear the status bar (~110px) and, per platform, the app's own header
+# (Reels' back-arrow/title row is the tallest).
+_SAFE_AREAS = {
+    "none":   (0.90, 0.22, 0.09),   # clears the iPhone status bar
+    "tiktok": (0.76, 0.22, 0.13),   # + TikTok's top area; captions clear the right rail
+    "reels":  (0.85, 0.24, 0.15),   # + the "Reels" header row
+}
 _ACCENT = (255, 214, 10, 255)     # active word — punchy yellow
 _WHITE = (255, 255, 255, 255)
 _OUTLINE = (0, 0, 0, 255)
@@ -837,7 +853,7 @@ def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
 def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Path,
                           width: int, height: int, font: str | None = None,
                           speed: float = 1.0, hook: str | None = None,
-                          hook_dur: float = 1.8) -> Path:
+                          hook_dur: float = 1.8, safe_area: str = "none") -> Path:
     """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
     third, thick outline, the word being spoken popped in an accent colour.
 
@@ -867,8 +883,9 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     pil_font = _load_caption_font(font_size, font)
     outline = max(3, font_size // 8)
     line_h = int(font_size * 1.28)
-    bottom_margin = int(height * 0.22)   # sit in the lower third, clear of the edge
-    max_w = int(width * 0.90)
+    w_frac, b_frac, _ = _SAFE_AREAS.get(safe_area, _SAFE_AREAS["none"])
+    bottom_margin = int(height * b_frac)  # sit in the lower third, clear of the edge
+    max_w = int(width * w_frac)
 
     measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     space_w = measure.textlength(" ", font=pil_font)
@@ -1181,6 +1198,7 @@ def extract_clip(
     logo: str | None = None,
     logo_pos: str = "top-left",
     hook: str | None = None,
+    safe_area: str = "none",
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
@@ -1247,13 +1265,16 @@ def extract_clip(
         # track) and before captions. Sized to a fraction of frame width, inset
         # from the chosen corner; the logo PNG's aspect is preserved.
         lw = round(tw * 0.22)
-        m = round(tw * 0.04)
+        mx = round(tw * 0.04)
+        # Vertical inset is much larger than horizontal: platform chrome (status
+        # bar, app header) lives at the top edge, not the sides.
+        my = round(th * _SAFE_AREAS.get(safe_area, _SAFE_AREAS["none"])[2])
         pos = {
-            "top-left": f"{m}:{m}",
-            "top-right": f"W-w-{m}:{m}",
-            "bottom-left": f"{m}:H-h-{m}",
-            "bottom-right": f"W-w-{m}:H-h-{m}",
-        }.get(logo_pos, f"{m}:{m}")
+            "top-left": f"{mx}:{my}",
+            "top-right": f"W-w-{mx}:{my}",
+            "bottom-left": f"{mx}:H-h-{my}",
+            "bottom-right": f"W-w-{mx}:H-h-{my}",
+        }.get(logo_pos, f"{mx}:{my}")
         fc = (f"[0:v]{vf}[base];[1:v]scale={lw}:-1[lg];"
               f"[base][lg]overlay={pos}:format=auto[v]")
         cmd += ["-loop", "1", "-i", str(logo), "-t", str(duration),
@@ -1284,7 +1305,8 @@ def extract_clip(
     if burn_captions:
         try:
             _burn_captions_pillow(temp_clip, caption_entries or [], output_path, tw, th,
-                                  font=font, speed=speed, hook=hook)
+                                  font=font, speed=speed, hook=hook,
+                                  safe_area=safe_area)
         finally:
             if temp_clip.exists():
                 temp_clip.unlink()
@@ -1353,7 +1375,8 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  aspect: str = "9:16", subtitles: bool = True,
                  speed: float = 1.0, font: str | None = None,
                  logo: str | None = None, logo_pos: str = "top-left",
-                 hook_card: bool = True, hook_variant: int = 0) -> list[str]:
+                 hook_card: bool = True, hook_variant: int = 0,
+                 safe_area: str = "none") -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
     burned Hebrew captions from the clip's word timings. If `logo` is given, it's
     trimmed once and overlaid in the `logo_pos` corner of every clip. When
@@ -1440,6 +1463,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
             logo=logo_ready,
             logo_pos=logo_pos,
             hook=(hook_text if hook_card else None),
+            safe_area=safe_area,
         )
         outputs.append(str(output_path))
 

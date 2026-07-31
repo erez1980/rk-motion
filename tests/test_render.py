@@ -375,3 +375,43 @@ def test_hook_card_height_is_budgeted_not_line_counted():
         assert [w["text"] for L in lines for w in L] == hook.split()  # complete
         assert len(lines) * int(size * 1.3) <= budget                 # inside budget
         assert size >= max(22, h // 28)                               # above the floor
+
+
+def test_safe_area_presets_narrow_captions_for_tiktok():
+    # TikTok and Reels are the same 1080x1920 format; only the UI safe zone differs.
+    # At the default 0.90 width a caption comes within 54px of the edge, which sits
+    # under TikTok's ~120px right-hand button rail.
+    from sofit.render import _SAFE_AREAS
+    W = 1080
+    def side_gap(frac):            # captions are centered, so gap is symmetric
+        return (W - int(W * frac)) // 2
+    assert side_gap(_SAFE_AREAS["none"][0]) < 120      # the problem
+    assert side_gap(_SAFE_AREAS["tiktok"][0]) >= 120   # clears the rail
+    assert side_gap(_SAFE_AREAS["reels"][0]) >= 60     # clears Reels' narrower rail
+    # bottom clearance must stay above both platforms' bottom chrome (~320px)
+    for name in ("tiktok", "reels"):
+        assert int(1920 * _SAFE_AREAS[name][1]) >= 320
+
+
+def test_safe_area_threads_through_render_clips(monkeypatch, tmp_path):
+    import sofit.render as r
+    captured = []
+    monkeypatch.setattr(r, "extract_clip", lambda **k: captured.append(k))
+    clip = {"id": "clip-1", "hook": "h", "focus": 0.5, "start": 0, "end": 1, "words": []}
+    r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False, safe_area="tiktok")
+    assert captured[-1]["safe_area"] == "tiktok"
+    r.render_clips("v.mp4", [clip], str(tmp_path), subtitles=False)
+    assert captured[-1]["safe_area"] == "none"
+
+
+def test_logo_clears_the_iphone_status_bar():
+    # Reported from a real Reels screenshot: at a 4% top margin (43px on 1080x1920)
+    # the wordmark rendered under the iPhone clock. Every preset must inset the logo
+    # far enough vertically to clear the status bar (~110px), and the platform
+    # presets further to clear the app's own header row.
+    from sofit.render import _SAFE_AREAS
+    H = 1920
+    assert int(H * _SAFE_AREAS["none"][2]) >= 110          # status bar
+    assert int(H * _SAFE_AREAS["tiktok"][2]) >= 200        # + TikTok top area
+    assert int(H * _SAFE_AREAS["reels"][2]) >= 250         # + "Reels" header row
+    assert round(1080 * 0.04) < 110                        # the old value did not

@@ -76,6 +76,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="logo corner (default top-left)")
     p.add_argument("--no-hook-card", action="store_true",
                    help="don't burn the clip's hook as an opening title card")
+    p.add_argument("--safe-area", choices=["none", "tiktok", "reels"], default="none",
+                   help="keep captions inside a platform's UI safe zone (TikTok's "
+                   "right-hand button rail covers ~120px; same 9:16 video either way)")
     p.add_argument("--hook-variant", type=int, default=0, metavar="N",
                    help="use alternate hook line N from the clip spec for the card "
                    "(0 = the primary hook; N>0 writes <id>.hookN.mp4 so A/B renders coexist)")
@@ -97,7 +100,8 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
 
 def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None,
                  logo: str | None = None, logo_pos: str = "top-left",
-                 hook_card: bool = True, hook_variant: int = 0) -> int:
+                 hook_card: bool = True, hook_variant: int = 0,
+                 safe_area: str = "none") -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -133,7 +137,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
     from . import render
     outs = render.render_clips(video, clips, out, aspect=aspect, logo=logo,
                                logo_pos=logo_pos, hook_card=hook_card,
-                               hook_variant=hook_variant)
+                               hook_variant=hook_variant, safe_area=safe_area)
     print(f"rendered {len(outs)} clip(s) to {out}", file=sys.stderr)
     return 0
 
@@ -149,7 +153,8 @@ def main(argv: list[str] | None = None) -> int:
         return _render_from(args.render_from, args.render_clips, args.aspect, args.only,
                             logo=args.logo, logo_pos=args.logo_pos,
                             hook_card=not args.no_hook_card,
-                            hook_variant=args.hook_variant)
+                            hook_variant=args.hook_variant,
+                            safe_area=args.safe_area)
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
@@ -297,7 +302,8 @@ def main(argv: list[str] | None = None) -> int:
                                                aspect=args.aspect, logo=args.logo,
                                                logo_pos=args.logo_pos,
                                                hook_card=not args.no_hook_card,
-                                               hook_variant=args.hook_variant)
+                                               hook_variant=args.hook_variant,
+                            safe_area=args.safe_area)
                     print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
                 except ImportError:
                     print("error: --render-clips needs the render extra: pip install 'sofit-cli[render]'", file=sys.stderr)
