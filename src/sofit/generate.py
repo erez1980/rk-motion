@@ -296,7 +296,13 @@ def resolve_clip_item(item: dict, segments: list[Segment], audio_end: float,
     if end - start < min_sec:
         return None  # too short for a hook + payoff
     if end - start > max_sec:
-        end = start + max_sec  # clamp runaway clips
+        # DROP it, don't clamp. Clamping kept the hook and cut the payoff off the
+        # end, producing exactly what the prompt forbids: an opener with no
+        # punchline. On WS204 three of four clips were clamped — clip-2 promised
+        # "Fiverr is collapsing" and ended 40s before the $350M-vs-$600M-cash line
+        # that made it interesting. If hook and payoff don't fit in max_sec, this
+        # moment is not a short-form clip.
+        return None
 
     title = (item.get("title") or "").strip()
     # Alternate hooks are optional and model-supplied: keep only non-empty strings

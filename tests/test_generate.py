@@ -120,7 +120,7 @@ def test_clip_words_relative_and_fallback():
 def test_make_clips_structure(monkeypatch):
     _stub_claude(monkeypatch, [
         {"title": "רגע מעניין", "hook_type": "question", "score": 9,
-         "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+         "quote_start": "שלום וברוכים", "quote_end": "היום נדבר"},
     ])
     clips = gen.make_clips(SEGMENTS)
     assert len(clips) == 1
@@ -136,9 +136,9 @@ def test_make_quotes_drops_weak_and_short(monkeypatch):
     # Weak hook (score < 7) and a too-short clip must both be dropped; only the
     # strong, long-enough clip survives.
     _stub_claude(monkeypatch, [
-        {"title": "חלש", "score": 4, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "חלש", "score": 4, "quote_start": "שלום וברוכים", "quote_end": "היום נדבר"},
         {"title": "קצר", "score": 9, "quote_start": "היום נדבר", "quote_end": "היום נדבר"},
-        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "היום נדבר"},
     ])
     quotes = gen.make_quotes(SEGMENTS)
     assert len(quotes) == 1
@@ -158,8 +158,14 @@ def test_resolve_clip_item_is_the_shared_contract():
             "quote_end": "וזאת הסיבה", "hook_variants": ["חלופה"]}
 
     q = gen.resolve_clip_item(item, segs, end_of_audio)
+    assert q is None  # hook->payoff span exceeds max_sec: dropped, never clamped
+
+    # A span that fits is kept, with the hook snap applied.
+    near = [_wseg(0, 10.0, ["אז", "למה", "כולם", "טועים"]),
+            _wseg(1, 40.0, ["וזאת", "הסיבה"])]
+    q = gen.resolve_clip_item(item, near, near[-1].end)
     assert q.start == pytest.approx(10.5)          # snapped past "אז"
-    assert q.end - q.start == pytest.approx(45.0)  # clamped to max_sec
+    assert q.end - q.start <= 45.0
     assert q.variants == ("חלופה",)
 
     assert gen.resolve_clip_item({**item, "score": 3}, segs, end_of_audio) is None   # weak
@@ -173,7 +179,7 @@ def test_make_quotes_keeps_hook_variants(monkeypatch):
     # Alternates are captured, capped at 2, and the primary is never duplicated
     # into the variant list (nor are blanks).
     _stub_claude(monkeypatch, [
-        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור",
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "היום נדבר",
          "hook_variants": ["גרסה א", "  ", "טוב", "גרסה ב", "גרסה ג"]},
     ])
     q = gen.make_quotes(SEGMENTS)[0]
@@ -183,7 +189,7 @@ def test_make_quotes_keeps_hook_variants(monkeypatch):
 def test_make_quotes_variants_default_empty(monkeypatch):
     # A model that omits hook_variants must not break selection.
     _stub_claude(monkeypatch, [
-        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "טוב", "score": 8, "quote_start": "שלום וברוכים", "quote_end": "היום נדבר"},
     ])
     assert gen.make_quotes(SEGMENTS)[0].variants == ()
 
@@ -235,7 +241,7 @@ def test_hook_word_start_none_when_absent():
 
 def test_make_quotes_raises_when_none_qualify(monkeypatch):
     _stub_claude(monkeypatch, [
-        {"title": "חלש", "score": 3, "quote_start": "שלום וברוכים", "quote_end": "עכשיו נעבור"},
+        {"title": "חלש", "score": 3, "quote_start": "שלום וברוכים", "quote_end": "היום נדבר"},
     ])
     with pytest.raises(GenerationError):
         gen.make_quotes(SEGMENTS)
@@ -325,3 +331,15 @@ def test_cli_timeout_is_configurable(monkeypatch):
     assert int(importlib.reload(gen).CLI_TIMEOUT) == 1234
     monkeypatch.delenv("SOFIT_CLI_TIMEOUT")
     importlib.reload(gen)  # restore the default for the rest of the suite
+
+
+def test_resolve_clip_item_drops_clips_whose_payoff_falls_outside_max_sec():
+    # WS204 regression: the end used to be clamped to start+max_sec, which kept
+    # the hook and threw the payoff away — clip-2 promised "Fiverr is collapsing"
+    # and ended 40s before the $350M-vs-$600M-cash line. A moment whose hook and
+    # payoff cannot fit in one window is not a short-form clip; drop it.
+    segs = [_wseg(0, 10.0, ["למה", "כולם", "טועים"]),
+            _wseg(1, 300.0, ["וזאת", "הסיבה"])]          # payoff ~5 min later
+    item = {"title": "t", "score": 9, "quote_start": "למה כולם טועים",
+            "quote_end": "וזאת הסיבה"}
+    assert gen.resolve_clip_item(item, segs, segs[-1].end) is None
