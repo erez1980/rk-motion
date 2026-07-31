@@ -415,3 +415,16 @@ def test_logo_clears_the_iphone_status_bar():
     assert int(H * _SAFE_AREAS["tiktok"][2]) >= 200        # + TikTok top area
     assert int(H * _SAFE_AREAS["reels"][2]) >= 250         # + "Reels" header row
     assert round(1080 * 0.04) < 110                        # the old value did not
+
+
+def test_encode_timeouts_are_generous_and_configurable(monkeypatch):
+    # A fixed 300s killed WS204 clip-5 (starts at 41:45 in an 8GB 1080p50 file,
+    # encoding alongside 5 siblings). Encode time scales with length/fps/load, so
+    # the ceiling must be generous and overridable.
+    import importlib
+    import sofit.render as r
+    assert r.FFMPEG_TIMEOUT >= 1800
+    monkeypatch.setenv("SOFIT_FFMPEG_TIMEOUT", "2400")
+    assert importlib.reload(r).FFMPEG_TIMEOUT == 2400
+    monkeypatch.delenv("SOFIT_FFMPEG_TIMEOUT")
+    importlib.reload(r)

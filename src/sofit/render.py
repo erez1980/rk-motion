@@ -51,6 +51,13 @@ def _check_ffmpeg_subtitles_support() -> bool:
 
 _HAS_SUBTITLES_FILTER = _check_ffmpeg_subtitles_support()
 
+# Wall clock for the ENCODE paths (not the fast capability probes). A fixed 300s
+# killed a real render: clip-5 of WS204 starts at 41:45 in an 8GB 1080p50 file and
+# was encoding alongside five sibling renders. Encode time scales with clip length,
+# resolution, fps and how many renders share the machine, so the ceiling is
+# generous and overridable rather than tuned.
+FFMPEG_TIMEOUT = int(os.environ.get("SOFIT_FFMPEG_TIMEOUT") or 1800)
+
 
 # ---------------------------------------------------------------------------
 # Fonts (Hebrew-capable)
@@ -617,7 +624,7 @@ def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
         proc.stdin.write(_render_frame(active_text))
 
     proc.stdin.close()
-    _, stderr = proc.communicate(timeout=300)
+    _, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
 
     if proc.returncode != 0:
         raise RuntimeError(f"Subtitle overlay failed: {stderr.decode()[-500:]}")
@@ -793,7 +800,7 @@ def _overlay_pillow_frames(video_path: Path, output_path: Path, width: int,
     for frame_idx in range(total_frames):
         proc.stdin.write(make_frame(frame_idx / fps))
     proc.stdin.close()
-    _, stderr = proc.communicate(timeout=600)
+    _, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
     if proc.returncode != 0:
         raise RuntimeError(f"Caption overlay failed: {stderr.decode()[-500:]}")
     return output_path
@@ -1168,7 +1175,7 @@ def _dynamic_crop_vf(aspect_ratio: str, keyframes: list) -> str:
 
 def _run_ffmpeg(cmd: list[str]) -> None:
     """Run an ffmpeg command and raise with a useful error on failure."""
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
     if result.returncode != 0:
         stderr = result.stderr.strip()
         error_lines = [
