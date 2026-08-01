@@ -860,7 +860,8 @@ def _fit_hook_card(hook: str, height: int, max_w: int, font: str | None = None):
 def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Path,
                           width: int, height: int, font: str | None = None,
                           speed: float = 1.0, hook: str | None = None,
-                          hook_dur: float = 1.8, safe_area: str = "none") -> Path:
+                          hook_dur: float = 1.8, safe_area: str = "none",
+                          hook_top_min: int = 0) -> Path:
     """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
     third, thick outline, the word being spoken popped in an accent colour.
 
@@ -923,7 +924,9 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     hook_font = None
     hook_line_h = hook_outline = 0
     space_w_hook = 0.0
-    top_margin = int(height * 0.16)
+    # The hook card must clear a top-corner logo. Raising the logo out of the
+    # iPhone status bar pushed it INTO this band, so the card starts below it.
+    top_margin = max(int(height * 0.16), hook_top_min)
     if hook and hook.strip():
         hook_font, space_w_hook, hook_lines, hook_size = _fit_hook_card(
             hook, height, max_w, font)
@@ -1227,8 +1230,7 @@ def extract_clip(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     tw, th = _target_resolution(aspect_ratio)
-
-    # Crop-to-fill: dynamic pan (crop_vf) if given, else static at crop_position.
+    hook_top_min = 0   # raised below when a top-corner logo would collide
     vf = crop_vf if crop_vf else _build_crop_vf(aspect_ratio, crop_position)
 
     # Word-highlight captions (and/or the opening hook card) render in a second
@@ -1276,6 +1278,14 @@ def extract_clip(
         # Vertical inset is much larger than horizontal: platform chrome (status
         # bar, app header) lives at the top edge, not the sides.
         my = round(th * _SAFE_AREAS.get(safe_area, _SAFE_AREAS["none"])[2])
+        if logo_pos.startswith("top"):
+            try:
+                from PIL import Image
+                with Image.open(logo) as _li:
+                    _lh = round(_li.height * lw / _li.width)
+            except Exception:
+                _lh = round(th * 0.05)          # conservative guess
+            hook_top_min = my + _lh + round(th * 0.025)   # logo bottom + a gap
         pos = {
             "top-left": f"{mx}:{my}",
             "top-right": f"W-w-{mx}:{my}",
@@ -1313,7 +1323,7 @@ def extract_clip(
         try:
             _burn_captions_pillow(temp_clip, caption_entries or [], output_path, tw, th,
                                   font=font, speed=speed, hook=hook,
-                                  safe_area=safe_area)
+                                  safe_area=safe_area, hook_top_min=hook_top_min)
         finally:
             if temp_clip.exists():
                 temp_clip.unlink()

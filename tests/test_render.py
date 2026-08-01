@@ -428,3 +428,16 @@ def test_encode_timeouts_are_generous_and_configurable(monkeypatch):
     assert importlib.reload(r).FFMPEG_TIMEOUT == 2400
     monkeypatch.delenv("SOFIT_FFMPEG_TIMEOUT")
     importlib.reload(r)
+
+
+def test_hook_card_starts_below_a_top_corner_logo():
+    # Raising the logo out of the iPhone status bar pushed it INTO the hook card's
+    # band (tiktok: logo 250-340, card started at 307). The card must start below
+    # the logo's bottom edge for every preset.
+    pytest.importorskip("PIL")
+    from sofit.render import _SAFE_AREAS
+    TH, LOGO_H = 1920, 90          # logo scaled to 22% width on this wordmark
+    for name, (_, _, logo_frac) in _SAFE_AREAS.items():
+        logo_bottom = round(TH * logo_frac) + LOGO_H
+        card_top = max(int(TH * 0.16), logo_bottom + round(TH * 0.025))
+        assert card_top >= logo_bottom, f"{name}: hook card overlaps the logo"
