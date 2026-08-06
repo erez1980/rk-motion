@@ -6,6 +6,7 @@ Covers the two things most likely to break silently:
 """
 
 import pytest
+from pathlib import Path
 
 from sofit.render import (
     _bidi_word_order,
@@ -441,3 +442,33 @@ def test_hook_card_starts_below_a_top_corner_logo():
         logo_bottom = round(TH * logo_frac) + LOGO_H
         card_top = max(int(TH * 0.16), logo_bottom + round(TH * 0.025))
         assert card_top >= logo_bottom, f"{name}: hook card overlaps the logo"
+
+
+def test_audio_is_peak_limited(monkeypatch, tmp_path):
+    # WS205 clip-1/2 rendered at 0.0 dBFS, which clips on playback and again when
+    # the platform re-encodes. Every render must carry a peak ceiling, and it must
+    # use level=disabled — alimiter's default auto-level RAISES quiet audio to the
+    # ceiling, which would change the mix instead of just catching peaks.
+    import sofit.render as r
+    cmds = []
+    monkeypatch.setattr(r, "_run_ffmpeg", lambda cmd: cmds.append(cmd))
+    monkeypatch.setattr(r, "_burn_captions_pillow", lambda *a, **k: None)
+    monkeypatch.setattr(r, "_burn_subtitles_pillow", lambda *a, **k: None)
+    r.extract_clip(source_video=Path("in.mp4"), start_time=0, end_time=5,
+                   output_path=tmp_path / "out.mp4")
+    af = cmds[0][cmds[0].index("-af") + 1]
+    assert "alimiter" in af
+    assert "level=disabled" in af          # never auto-level quiet clips upward
+
+
+def test_speed_change_keeps_the_limiter(monkeypatch, tmp_path):
+    # The limiter must survive the atempo path, not be replaced by it.
+    import sofit.render as r
+    cmds = []
+    monkeypatch.setattr(r, "_run_ffmpeg", lambda cmd: cmds.append(cmd))
+    monkeypatch.setattr(r, "_burn_captions_pillow", lambda *a, **k: None)
+    monkeypatch.setattr(r, "_burn_subtitles_pillow", lambda *a, **k: None)
+    r.extract_clip(source_video=Path("in.mp4"), start_time=0, end_time=5,
+                   output_path=tmp_path / "out.mp4", speed=1.5)
+    af = cmds[0][cmds[0].index("-af") + 1]
+    assert "atempo=1.5" in af and "alimiter" in af

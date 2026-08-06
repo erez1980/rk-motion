@@ -58,6 +58,13 @@ _HAS_SUBTITLES_FILTER = _check_ffmpeg_subtitles_support()
 # generous and overridable rather than tuned.
 FFMPEG_TIMEOUT = int(os.environ.get("SOFIT_FFMPEG_TIMEOUT") or 1800)
 
+# Peak ceiling for clip audio. Rendered clips were coming out at 0.0 dBFS (WS205
+# clip-1 and clip-2), which clips on playback and again when a platform re-encodes.
+# level=disabled matters: alimiter's default auto-level RAISES quiet material up to
+# the ceiling, so only peaks above it get touched this way and quieter clips are
+# left exactly as they were. 0.89 lands around -1 dBFS after AAC overshoot.
+_AUDIO_LIMITER = "alimiter=limit=0.89:level=disabled"
+
 
 # ---------------------------------------------------------------------------
 # Fonts (Hebrew-capable)
@@ -1258,9 +1265,9 @@ def extract_clip(
     # Add speed-up filter AFTER subtitles (setpts for video)
     if speed and speed != 1.0:
         vf += f",setpts={1.0/speed}*PTS"
-        af = f"atempo={speed}"
+        af = f"atempo={speed},{_AUDIO_LIMITER}"
     else:
-        af = None
+        af = _AUDIO_LIMITER
 
     # Step 1: Extract and scale/crop the clip
     if burn_with_pillow or burn_captions:
