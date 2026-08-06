@@ -87,3 +87,21 @@ scorer learn from what actually held viewers, rather than from research priors.
 ## Explicitly NOT doing
 - Flashy transitions / VFX / animated backgrounds. Multiple senior editors flag these
   as dating fast and distracting from story. Keep the visual layer minimal.
+- **Background music bed under clips.** Researched (2026-08-06) and then actually
+  tested on five WS205 clips with the show's own beat, sidechain-ducked at -10 dB and
+  again at -14 dB. Verdict after listening: it does not work for this content.
+  Two independent reasons, so don't revisit without new information:
+  - *No reach upside, structurally.* The trending-audio boost comes from the sound ID
+    the platform assigns when audio is picked IN-APP. Music burned into an mp4 has no
+    sound ID and joins no sound graph. A file renderer cannot buy that benefit.
+    Weekly Sync is also a business account, limited to the Meta Sound Collection, so
+    trending commercial tracks are off the table regardless, and 2026 fingerprinting
+    catches short beds - a false positive mutes the WHOLE track, killing a
+    talking-head clip.
+  - *No craft upside here.* These are dense Hebrew talking-head arguments with
+    word-by-word captions; the viewer is already reading and listening at once. The
+    usual pro-bed case (smoothing hard cuts) was measured on the WS204 combo and did
+    not apply: the two sides of a 4-minute splice were -21.4 vs -22.2 dB with
+    identical peaks, so there was nothing to mask.
+  No code was written for this - the test ran as a throwaway ffmpeg pass, which is why
+  there is nothing to revert.
