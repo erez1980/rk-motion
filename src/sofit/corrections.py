@@ -107,9 +107,20 @@ def correct_clips(clips: list[dict], find: str, replace: str,
     for clip in clips:
         if clip_id is not None and clip.get("id") != clip_id:
             continue
+        n_clip = 0
         new_words, n = apply_correction(clip.get("words", []), find, replace)
         if n:
             clip["words"] = new_words
-            total += n
+            n_clip += n
+        # Narrative edits keep words per kept span. A find can't match across a
+        # cut — merging a time span over removed material would corrupt timing —
+        # and shouldn't: the cut is a hard boundary in the rendered clip too.
+        for seg in clip.get("segments") or []:
+            new_words, n = apply_correction(seg.get("words", []), find, replace)
+            if n:
+                seg["words"] = new_words
+                n_clip += n
+        if n_clip:
+            total += n_clip
             affected.append(str(clip.get("id")))
     return total, affected

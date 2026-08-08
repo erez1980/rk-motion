@@ -43,8 +43,14 @@ CLIP_RULES = (
     "they raise a question in the viewer's mind that the clip has not yet answered, so "
     "they must keep watching to close it. Score highest when the hook is the first "
     "thing said, not buried after throat-clearing. (2) be a COMPLETE, self-contained "
-    "thought with a payoff that closes that gap, not a fragment; (3) run about 20-45 "
-    "seconds."
+    "STORY with a payoff that closes that gap, not a fragment; (3) total about 20-45 "
+    "seconds of kept material. EDIT, don't just cut a window: a clip is 1-4 beats "
+    "(quote spans in chronological order) that together tell one story — hook, "
+    "escalation, payoff. When the strongest hook and its payoff are separated by "
+    "banter, tangents or filler, DROP the filler by making each kept part its own "
+    "beat. Prefer 2-3 tight beats over one baggy window. Never reorder beats, never "
+    "cut mid-sentence, and keep every beat at least ~4 seconds so the edit doesn't "
+    "feel jumpy."
 )
 
 CLIP_FIELDS = (
@@ -53,8 +59,12 @@ CLIP_FIELDS = (
     "from title (e.g. if title is a question, make one a bold claim and one a "
     "surprising number/fact) — they are for A/B testing which opener holds viewers. "
     "hook_type = one of question|bold_claim|surprise|emotion|story. score = 1-10 for "
-    "how strongly the OPENING stops the scroll. quote_start = first ~4 words of the "
-    "hook line, copied VERBATIM; quote_end = last ~4 words of the payoff, VERBATIM."
+    "how strongly the OPENING stops the scroll. beats = the story's kept spans, in "
+    'order: [{"quote_start": str, "quote_end": str}, ...] where quote_start is the '
+    "first ~4 words of that span copied VERBATIM from the transcript and quote_end "
+    "is its last ~4 words, VERBATIM. A single-span clip has one beat. For "
+    "backwards compatibility you may instead give top-level quote_start/quote_end "
+    "for a one-beat clip."
 )
 
 
@@ -130,6 +140,11 @@ class Quote:
     # Alternate hook lines for the same moment, to A/B against the retention
     # curve. `text` stays the primary. Tuple so the default is safely immutable.
     variants: tuple[str, ...] = ()
+    # The narrative edit: kept (start, end) spans in chronological order whose
+    # union is the clip. One beat == a plain contiguous clip; 2+ beats mean the
+    # filler between them is cut out at render time. start/end above stay the
+    # envelope (first beat's start, last beat's end).
+    beats: tuple[tuple[float, float], ...] = ()
 
 
 class GenerationError(RuntimeError):
@@ -259,15 +274,46 @@ def _hook_word_start(seg: Segment, quote: str) -> float | None:
     return seg.words[owner[pos]].start
 
 
+def _resolve_span(qs: str, qe: str, segments: list[Segment], audio_end: float,
+                  start_from: int, snap_hook: bool) -> tuple[float, float, int] | None:
+    """Resolve one quoted span to (start, end, end_segment_index), or None.
+
+    `snap_hook` starts the span on the quoted words themselves (skipping
+    throat-clearing earlier in the segment) — wanted for the first beat, where
+    second zero must be the hook.
+    """
+    start_seg = _locate(qs, segments, start_from)
+    if start_seg is None:
+        return None
+    end_seg = _locate(qe, segments, start_seg.index) or start_seg
+
+    start = start_seg.words[0].start if start_seg.words else start_seg.start
+    if snap_hook:
+        hooked = _hook_word_start(start_seg, qs)
+        if hooked is not None and hooked > start:
+            start = hooked
+    end = min(end_seg.words[-1].end if end_seg.words else end_seg.end, audio_end)
+    if end <= start:
+        return None
+    return start, end, end_seg.index
+
+
 def resolve_clip_item(item: dict, segments: list[Segment], audio_end: float,
                       min_sec: float = 18.0, max_sec: float = 45.0,
-                      min_score: int = 7) -> Quote | None:
+                      min_score: int = 7, min_beat_sec: float = 3.0) -> Quote | None:
     """Turn one model-proposed clip into a timed `Quote`, or None if it misses the bar.
 
-    Takes `{title, score, quote_start, quote_end, hook_variants}` and applies, in
-    order: the hook-strength gate, quote->segment location, the hook-word snap (so
-    second zero is the hook, not the throat-clearing before it), the length gates,
-    and the variant cleanup.
+    Takes `{title, score, beats|[quote_start, quote_end], hook_variants}` and
+    applies, in order: the hook-strength gate, per-beat quote->segment location
+    (chronological, non-overlapping), the hook-word snap on the FIRST beat (so
+    second zero is the hook, not the throat-clearing before it), the length gates
+    on the KEPT total, and the variant cleanup.
+
+    A clip is a narrative edit: 1-4 beats whose union tells the story and whose
+    gaps (banter, tangents) are cut at render time. Beats that touch or nearly
+    touch (<1s gap) merge — a sub-second cut reads as a glitch, not an edit.
+    Beats shorter than `min_beat_sec` after merging drop the whole clip: the
+    model is chasing confetti, not editing.
 
     Shared by `make_quotes` and the skill's candidate-pool generator. Those two
     grew as parallel copies and silently drifted apart (the pool kept a 90s cap and
@@ -280,22 +326,41 @@ def resolve_clip_item(item: dict, segments: list[Segment], audio_end: float,
     if score < min_score:
         return None  # weak hook — drop
 
-    start_seg = _locate(item.get("quote_start", ""), segments, 0)
-    if start_seg is None:
-        return None  # can't place it; skip
-    end_seg = _locate(item.get("quote_end", ""), segments, start_seg.index) or start_seg
+    raw_beats = item.get("beats")
+    if not isinstance(raw_beats, list) or not raw_beats:
+        raw_beats = [{"quote_start": item.get("quote_start", ""),
+                      "quote_end": item.get("quote_end", "")}]
 
-    start = start_seg.words[0].start if start_seg.words else start_seg.start
-    # Open ON the hook: skip any throat-clearing that precedes it in the same
-    # segment. Only ever moves forward, never into the previous sentence.
-    hooked = _hook_word_start(start_seg, item.get("quote_start", ""))
-    if hooked is not None and hooked > start:
-        start = hooked
+    spans: list[tuple[float, float]] = []
+    cursor = 0
+    for i, b in enumerate(raw_beats[:4]):
+        if not isinstance(b, dict):
+            return None
+        r = _resolve_span(b.get("quote_start", ""), b.get("quote_end", ""),
+                          segments, audio_end, cursor, snap_hook=(i == 0))
+        if r is None:
+            return None  # an unlocatable beat means an untrustworthy edit; drop
+        s, e, end_idx = r
+        if spans and s < spans[-1][1]:
+            return None  # out of order / overlapping — never reorder speech
+        spans.append((s, e))
+        cursor = end_idx  # next beat starts at or after this one's end segment
 
-    end = min(end_seg.words[-1].end if end_seg.words else end_seg.end, audio_end)
-    if end - start < min_sec:
+    # Merge beats separated by a blink: a <1s cut reads as a stutter.
+    merged: list[list[float]] = [list(spans[0])]
+    for s, e in spans[1:]:
+        if s - merged[-1][1] < 1.0:
+            merged[-1][1] = e
+        else:
+            merged.append([s, e])
+    if any(e - s < min_beat_sec for s, e in merged):
+        return None
+    beats = tuple((s, e) for s, e in merged)
+
+    kept = sum(e - s for s, e in beats)
+    if kept < min_sec:
         return None  # too short for a hook + payoff
-    if end - start > max_sec:
+    if kept > max_sec:
         # DROP it, don't clamp. Clamping kept the hook and cut the payoff off the
         # end, producing exactly what the prompt forbids: an opener with no
         # punchline. On WS204 three of four clips were clamped — clip-2 promised
@@ -311,7 +376,8 @@ def resolve_clip_item(item: dict, segments: list[Segment], audio_end: float,
         v.strip() for v in (item.get("hook_variants") or [])
         if isinstance(v, str) and v.strip() and v.strip() != title
     )[:2]
-    return Quote(start=start, end=end, text=title, variants=variants)
+    return Quote(start=beats[0][0], end=beats[-1][1], text=title,
+                 variants=variants, beats=beats)
 
 
 def make_chapters(segments: list[Segment], max_chapters: int = 12, titler: str = "api") -> list[Chapter]:
@@ -379,10 +445,11 @@ def make_quotes(
         return []
     audio_end = segments[-1].end
     system = (
-        "You select scroll-stopping short-form clips from a Hebrew podcast (for "
-        "Reels / TikTok / Shorts). " + CLIP_RULES + " Return ONLY a JSON array: "
-        '[{"title": str, "hook_type": str, "score": int, "quote_start": str, '
-        '"quote_end": str, "hook_variants": [str, str]}]. ' + CLIP_FIELDS +
+        "You select and EDIT scroll-stopping short-form clips from a Hebrew podcast "
+        "(for Reels / TikTok / Shorts). " + CLIP_RULES + " Return ONLY a JSON array: "
+        '[{"title": str, "hook_type": str, "score": int, "beats": '
+        '[{"quote_start": str, "quote_end": str}], "hook_variants": [str, str]}]. '
+        + CLIP_FIELDS +
         " Only include clips you would score 7 or higher." + performance_hint()
     )
     user = f"Transcript segments:\n{_numbered(segments)}"
@@ -428,18 +495,32 @@ def _clip_words(segments: list[Segment], start: float, end: float) -> list[dict]
     return out
 
 
+def clip_spec(q: Quote, segments: list[Segment], clip_id: str) -> dict:
+    """One clips.json entry from a resolved Quote. A multi-beat quote becomes a
+    `segments` list (each beat with its own beat-relative words) — the renderer
+    cuts the gaps; a single beat stays the flat legacy shape."""
+    spec = {
+        "id": clip_id,
+        "start": round(q.start, 3),
+        "end": round(q.end, 3),
+        "hook": q.text,
+        "hook_variants": list(q.variants),
+        "focus": None,
+    }
+    beats = q.beats or ((q.start, q.end),)
+    if len(beats) > 1:
+        spec["segments"] = [
+            {"start": round(s, 3), "end": round(e, 3),
+             "words": _clip_words(segments, s, e)}
+            for s, e in beats
+        ]
+    else:
+        spec["words"] = _clip_words(segments, beats[0][0], beats[0][1])
+    return spec
+
+
 def make_clips(segments: list[Segment], titler: str = "api") -> list[dict]:
     """Clip specs for the social-clipper: reuse the pull-quote ranges + hooks, attach
     clip-relative per-word timings. Returns the `clips` array of the clips.json contract."""
-    clips = []
-    for i, q in enumerate(make_quotes(segments, titler=titler), 1):
-        clips.append({
-            "id": f"clip-{i}",
-            "start": round(q.start, 3),
-            "end": round(q.end, 3),
-            "hook": q.text,
-            "hook_variants": list(q.variants),
-            "focus": None,
-            "words": _clip_words(segments, q.start, q.end),
-        })
-    return clips
+    return [clip_spec(q, segments, f"clip-{i}")
+            for i, q in enumerate(make_quotes(segments, titler=titler), 1)]

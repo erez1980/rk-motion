@@ -1395,6 +1395,20 @@ def _prep_logo(logo_path: str, work_dir: str) -> str | None:
     return str(out)
 
 
+def _concat_parts(parts: list[Path], output_path: Path) -> None:
+    """Losslessly join rendered segment files (identical codec settings) into
+    `output_path` with the concat demuxer. Stream copy: no second encode."""
+    lst = output_path.with_suffix(".concat.txt")
+    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts), encoding="utf-8")
+    try:
+        _run_ffmpeg(["ffmpeg", "-f", "concat", "-safe", "0", "-i", str(lst),
+                     "-c", "copy", "-movflags", "+faststart", "-y", str(output_path)])
+    finally:
+        lst.unlink(missing_ok=True)
+        for p in parts:
+            p.unlink(missing_ok=True)
+
+
 def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  aspect: str = "9:16", subtitles: bool = True,
                  speed: float = 1.0, font: str | None = None,
@@ -1428,8 +1442,6 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     outputs: list[str] = []
     for clip in clips:
         clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
-        start = float(clip["start"])
-        end = float(clip["end"])
 
         # Hook line for the card: primary, or an alternate for A/B testing. An
         # out-of-range variant falls back to the primary rather than rendering
@@ -1446,49 +1458,69 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                       "using the primary hook", file=sys.stderr)
         output_path = out / f"{clip_id}{suffix}.mp4"
 
-        # Word-level caption entries (kept for the highlight burn-in).
-        caption_entries = None
-        if subtitles and clip.get("words"):
-            caption_entries = _caption_entries(_clip_transcript(clip), start, end)
+        # A narrative edit carries `segments` (kept spans, gaps cut). A plain
+        # clip is one span. Each span renders through the same single-range
+        # pipeline below; multi-span outputs are then losslessly concatenated.
+        ranges = clip.get("segments") or [
+            {"start": clip["start"], "end": clip["end"], "words": clip.get("words")}
+        ]
+        parts: list[Path] = []
+        for ri, rng in enumerate(ranges):
+            start = float(rng["start"])
+            end = float(rng["end"])
+            part_path = (output_path if len(ranges) == 1
+                         else out / f"{clip_id}{suffix}.part{ri}.tmp.mp4")
 
-        # Framing: explicit `focus` [0,1] wins. Otherwise track the on-screen face
-        # over the clip — pan the crop to follow it (fixes speakers going out of
-        # frame when the camera cuts between people); if the face barely moves,
-        # settle on a single face-centered crop; no face -> center.
-        focus = clip.get("focus")
-        crop_vf = None
-        crop_position = 0.5
-        if isinstance(focus, (int, float)):
-            crop_position = float(focus)
-        elif tw < th:
-            samples, aspect_hw = _face_track(source, start, end)
-            kf = _pan_keyframes(samples) if samples else []
-            if kf:
-                spread = max(c for _, c in kf) - min(c for _, c in kf)
-                crop_w_frac = (tw / th) * aspect_hw
-                if spread > 0.08:
-                    crop_vf = _dynamic_crop_vf(aspect, kf)        # speaker-tracking pan
-                else:
-                    mid = sorted(c for _, c in kf)[len(kf) // 2]  # steady: face-centered
-                    crop_position = _crop_position_for_face(mid, crop_w_frac)
+            # Word-level caption entries (kept for the highlight burn-in).
+            caption_entries = None
+            if subtitles and rng.get("words"):
+                pseudo = {"start": start, "end": end, "words": rng["words"]}
+                caption_entries = _caption_entries(_clip_transcript(pseudo), start, end)
 
-        extract_clip(
-            source_video=source,
-            start_time=start,
-            end_time=end,
-            output_path=output_path,
-            aspect_ratio=aspect,
-            crop_position=crop_position,
-            crop_vf=crop_vf,
-            caption_entries=caption_entries,
-            speed=speed,
-            pad_seconds=0.0,
-            font=font,
-            logo=logo_ready,
-            logo_pos=logo_pos,
-            hook=(hook_text if hook_card else None),
-            safe_area=safe_area,
-        )
+            # Framing: explicit `focus` [0,1] wins. Otherwise track the on-screen
+            # face over this span — pan the crop to follow it (fixes speakers going
+            # out of frame when the camera cuts between people); if the face barely
+            # moves, settle on a single face-centered crop; no face -> center.
+            # Per-span on purpose: the shot can change across a narrative cut.
+            focus = clip.get("focus")
+            crop_vf = None
+            crop_position = 0.5
+            if isinstance(focus, (int, float)):
+                crop_position = float(focus)
+            elif tw < th:
+                samples, aspect_hw = _face_track(source, start, end)
+                kf = _pan_keyframes(samples) if samples else []
+                if kf:
+                    spread = max(c for _, c in kf) - min(c for _, c in kf)
+                    crop_w_frac = (tw / th) * aspect_hw
+                    if spread > 0.08:
+                        crop_vf = _dynamic_crop_vf(aspect, kf)        # speaker-tracking pan
+                    else:
+                        mid = sorted(c for _, c in kf)[len(kf) // 2]  # steady: face-centered
+                        crop_position = _crop_position_for_face(mid, crop_w_frac)
+
+            extract_clip(
+                source_video=source,
+                start_time=start,
+                end_time=end,
+                output_path=part_path,
+                aspect_ratio=aspect,
+                crop_position=crop_position,
+                crop_vf=crop_vf,
+                caption_entries=caption_entries,
+                speed=speed,
+                pad_seconds=0.0,
+                font=font,
+                logo=logo_ready,
+                logo_pos=logo_pos,
+                # The hook card belongs to second zero only — the first span.
+                hook=(hook_text if hook_card and ri == 0 else None),
+                safe_area=safe_area,
+            )
+            parts.append(part_path)
+
+        if len(parts) > 1:
+            _concat_parts(parts, output_path)
         outputs.append(str(output_path))
 
     if logo_dir:

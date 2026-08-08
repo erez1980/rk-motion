@@ -94,3 +94,22 @@ def test_correct_clips_scoped_to_one_id():
     total, affected = correct_clips(clips, "קטאר", "Qatar", clip_id="clip-3")
     assert total == 1 and affected == ["clip-3"]
     assert clips[0]["words"][0]["w"] == "קטאר"  # clip-1 untouched
+
+
+def test_correct_clips_reaches_segment_words():
+    # Narrative edits keep words per kept span; corrections must reach them.
+    clips = [{
+        "id": "clip-1",
+        "segments": [
+            {"start": 10.0, "end": 20.0,
+             "words": [{"t": 0.0, "d": 0.5, "w": "שלום"}]},
+            {"start": 60.0, "end": 70.0,
+             "words": [{"t": 0.0, "d": 0.5, "w": "טעות"},
+                       {"t": 0.5, "d": 0.5, "w": "סוף"}]},
+        ],
+    }]
+    total, affected = correct_clips(clips, "טעות", "תיקון")
+    assert total == 1 and affected == ["clip-1"]
+    assert clips[0]["segments"][1]["words"][0]["w"] == "תיקון"
+    # timings untouched
+    assert clips[0]["segments"][1]["words"][0]["t"] == 0.0

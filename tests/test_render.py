@@ -472,3 +472,36 @@ def test_speed_change_keeps_the_limiter(monkeypatch, tmp_path):
                    output_path=tmp_path / "out.mp4", speed=1.5)
     af = cmds[0][cmds[0].index("-af") + 1]
     assert "atempo=1.5" in af and "alimiter" in af
+
+
+def test_render_clips_narrative_segments_render_per_span_and_concat(monkeypatch, tmp_path):
+    # A clip with `segments` (narrative edit) renders each kept span through the
+    # single-range pipeline — hook card on the FIRST span only, captions from
+    # that span's own words — then concatenates the parts into <id>.mp4.
+    import sofit.render as r
+    calls, concats = [], []
+    monkeypatch.setattr(r, "extract_clip", lambda **k: calls.append(k))
+    monkeypatch.setattr(r, "_concat_parts", lambda parts, out: concats.append((list(parts), out)))
+    clip = {"id": "clip-1", "hook": "הוק", "focus": 0.5,
+            "start": 100.0, "end": 190.0,
+            "segments": [
+                {"start": 100.0, "end": 120.0, "words": [{"t": 0.0, "d": 0.5, "w": "א"}]},
+                {"start": 180.0, "end": 190.0, "words": [{"t": 0.0, "d": 0.5, "w": "ב"}]},
+            ]}
+    outs = r.render_clips("v.mp4", [clip], str(tmp_path))
+    assert len(calls) == 2
+    assert (calls[0]["start_time"], calls[0]["end_time"]) == (100.0, 120.0)
+    assert (calls[1]["start_time"], calls[1]["end_time"]) == (180.0, 190.0)
+    assert calls[0]["hook"] == "הוק" and calls[1]["hook"] is None
+    assert ".part0" in str(calls[0]["output_path"]) and ".part1" in str(calls[1]["output_path"])
+    (parts, final), = concats
+    assert [str(p) for p in parts] == [str(c["output_path"]) for c in calls]
+    assert str(final).endswith("clip-1.mp4") and outs == [str(final)]
+
+    # Legacy single-range clips still render directly to <id>.mp4, no concat.
+    calls.clear(); concats.clear()
+    flat = {"id": "clip-2", "hook": "הוק", "focus": 0.5, "start": 0, "end": 20,
+            "words": [{"t": 0.0, "d": 0.5, "w": "א"}]}
+    outs = r.render_clips("v.mp4", [flat], str(tmp_path))
+    assert len(calls) == 1 and not concats
+    assert outs == [str(calls[0]["output_path"])] and outs[0].endswith("clip-2.mp4")

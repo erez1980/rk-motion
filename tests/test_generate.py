@@ -343,3 +343,91 @@ def test_resolve_clip_item_drops_clips_whose_payoff_falls_outside_max_sec():
     item = {"title": "t", "score": 9, "quote_start": "למה כולם טועים",
             "quote_end": "וזאת הסיבה"}
     assert gen.resolve_clip_item(item, segs, segs[-1].end) is None
+
+
+# ---------------------------------------------------------------------------
+# Narrative edits (beats -> segments)
+# ---------------------------------------------------------------------------
+
+_HOOK_TOKENS = ["למה", "כולם", "טועים", "בזה", "לגמרי", "תמיד", "אבל",
+                "באמת", "שווה", "להבין", "את", "זה", "לעומק", "ממש",
+                "כי", "יש", "כאן", "משהו", "מעניין", "פה", "שאף", "אחד",
+                "לא", "רואה", "אותו", "בכלל", "למרות", "שהוא", "מולנו",
+                "כל", "הזמן", "ואי", "אפשר", "להתעלם", "ממנו", "יותר",
+                "אז", "בואו", "נדבר", "עליו"]  # ~19.9s at the _wseg cadence
+
+_PAYOFF_TOKENS = ["וזאת", "הסיבה", "האמיתית", "שכולם", "מפספסים", "אותה",
+                  "כבר", "שנים", "רבות", "מאוד", "בתעשייה", "שלנו",
+                  "וזה", "הלקח", "המרכזי", "שחשוב", "לזכור", "תמיד",
+                  "בסוף", "היום"]  # ~9.9s
+
+
+def _story_segs():
+    """Hook at 10s, filler at 32s, payoff at 60s — the shape that needs an edit."""
+    return [
+        _wseg(0, 10.0, _HOOK_TOKENS),
+        _wseg(1, 32.0, ["סתם", "פטפוט", "על", "משהו", "אחר", "לגמרי"]),
+        _wseg(2, 60.0, _PAYOFF_TOKENS),
+    ]
+
+
+def test_resolve_clip_item_builds_a_narrative_edit_from_beats():
+    segs = _story_segs()
+    item = {"title": "כותרת", "score": 9, "beats": [
+        {"quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+        {"quote_start": "וזאת הסיבה האמיתית", "quote_end": "בסוף היום"},
+    ]}
+    q = gen.resolve_clip_item(item, segs, segs[-1].end)
+    assert q is not None
+    assert len(q.beats) == 2
+    assert q.beats[0][0] == pytest.approx(10.0)
+    assert q.beats[1][0] == pytest.approx(60.0)   # filler at 30s is not kept
+    assert q.start == q.beats[0][0] and q.end == q.beats[-1][1]  # envelope
+    kept = sum(e - s for s, e in q.beats)
+    assert 18.0 <= kept <= 45.0
+
+
+def test_resolve_clip_item_beats_gates():
+    segs = _story_segs()
+    base = {"title": "כותרת", "score": 9}
+    # Out-of-order beats: speech is never reordered.
+    assert gen.resolve_clip_item({**base, "beats": [
+        {"quote_start": "וזאת הסיבה האמיתית", "quote_end": "בסוף היום"},
+        {"quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+    ]}, segs, segs[-1].end) is None
+    # An unlocatable beat drops the whole clip (an untrustworthy edit).
+    assert gen.resolve_clip_item({**base, "beats": [
+        {"quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+        {"quote_start": "לא קיים בכלל", "quote_end": "בסוף היום"},
+    ]}, segs, segs[-1].end) is None
+    # Nearly-touching beats merge into one contiguous span (no stutter cuts).
+    hook_end = 10.0 + (len(_HOOK_TOKENS) - 1) * 0.5 + 0.4   # last hook word's end
+    near = [_wseg(0, 10.0, _HOOK_TOKENS),
+            _wseg(1, hook_end + 0.4, _PAYOFF_TOKENS)]        # 0.4s gap: a blink
+    q = gen.resolve_clip_item({**base, "beats": [
+        {"quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+        {"quote_start": "וזאת הסיבה האמיתית", "quote_end": "בסוף היום"},
+    ]}, near, near[-1].end)
+    assert q is not None and len(q.beats) == 1
+
+
+def test_clip_spec_emits_segments_only_for_multi_beat_edits():
+    segs = _story_segs()
+    q = gen.resolve_clip_item({"title": "כותרת", "score": 9, "beats": [
+        {"quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+        {"quote_start": "וזאת הסיבה האמיתית", "quote_end": "בסוף היום"},
+    ]}, segs, segs[-1].end)
+    spec = gen.clip_spec(q, segs, "clip-1")
+    assert "words" not in spec and len(spec["segments"]) == 2
+    for seg_spec, (bs, be) in zip(spec["segments"], q.beats):
+        assert seg_spec["start"] == pytest.approx(bs, abs=0.001)
+        # words are relative to the SEGMENT start, starting near zero
+        assert seg_spec["words"][0]["t"] == pytest.approx(0.0, abs=0.01)
+
+    # Single beat -> legacy flat shape, so old clips.json consumers still work.
+    q1 = gen.resolve_clip_item(
+        {"title": "כותרת", "score": 9,
+         "quote_start": "למה כולם טועים", "quote_end": "נדבר עליו"},
+        segs, segs[-1].end)
+    spec1 = gen.clip_spec(q1, segs, "clip-2")
+    assert "segments" not in spec1 and spec1["words"]
