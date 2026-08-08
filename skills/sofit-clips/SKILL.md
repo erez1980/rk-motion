@@ -72,6 +72,9 @@ Present the table; ask which numbers to render. Build the spec from the picks:
 "$SOFIT" --render-from "<episode>.clips.json" --render-clips "<out_dir>" --logo "$LOGO"
 ```
 - Crop-to-fill 9:16, speaker-tracking face crop, bold Hebrew word-highlight captions, logo top-left.
+- Narrative edits: a clip with `segments` (2+ kept spans) renders each span and
+  losslessly concats them — the filler between beats is cut automatically. The
+  hook card goes on the first span only; captions/face-crop run per span.
 - Output `<out_dir>/clip-N.mp4` (ids match the pool numbers). Copy to ~/Downloads as `WS<episode>_clip-N.mp4`.
 - Per-frame Pillow caption pass ⇒ seconds+ per clip; run in background.
 - Set-once logo: `export SOFIT_LOGO="$LOGO"` (then `--logo` optional). `--logo-pos {top-left,top-right,bottom-left,bottom-right}`.

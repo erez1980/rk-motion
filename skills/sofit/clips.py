@@ -8,9 +8,12 @@ Run with the sofit venv python so `import sofit` resolves:
 
 `pool`  : from the CACHED transcript, ask Claude (via `claude -p`, no API key) for a
           ranked pool of scroll-stopping candidate clips; writes <episode>.pool.json
-          next to the episode and prints a numbered table.
+          next to the episode and prints a numbered table. Candidates are NARRATIVE
+          EDITS: 1-4 `beats` (kept spans — hook, escalation, payoff) whose gaps
+          (banter/filler) are cut at render time, not one baggy window.
 `build` : from picked candidate numbers, build a clips.json (ranges + hooks + per-word
-          timings) ready for `sofit --render-from`. Writes <episode>.clips.json.
+          timings; multi-beat picks become `segments`) ready for
+          `sofit --render-from`. Writes <episode>.clips.json.
 
 Everything else (transcribe, chapters/shownotes/quotes, render, --logo, correct_clip)
 is in the CLI / MCP — see SKILL.md.
@@ -27,8 +30,9 @@ POOL_SYSTEM = (
     "You are picking a POOL of candidate short-form clips from a Hebrew podcast "
     "(Reels/TikTok/Shorts) for a human to choose from. Find the {n} strongest, most "
     "DISTINCT moments across the whole episode. " + gen.CLIP_RULES + " Return ONLY a JSON array "
-    '[{{"title":str,"hook_type":str,"score":int,"reason":str,"quote_start":str,'
-    '"quote_end":str,"hook_variants":[str,str]}}]. ' + gen.CLIP_FIELDS +
+    '[{"title":str,"hook_type":str,"score":int,"reason":str,'
+    '"beats":[{"quote_start":str,"quote_end":str}],"hook_variants":[str,str]}]. '
+    + gen.CLIP_FIELDS +
     " reason = one short English line on why it would perform. "
     "Cover different topics. Only include clips you would score 7 or higher."
 )
@@ -45,7 +49,8 @@ def _segments(video):
 def cmd_pool(video, out, n, titler):
     segs = _segments(video)
     audio_end = segs[-1].end
-    system = POOL_SYSTEM.format(n=n) + gen.performance_hint()
+    # .replace, not .format: CLIP_FIELDS legitimately contains JSON braces.
+    system = POOL_SYSTEM.replace("{n}", str(n)) + gen.performance_hint()
     user = f"Transcript segments:\n{gen._numbered(segs)}"
 
     def validate(obj):
@@ -60,6 +65,7 @@ def cmd_pool(video, out, n, titler):
                 continue
             out_rows.append({
                 "start": round(q.start, 3), "end": round(q.end, 3),
+                "beats": [[round(s, 3), round(e, 3)] for s, e in q.beats],
                 "score": int(it.get("score", 0)), "hook": q.text,
                 "type": it.get("hook_type", ""),
                 "reason": (it.get("reason") or "").strip(),
@@ -83,7 +89,10 @@ def cmd_pool(video, out, n, titler):
     print(f"wrote {out} ({len(kept)} candidates)\n")
     for i, c in enumerate(kept, 1):
         m, s = divmod(int(c["start"]), 60)
-        print(f"{i:2d}. [{m}:{s:02d}] ({int(c['end']-c['start'])}s, {c['type']}, "
+        beats = c.get("beats") or [[c["start"], c["end"]]]
+        kept_sec = int(sum(e - b for b, e in beats))
+        cuts = "" if len(beats) == 1 else f", {len(beats)} beats ({len(beats)-1} cut)"
+        print(f"{i:2d}. [{m}:{s:02d}] ({kept_sec}s{cuts}, {c['type']}, "
               f"score {c['score']}) {c['hook']}")
         print(f"      why: {c['reason']}")
 
@@ -96,12 +105,12 @@ def cmd_build(video, pool_path, pick, out):
     clips = []
     for n in nums:
         c = cands[n - 1]  # 1-based, matches the pool table
-        clips.append({
-            "id": f"clip-{n}", "start": c["start"], "end": c["end"],
-            "hook": c["hook"], "hook_variants": c.get("hook_variants") or [],
-            "focus": None,
-            "words": gen._clip_words(segs, c["start"], c["end"]),
-        })
+        beats = tuple((float(s), float(e)) for s, e in
+                      (c.get("beats") or [[c["start"], c["end"]]]))
+        q = gen.Quote(start=float(c["start"]), end=float(c["end"]),
+                      text=c["hook"], variants=tuple(c.get("hook_variants") or []),
+                      beats=beats)
+        clips.append(gen.clip_spec(q, segs, f"clip-{n}"))
     out = out or os.path.splitext(video)[0] + ".clips.json"
     json.dump({"schema_version": 1, "source": {"video": os.path.abspath(video)},
                "clips": clips}, open(out, "w"), ensure_ascii=False, indent=2)
