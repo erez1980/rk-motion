@@ -20,6 +20,7 @@ Caption rendering has two paths:
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -868,7 +869,8 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
                           width: int, height: int, font: str | None = None,
                           speed: float = 1.0, hook: str | None = None,
                           hook_dur: float = 1.8, safe_area: str = "none",
-                          hook_top_min: int = 0) -> Path:
+                          hook_top_min: int = 0,
+                          accent: tuple[int, int, int, int] | None = None) -> Path:
     """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
     third, thick outline, the word being spoken popped in an accent colour.
 
@@ -943,6 +945,7 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     def hook_w(txt: str) -> float:
         return measure.textlength(txt, font=hook_font)
 
+    active_color = accent or _ACCENT
     empty = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes("raw", "RGBA")
 
     def make_frame(t: float) -> bytes:
@@ -979,7 +982,7 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
                 lw = sum(word_w(w["text"]) for w in order) + space_w * (len(order) - 1)
                 x = (width - lw) / 2  # left edge of the centered line
                 for w in order:
-                    color = _ACCENT if (w["start"] <= t < w["end"]) else _WHITE
+                    color = active_color if (w["start"] <= t < w["end"]) else _WHITE
                     d.text((x, y), w["text"], font=pil_font, fill=color,
                            stroke_width=outline, stroke_fill=_OUTLINE)
                     x += word_w(w["text"]) + space_w
@@ -1180,6 +1183,213 @@ def _dynamic_crop_vf(aspect_ratio: str, keyframes: list) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Audiogram canvas (audio-only sources: mp3 podcasts with no video track)
+# ---------------------------------------------------------------------------
+
+def _is_audio_only(source: Path) -> bool:
+    """True when the source has audio but no real video stream. An embedded
+    cover image (mp3 attached_pic) does not count as video."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(source)],
+            capture_output=True, text=True, timeout=30)
+        streams = json.loads(result.stdout or "{}").get("streams", [])
+    except Exception:
+        return False
+    has_audio = False
+    for s in streams:
+        ctype = s.get("codec_type")
+        if ctype == "audio":
+            has_audio = True
+        elif ctype == "video" and not (s.get("disposition") or {}).get("attached_pic"):
+            return False
+    return has_audio
+
+
+def _extract_embedded_art(source: Path, work_dir: str) -> str | None:
+    """Pull the attached-pic cover art out of an mp3/m4a, if there is one."""
+    out = Path(work_dir) / "_embedded_art.jpg"
+    try:
+        _run_ffmpeg(["ffmpeg", "-i", str(source), "-map", "0:v",
+                     "-frames:v", "1", "-y", str(out)])
+    except Exception:
+        return None
+    return str(out) if out.exists() and out.stat().st_size > 0 else None
+
+
+def _prep_audiogram_assets(cover: str | None, tw: int, th: int,
+                           work_dir: str) -> tuple[str, str | None]:
+    """One-time Pillow prep for the audiogram canvas: a blurred/darkened
+    background PNG at frame size, plus a rounded square art card (~55% of frame
+    width). Blurring the still once here (instead of gblur per frame in ffmpeg)
+    keeps the render fast. Returns (bg_path, art_path); no cover -> a dark
+    gradient background and no card."""
+    from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+
+    bg_path = str(Path(work_dir) / "_ag_bg.png")
+    if not cover:
+        bg = Image.new("RGB", (tw, th))
+        d = ImageDraw.Draw(bg)
+        for y in range(th):  # subtle vertical near-black gradient
+            v = 34 - round(20 * y / th)
+            d.line([(0, y), (tw, y)], fill=(v, v, v + 8))
+        bg.save(bg_path)
+        return bg_path, None
+
+    im = Image.open(cover).convert("RGB")
+    # Background: crop-to-fill the frame, blur hard, darken. The blur also
+    # hides zoompan's integer-rounding jitter during the slow push-in.
+    scale = max(tw / im.width, th / im.height)
+    bg = im.resize((round(im.width * scale), round(im.height * scale)))
+    left, top = (bg.width - tw) // 2, (bg.height - th) // 2
+    bg = bg.crop((left, top, left + tw, top + th))
+    bg = bg.filter(ImageFilter.GaussianBlur(radius=max(20, tw // 27)))
+    bg = ImageEnhance.Brightness(bg).enhance(0.45)
+    bg.save(bg_path)
+
+    # Art card: square center-crop with rounded corners.
+    side = min(im.width, im.height)
+    art = im.crop(((im.width - side) // 2, (im.height - side) // 2,
+                   (im.width + side) // 2, (im.height + side) // 2))
+    card = round(tw * 0.55)
+    art = art.resize((card, card))
+    mask = Image.new("L", (card, card), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, card - 1, card - 1], radius=card // 18, fill=255)
+    art_rgba = Image.new("RGBA", (card, card))
+    art_rgba.paste(art, (0, 0), mask)
+    art_path = str(Path(work_dir) / "_ag_art.png")
+    art_rgba.save(art_path)
+    return bg_path, art_path
+
+
+def _accent_from_art(image_path: str | None) -> tuple[int, int, int, int] | None:
+    """Pick the artwork's dominant vibrant hue as the caption accent colour, so
+    the active-word highlight matches the podcast's branding. The hue is
+    re-lit for readability (full brightness, saturation backed off until the
+    colour is light enough over a dark background). Returns None — keep the
+    default accent — when there's no art or it's essentially monochrome."""
+    if not image_path:
+        return None
+    import colorsys
+    try:
+        from PIL import Image
+        im = Image.open(image_path).convert("RGB").resize((64, 64))
+    except Exception:
+        return None
+    bins = [0.0] * 12  # 30° hue bins, votes weighted by saturation*brightness
+    for r, g, b in im.getdata():
+        h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        if s < 0.25 or v < 0.25:
+            continue  # grays / blacks / near-whites don't vote
+        bins[int(h * 12) % 12] += s * v
+    if sum(bins) < 64:  # <~1.5% of pixels carry colour: monochrome art
+        return None
+    hue = (bins.index(max(bins)) + 0.5) / 12
+    r = g = b = 1.0
+    for s in (0.85, 0.65, 0.45):  # back off saturation until light enough
+        r, g, b = colorsys.hsv_to_rgb(hue, s, 1.0)
+        if 0.2126 * r + 0.7152 * g + 0.0722 * b >= 0.55:
+            break
+    return (round(r * 255), round(g * 255), round(b * 255), 255)
+
+
+def _logo_geometry(logo: str, tw: int, th: int, logo_pos: str,
+                   safe_area: str) -> tuple[int, str, int]:
+    """Logo overlay width, ffmpeg overlay position expression, and the minimum
+    top offset a hook card needs to clear a top-corner logo."""
+    lw = round(tw * 0.22)
+    mx = round(tw * 0.04)
+    # Vertical inset is much larger than horizontal: platform chrome (status
+    # bar, app header) lives at the top edge, not the sides.
+    my = round(th * _SAFE_AREAS.get(safe_area, _SAFE_AREAS["none"])[2])
+    hook_top_min = 0
+    if logo_pos.startswith("top"):
+        try:
+            from PIL import Image
+            with Image.open(logo) as _li:
+                _lh = round(_li.height * lw / _li.width)
+        except Exception:
+            _lh = round(th * 0.05)          # conservative guess
+        hook_top_min = my + _lh + round(th * 0.025)   # logo bottom + a gap
+    pos = {
+        "top-left": f"{mx}:{my}",
+        "top-right": f"W-w-{mx}:{my}",
+        "bottom-left": f"{mx}:H-h-{my}",
+        "bottom-right": f"W-w-{mx}:H-h-{my}",
+    }.get(logo_pos, f"{mx}:{my}")
+    return lw, pos, hook_top_min
+
+
+def _audiogram_cmd(source_video: Path, padded_start: float, duration: float,
+                   tw: int, th: int, bg_png: str, art_png: str | None,
+                   logo: str | None, logo_pos: str, safe_area: str,
+                   speed: float, af: str, temp_clip: Path,
+                   card_fade_at: float | None = None) -> tuple[list[str], int]:
+    """ffmpeg command for an audio-only source: blurred cover background with a
+    slow push-in, optional rounded art card, and a subtle waveform strip (the
+    captions burned by the later Pillow pass are the hero element — research
+    says over-designed waveforms hurt retention). `card_fade_at` delays the art
+    card until the opening hook card leaves, so the two never collide.
+    Returns (cmd, hook_top_min)."""
+    fps = 30
+    frames = max(1, round(duration * fps))
+    cmd = ["ffmpeg", "-ss", str(padded_start), "-t", str(duration),
+           "-i", str(source_video), "-loop", "1", "-i", bg_png]
+    # Slow 10% push-in over the clip; the pre-blurred background hides
+    # zoompan's integer-rounding jitter.
+    fc = [
+        "[0:a]asplit=2[a_wv][a_raw]",
+        f"[1:v]zoompan=z='1+0.10*on/{frames}':x='(iw-iw/zoom)/2'"
+        f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps={fps}[bg]",
+    ]
+    last = "bg"
+    idx = 2
+    if art_png:
+        cmd += ["-loop", "1", "-i", art_png]
+        art_in = f"{idx}:v"
+        if card_fade_at:
+            fc.append(f"[{idx}:v]format=rgba,"
+                      f"fade=t=in:st={card_fade_at}:d=0.4:alpha=1[fad]")
+            art_in = "fad"
+        fc.append(f"[{last}][{art_in}]overlay=(W-w)/2:{round(th * 0.27)}"
+                  f":format=auto[art]")
+        last = "art"
+        idx += 1
+    wave_h = 2 * round(th * 0.0375)   # even height for yuv420p
+    fc.append(f"[a_wv]aformat=channel_layouts=mono,"
+              f"showwaves=s={tw}x{wave_h}:mode=cline:rate={fps}"
+              f":colors=white@0.75[wv]")
+    fc.append(f"[{last}][wv]overlay=0:{round(th * 0.60)}:format=auto[wav]")
+    last = "wav"
+    hook_top_min = 0
+    if logo and os.path.exists(logo):
+        lw, pos, hook_top_min = _logo_geometry(logo, tw, th, logo_pos, safe_area)
+        cmd += ["-loop", "1", "-i", str(logo)]
+        fc.append(f"[{idx}:v]scale={lw}:-1[lg]")
+        fc.append(f"[{last}][lg]overlay={pos}:format=auto[lgo]")
+        last = "lgo"
+    if speed and speed != 1.0:
+        fc.append(f"[{last}]setpts={1.0/speed}*PTS[spd]")
+        last = "spd"
+    fc.append(f"[a_raw]{af}[aout]")
+    cmd += [
+        "-filter_complex", ";".join(fc),
+        "-map", f"[{last}]", "-map", "[aout]", "-shortest",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "medium",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-y",
+        str(temp_clip),
+    ]
+    return cmd, hook_top_min
+
+
+# ---------------------------------------------------------------------------
 # ffmpeg runner + clip extraction
 # ---------------------------------------------------------------------------
 
@@ -1216,8 +1426,13 @@ def extract_clip(
     logo_pos: str = "top-left",
     hook: str | None = None,
     safe_area: str = "none",
+    audiogram: tuple[str, str | None] | None = None,
+    accent: tuple[int, int, int, int] | None = None,
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
+
+    `audiogram` is (bg_png, art_png|None) from `_prep_audiogram_assets`: the
+    source is audio-only, so the video canvas is generated instead of cropped.
 
     Crop-to-fill is always used (never letterbox). `crop_vf` overrides the crop
     filtergraph (used for the speaker-tracking dynamic pan); otherwise a static
@@ -1249,7 +1464,7 @@ def extract_clip(
     _sub_symlink = None
     burn_with_pillow = False
     if not burn_captions and subtitles_path and subtitles_path.exists():
-        if _HAS_SUBTITLES_FILTER:
+        if _HAS_SUBTITLES_FILTER and not audiogram:
             _sub_symlink = Path(tempfile.mktemp(suffix=".srt", prefix="hc_sub_"))
             _sub_symlink.symlink_to(subtitles_path.resolve())
             safe_sub_path = str(_sub_symlink).replace("\\", "\\\\").replace(":", "\\:")
@@ -1275,49 +1490,42 @@ def extract_clip(
     else:
         temp_clip = output_path
 
-    cmd = ["ffmpeg", "-ss", str(padded_start), "-i", str(source_video)]
-    if logo and os.path.exists(logo):
-        # Overlay a fixed logo AFTER the crop (so it doesn't pan with the face
-        # track) and before captions. Sized to a fraction of frame width, inset
-        # from the chosen corner; the logo PNG's aspect is preserved.
-        lw = round(tw * 0.22)
-        mx = round(tw * 0.04)
-        # Vertical inset is much larger than horizontal: platform chrome (status
-        # bar, app header) lives at the top edge, not the sides.
-        my = round(th * _SAFE_AREAS.get(safe_area, _SAFE_AREAS["none"])[2])
-        if logo_pos.startswith("top"):
-            try:
-                from PIL import Image
-                with Image.open(logo) as _li:
-                    _lh = round(_li.height * lw / _li.width)
-            except Exception:
-                _lh = round(th * 0.05)          # conservative guess
-            hook_top_min = my + _lh + round(th * 0.025)   # logo bottom + a gap
-        pos = {
-            "top-left": f"{mx}:{my}",
-            "top-right": f"W-w-{mx}:{my}",
-            "bottom-left": f"{mx}:H-h-{my}",
-            "bottom-right": f"W-w-{mx}:H-h-{my}",
-        }.get(logo_pos, f"{mx}:{my}")
-        fc = (f"[0:v]{vf}[base];[1:v]scale={lw}:-1[lg];"
-              f"[base][lg]overlay={pos}:format=auto[v]")
-        cmd += ["-loop", "1", "-i", str(logo), "-t", str(duration),
-                "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"]
+    if audiogram:
+        # Audio-only source: generate the canvas (blurred cover + art card +
+        # waveform + logo) instead of cropping a video track. Audio filtering
+        # rides inside the filter_complex, so af is fully consumed here.
+        cmd, hook_top_min = _audiogram_cmd(
+            source_video, padded_start, duration, tw, th,
+            audiogram[0], audiogram[1], logo, logo_pos, safe_area,
+            speed, af, temp_clip,
+            card_fade_at=(1.8 if hook and hook.strip() else None))
     else:
-        cmd += ["-t", str(duration), "-vf", vf]
-    if af:
-        cmd += ["-af", af]
-    cmd += [
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "medium",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        "-y",
-        str(temp_clip),
-    ]
+        cmd = ["ffmpeg", "-ss", str(padded_start), "-i", str(source_video)]
+        if logo and os.path.exists(logo):
+            # Overlay a fixed logo AFTER the crop (so it doesn't pan with the
+            # face track) and before captions. Sized to a fraction of frame
+            # width, inset from the chosen corner; PNG aspect preserved.
+            lw, pos, hook_top_min = _logo_geometry(logo, tw, th, logo_pos,
+                                                   safe_area)
+            fc = (f"[0:v]{vf}[base];[1:v]scale={lw}:-1[lg];"
+                  f"[base][lg]overlay={pos}:format=auto[v]")
+            cmd += ["-loop", "1", "-i", str(logo), "-t", str(duration),
+                    "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"]
+        else:
+            cmd += ["-t", str(duration), "-vf", vf]
+        if af:
+            cmd += ["-af", af]
+        cmd += [
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "medium",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-y",
+            str(temp_clip),
+        ]
 
     try:
         _run_ffmpeg(cmd)
@@ -1330,7 +1538,8 @@ def extract_clip(
         try:
             _burn_captions_pillow(temp_clip, caption_entries or [], output_path, tw, th,
                                   font=font, speed=speed, hook=hook,
-                                  safe_area=safe_area, hook_top_min=hook_top_min)
+                                  safe_area=safe_area, hook_top_min=hook_top_min,
+                                  accent=accent)
         finally:
             if temp_clip.exists():
                 temp_clip.unlink()
@@ -1414,7 +1623,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  speed: float = 1.0, font: str | None = None,
                  logo: str | None = None, logo_pos: str = "top-left",
                  hook_card: bool = True, hook_variant: int = 0,
-                 safe_area: str = "none") -> list[str]:
+                 safe_area: str = "none", cover: str | None = None) -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
     burned Hebrew captions from the clip's word timings. If `logo` is given, it's
     trimmed once and overlaid in the `logo_pos` corner of every clip. When
@@ -1424,6 +1633,12 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     `hook_variant` picks which hook line the card uses: 0 = the primary `hook`
     (default), N>0 = `hook_variants[N-1]` from the clip spec, written to
     `<id>.hookN.mp4` so A/B renders of the same clip don't overwrite each other.
+
+    Audio-only sources (mp3 podcasts) render in audiogram mode automatically:
+    a blurred cover-art canvas with a slow push-in, rounded art card, and a
+    subtle waveform strip — the karaoke captions remain the hero. Cover art:
+    `cover` arg, else SOFIT_COVER env, else the mp3's embedded art, else a
+    plain dark gradient.
     Returns the list of output paths."""
     source = Path(video_path)
     out = Path(out_dir)
@@ -1439,6 +1654,23 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
         logo_ready = _prep_logo(logo, logo_dir)
 
     tw, th = _target_resolution(aspect)
+
+    # Audio-only source -> audiogram mode: build the canvas assets once.
+    audiogram_assets = None
+    ag_dir = None
+    if _is_audio_only(source):
+        ag_dir = tempfile.mkdtemp(prefix="hc_ag_")
+        cover = (cover or os.environ.get("SOFIT_COVER")
+                 or _extract_embedded_art(source, ag_dir))
+        audiogram_assets = _prep_audiogram_assets(cover, tw, th, ag_dir)
+        print(f"audio-only source: rendering audiograms "
+              f"({'cover art' if cover else 'no cover art — gradient'})",
+              file=sys.stderr)
+
+    # Brand-match the active-word caption colour to the show's artwork: the
+    # cover in audiogram mode, else the logo. Monochrome art keeps the default.
+    accent = _accent_from_art(cover if audiogram_assets else logo)
+
     outputs: list[str] = []
     for clip in clips:
         clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
@@ -1485,7 +1717,9 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
             focus = clip.get("focus")
             crop_vf = None
             crop_position = 0.5
-            if isinstance(focus, (int, float)):
+            if audiogram_assets:
+                pass  # generated canvas: nothing to crop or track
+            elif isinstance(focus, (int, float)):
                 crop_position = float(focus)
             elif tw < th:
                 samples, aspect_hw = _face_track(source, start, end)
@@ -1516,6 +1750,8 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                 # The hook card belongs to second zero only — the first span.
                 hook=(hook_text if hook_card and ri == 0 else None),
                 safe_area=safe_area,
+                audiogram=audiogram_assets,
+                accent=accent,
             )
             parts.append(part_path)
 
@@ -1525,4 +1761,6 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
 
     if logo_dir:
         shutil.rmtree(logo_dir, ignore_errors=True)
+    if ag_dir:
+        shutil.rmtree(ag_dir, ignore_errors=True)
     return outputs

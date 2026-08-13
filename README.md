@@ -171,6 +171,15 @@ sofit episode.mp4 --render-clips clips_out --aspect 9:16
 Also exposed as the MCP `render_clips` tool for the Claude-app interface. (Rendering
 logic is self-contained here — no dependency on any other tool.)
 
+**Audio-only podcasts (audiograms).** An mp3 with no video track renders automatically
+as an audiogram: blurred cover art background with a slow push-in, a rounded art card,
+a subtle waveform strip — the karaoke captions stay the hero element. Cover art comes
+from `--cover PATH`, else the `SOFIT_COVER` env var, else the mp3's embedded art, else
+a plain dark gradient. Everything else (hook card, logo, captions, trims) works the same.
+```bash
+sofit episode.mp3 --render-clips clips_out   # audiogram mode, auto-detected
+```
+
 **Framing.** By default the crop is centered. With the optional `crop` extra
 (`pip install 'sofit-cli[crop]'`, adds OpenCV) each clip is auto-cropped to
 center on a detected face — so a speaker sitting off to one side is framed instead

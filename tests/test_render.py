@@ -505,3 +505,74 @@ def test_render_clips_narrative_segments_render_per_span_and_concat(monkeypatch,
     outs = r.render_clips("v.mp4", [flat], str(tmp_path))
     assert len(calls) == 1 and not concats
     assert outs == [str(calls[0]["output_path"])] and outs[0].endswith("clip-2.mp4")
+
+
+# ---------------------------------------------------------------------------
+# Audiogram mode (audio-only sources)
+# ---------------------------------------------------------------------------
+
+def test_audiogram_cmd_shape():
+    """The generated ffmpeg command builds the canvas from the audio + stills:
+    zoompan background, art card, waveform, and audio filtered in-graph."""
+    from sofit.render import _audiogram_cmd, _AUDIO_LIMITER
+
+    cmd, hook_top_min = _audiogram_cmd(
+        Path("ep.mp3"), 30.0, 12.0, 1080, 1920,
+        "bg.png", "art.png", None, "top-left", "none",
+        1.0, _AUDIO_LIMITER, Path("out.mp4"), card_fade_at=1.8)
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    assert "zoompan" in fc                      # slow push-in background
+    assert "showwaves" in fc                    # waveform strip
+    assert "fade=t=in:st=1.8" in fc             # card dodges the hook card
+    assert _AUDIO_LIMITER in fc                 # audio filtered in-graph...
+    assert "-af" not in cmd                     # ...not doubled via -af
+    assert "-shortest" in cmd                   # looped stills end with audio
+    assert hook_top_min == 0                    # no logo -> no hook offset
+
+
+def test_prep_audiogram_assets_gradient_fallback(tmp_path):
+    """No cover art -> a frame-sized gradient background and no art card."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    from sofit.render import _prep_audiogram_assets
+
+    bg, art = _prep_audiogram_assets(None, 108, 192, str(tmp_path))
+    assert art is None
+    assert Image.open(bg).size == (108, 192)
+
+
+def test_prep_audiogram_assets_cover(tmp_path):
+    """A cover produces a blurred frame-sized bg and a square rounded card."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    from sofit.render import _prep_audiogram_assets
+
+    cover = tmp_path / "cover.jpg"
+    Image.new("RGB", (500, 500), (200, 120, 40)).save(cover)
+    bg, art = _prep_audiogram_assets(str(cover), 108, 192, str(tmp_path))
+    assert Image.open(bg).size == (108, 192)
+    card = Image.open(art)
+    assert card.size == (round(108 * 0.55), round(108 * 0.55))
+    assert card.mode == "RGBA"
+    assert card.getpixel((0, 0))[3] == 0        # rounded corner is transparent
+
+
+def test_accent_from_art(tmp_path):
+    """Vibrant art yields a bright brand-matched accent; monochrome art and
+    missing art keep the default (None)."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    from sofit.render import _accent_from_art
+
+    orange = tmp_path / "orange.png"
+    Image.new("RGB", (64, 64), (230, 140, 20)).save(orange)
+    accent = _accent_from_art(str(orange))
+    assert accent is not None
+    r, g, b, a = accent
+    assert r > b and a == 255                   # warm hue kept
+    assert 0.2126 * r + 0.7152 * g + 0.0722 * b >= 0.55 * 255  # readable
+
+    mono = tmp_path / "mono.png"
+    Image.new("RGB", (64, 64), (240, 240, 240)).save(mono)
+    assert _accent_from_art(str(mono)) is None
+    assert _accent_from_art(None) is None

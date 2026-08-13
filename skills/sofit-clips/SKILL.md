@@ -72,6 +72,9 @@ Present the table; ask which numbers to render. Build the spec from the picks:
 "$SOFIT" --render-from "<episode>.clips.json" --render-clips "<out_dir>" --logo "$LOGO"
 ```
 - Crop-to-fill 9:16, speaker-tracking face crop, bold Hebrew word-highlight captions, logo top-left.
+- Audio-only source (mp3, no video track) ⇒ audiogram mode automatically: blurred
+  cover-art background + art card + subtle waveform; captions stay the hero. Cover:
+  `--cover PATH` / `SOFIT_COVER` env / the mp3's embedded art / gradient fallback.
 - Narrative edits: a clip with `segments` (2+ kept spans) renders each span and
   losslessly concats them — the filler between beats is cut automatically. The
   hook card goes on the first span only; captions/face-crop run per span.
