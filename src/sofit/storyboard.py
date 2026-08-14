@@ -131,8 +131,15 @@ def character_sheet(char_refs: dict[str, str], style: str, cache_path: Path) -> 
         f"Characters: {names}. "
         + " ".join(f"Photo {i + 1} is {name}." for i, name in enumerate(char_refs))
         + " Show each character full-body, front view and three-quarter view, on a "
-          "plain light background, consistent proportions and outfits, with the "
-          "character's name printed under each. No other text.")}]
+          "plain light background, consistent proportions and outfits"
+        # Name labels exist only to map names to faces; with one character
+        # they just teach the model to stamp the name into every scene.
+        + (", with the character's name printed under each. No other text. "
+           if len(char_refs) > 1 else ". No text or labels anywhere. ")
+        + "CRITICAL: match each photo's REAL features faithfully - face shape, "
+          "hairstyle, hair color and length, apparent age, and body type. Do not "
+          "idealize, de-age, or turn the person into a generic hero; a stylized "
+          "but recognizable likeness.")}]
     parts += [_img_part(p) for p in char_refs.values()]
     print("storyboard: generating character sheet (cached for later runs)", file=sys.stderr)
     cache_path.write_bytes(_gemini_image(parts, aspect="16:9"))
@@ -194,10 +201,13 @@ def plan_scenes(words: list[dict], duration: float, characters: list[str],
 def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) -> Path:
     parts: list[dict] = [{"text": (
         f"{style}. {prompt}. Vertical 9:16 composition. "
-        "No text, no numbers, no readable signage or screens, no captions, "
-        "no watermarks, no speech bubbles."
+        "Absolutely no letters, words, names, or numbers anywhere in the "
+        "image: no text, no readable signage or screens, no captions, no "
+        "watermarks, no speech bubbles, no name labels."
         + (" Use the attached character reference sheet: keep every depicted "
-           "character EXACTLY consistent with it (face, hair, outfit, colors)."
+           "character EXACTLY consistent with it (face, hair, outfit, colors). "
+           "Never copy the sheet's name labels, panel layout, or plain "
+           "background into the scene."
            if sheet else ""))}]
     if sheet:
         parts.append(_img_part(sheet))
