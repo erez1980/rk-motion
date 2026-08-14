@@ -194,7 +194,8 @@ def plan_scenes(words: list[dict], duration: float, characters: list[str],
 def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) -> Path:
     parts: list[dict] = [{"text": (
         f"{style}. {prompt}. Vertical 9:16 composition. "
-        "No text, no captions, no watermarks, no speech bubbles."
+        "No text, no numbers, no readable signage or screens, no captions, "
+        "no watermarks, no speech bubbles."
         + (" Use the attached character reference sheet: keep every depicted "
            "character EXACTLY consistent with it (face, hair, outfit, colors)."
            if sheet else ""))}]
