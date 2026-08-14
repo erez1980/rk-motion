@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -38,6 +39,13 @@ DEFAULT_STYLE = (
 IMAGE_MODEL = os.environ.get("SOFIT_IMAGE_MODEL", "gemini-2.5-flash-image")
 _GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
                "{model}:generateContent?key={key}")
+
+# --animate: image-to-video via fal.ai (needs FAL_KEY). Kling only does 5s or
+# 10s shots; shorter scenes get trimmed, longer ones freeze-hold the last frame.
+VIDEO_MODEL = os.environ.get("SOFIT_VIDEO_MODEL",
+                             "fal-ai/kling-video/v2.1/standard/image-to-video")
+_FAL_QUEUE = "https://queue.fal.run/{model}"
+_FAL_POLL_SECONDS = 480
 
 # Stills are rendered at 2x the 1080x1920 target so zoompan's integer-rounding
 # jitter lands on subpixels of the source, not visible steps.
@@ -214,12 +222,75 @@ def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) ->
     return _save_cover(_gemini_image(parts, aspect="9:16"), out_path)
 
 
+def _scene_video(prompt: str, still: Path, dur: float, out_path: Path) -> Path | None:
+    """Animate a scene still via fal.ai image-to-video. Returns the mp4 path,
+    or None on any failure so the caller falls back to Ken Burns."""
+    fal_key = os.environ.get("FAL_KEY")
+    if not fal_key:
+        return None
+    try:
+        from PIL import Image
+        im = Image.open(still).convert("RGB")
+        im.thumbnail((1080, 1920), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=88)
+        body = json.dumps({
+            "prompt": (f"{prompt}. Subtle cinematic motion, natural character "
+                       "movement, slow camera drift. No text."),
+            "image_url": ("data:image/jpeg;base64,"
+                          + base64.b64encode(buf.getvalue()).decode()),
+            "duration": "5" if dur <= 5.0 else "10",
+        }).encode()
+        headers = {"Authorization": f"Key {fal_key}", "Content-Type": "application/json"}
+        req = urllib.request.Request(_FAL_QUEUE.format(model=VIDEO_MODEL),
+                                     data=body, headers=headers)
+        with urllib.request.urlopen(req, timeout=60) as r:
+            job = json.loads(r.read())
+        deadline = time.monotonic() + _FAL_POLL_SECONDS
+
+        def _get_json(url: str, timeout: int) -> dict:
+            # Transient read timeouts are normal on long polls; retry until
+            # the overall deadline says otherwise.
+            while True:
+                try:
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=timeout) as r:
+                        return json.loads(r.read())
+                except (TimeoutError, urllib.error.URLError) as e:
+                    if time.monotonic() > deadline:
+                        raise RuntimeError("fal job timed out") from e
+                    time.sleep(5)
+
+        while True:
+            status = _get_json(job["status_url"], 30)["status"]
+            if status == "COMPLETED":
+                break
+            if status not in ("IN_QUEUE", "IN_PROGRESS"):
+                raise RuntimeError(f"fal job status {status}")
+            if time.monotonic() > deadline:
+                raise RuntimeError("fal job timed out")
+            time.sleep(5)
+        url = _get_json(job["response_url"], 60)["video"]["url"]
+        for attempt in (1, 2):
+            try:
+                with urllib.request.urlopen(url, timeout=180) as r:
+                    out_path.write_bytes(r.read())
+                return out_path
+            except (TimeoutError, urllib.error.URLError):
+                if attempt == 2:
+                    raise
+        return out_path
+    except Exception as e:  # noqa: BLE001 - any failure degrades to Ken Burns
+        print(f"warning: scene animation failed ({e}); using still", file=sys.stderr)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # ffmpeg assembly (Ken Burns over the clip audio) + captions
 # ---------------------------------------------------------------------------
 
 def _render_span(source: Path, start: float, duration: float,
-                 scene_files: list[tuple[Path, float]], output_path: Path,
+                 scene_files: list[tuple[Path, float, bool]], output_path: Path,
                  tw: int, th: int, logo: str | None, logo_pos: str,
                  safe_area: str, caption_entries: list | None,
                  hook: str | None, cta: str | None, font: str | None,
@@ -230,18 +301,27 @@ def _render_span(source: Path, start: float, duration: float,
 
     cmd = ["ffmpeg", "-ss", str(start), "-t", str(duration), "-i", str(source)]
     fc, labels = [], []
-    for i, (png, d) in enumerate(scene_files):
-        # -framerate FPS matters: the png demuxer defaults to 25fps and zoompan
-        # (d=1) emits one output frame per input frame, which would cut every
-        # scene short by 5/30ths.
-        cmd += ["-framerate", str(FPS), "-loop", "1", "-t", str(d), "-i", str(png)]
-        frames = max(1, round(d * FPS))
-        # Alternate push-in / pull-out per scene so consecutive stills don't
-        # move identically.
-        z = (f"1+0.08*on/{frames}" if i % 2 == 0 else f"1.08-0.08*on/{frames}")
-        fc.append(f"[{i + 1}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
-                  f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps={FPS},"
-                  f"trim=duration={d},setpts=PTS-STARTPTS[s{i}]")
+    for i, (path, d, is_video) in enumerate(scene_files):
+        if is_video:
+            # Animated scene: cover-crop, freeze-hold the last frame if the
+            # shot is shorter than the scene, trim to the exact beat length.
+            cmd += ["-i", str(path)]
+            fc.append(f"[{i + 1}:v]scale={tw}:{th}:force_original_aspect_ratio="
+                      f"increase,crop={tw}:{th},fps={FPS},"
+                      f"tpad=stop_mode=clone:stop_duration=30,"
+                      f"trim=duration={d},setpts=PTS-STARTPTS[s{i}]")
+        else:
+            # -framerate FPS matters: the png demuxer defaults to 25fps and
+            # zoompan (d=1) emits one output frame per input frame, which would
+            # cut every scene short by 5/30ths.
+            cmd += ["-framerate", str(FPS), "-loop", "1", "-t", str(d), "-i", str(path)]
+            frames = max(1, round(d * FPS))
+            # Alternate push-in / pull-out per scene so consecutive stills
+            # don't move identically.
+            z = (f"1+0.08*on/{frames}" if i % 2 == 0 else f"1.08-0.08*on/{frames}")
+            fc.append(f"[{i + 1}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
+                      f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps={FPS},"
+                      f"trim=duration={d},setpts=PTS-STARTPTS[s{i}]")
         labels.append(f"[s{i}]")
     fc.append("".join(labels) + f"concat=n={len(scene_files)}:v=1:a=0[bg]")
     last, idx = "bg", len(scene_files) + 1
@@ -284,7 +364,8 @@ def render_storyboard_clips(video_path: str, clips: list[dict], out_dir: str,
                             hook_variant: int = 0, safe_area: str = "none",
                             cta: str | None = None, style: str | None = None,
                             char_refs: dict[str, str] | None = None,
-                            font: str | None = None, titler: str = "api") -> list[str]:
+                            font: str | None = None, titler: str = "api",
+                            animate: bool = False) -> list[str]:
     """Render each clip as an AI-illustrated storytime video to out_dir/<id>.mp4.
 
     Same clip spec, captions, hook card, CTA and logo behavior as
@@ -337,15 +418,25 @@ def render_storyboard_clips(video_path: str, clips: list[dict], out_dir: str,
             print(f"storyboard: {clip_id} span {ri + 1}/{len(ranges)}: "
                   f"{len(scenes)} scenes", file=sys.stderr)
 
-            scene_files: list[tuple[Path, float]] = []
+            scene_files: list[tuple[Path, float, bool]] = []
             for s in scenes:
                 scene_no += 1
+                d = s["end"] - s["start"]
                 png = scene_dir / f"scene-{scene_no:02d}.png"
                 if not png.exists():  # re-runs reuse already-generated stills
                     _scene_image(s["prompt"], style, sheet, png)
                 (scene_dir / f"scene-{scene_no:02d}.txt").write_text(
                     s["prompt"] + "\n", encoding="utf-8")
-                scene_files.append((png, s["end"] - s["start"]))
+                if animate:
+                    mp4 = scene_dir / f"scene-{scene_no:02d}.mp4"
+                    if not mp4.exists():  # re-runs reuse animated shots too
+                        print(f"storyboard: animating scene {scene_no}...",
+                              file=sys.stderr)
+                        _scene_video(s["prompt"], png, d, mp4)
+                    if mp4.exists():
+                        scene_files.append((mp4, d, True))
+                        continue
+                scene_files.append((png, d, False))
 
             caption_entries = None
             if words:
@@ -402,11 +493,18 @@ def _selftest() -> None:  # pragma: no cover - manual check
         wav = tdp / "tone.wav"
         render._run_ffmpeg(["ffmpeg", "-f", "lavfi", "-i",
                             "sine=frequency=440:duration=4", "-y", str(wav)])
+        # A 1s "animated" scene shorter than its 2s beat: exercises the video
+        # branch (cover-crop + tpad freeze-hold + trim).
+        vid = tdp / "v0.mp4"
+        render._run_ffmpeg(["ffmpeg", "-framerate", "30", "-loop", "1", "-t", "1",
+                            "-i", str(tdp / "s1.png"), "-pix_fmt", "yuv420p",
+                            "-y", str(vid)])
         out = tdp / "out.mp4"
         entries = [{"start": 0.2, "end": 3.5,
                     "words": [{"text": "שלום", "start": 0.2, "end": 1.0},
                               {"text": "עולם", "start": 1.0, "end": 2.0}]}]
-        _render_span(wav, 0.0, 4.0, [(tdp / "s0.png", 2.0), (tdp / "s1.png", 2.0)],
+        _render_span(wav, 0.0, 4.0,
+                     [(tdp / "s0.png", 2.0, False), (vid, 2.0, True)],
                      out, 1080, 1920, None, "top-left", "none", entries,
                      hook="בדיקה", cta=None, font=None, accent=None)
         assert out.exists() and out.stat().st_size > 10_000

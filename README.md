@@ -96,6 +96,10 @@ generated once from your `--char-ref` photos (cached as
 can inspect or tweak; re-runs reuse existing stills. `--style` overrides the
 default comic-book look (or set `SOFIT_STYLE`).
 
+Add `--animate` (needs `FAL_KEY` from fal.ai) to turn each still into a real
+image-to-video shot via Kling (~$0.25-0.50 per scene); failed scenes fall back
+to Ken Burns stills, and generated shots cache in `<clip>.scenes/*.mp4`.
+
 ## How it works
 
 ```

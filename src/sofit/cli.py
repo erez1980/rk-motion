@@ -101,6 +101,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--style", metavar="TEXT",
                    help="storyboard art style (default: SOFIT_STYLE env, else a "
                    "comic-book look)")
+    p.add_argument("--animate", action="store_true",
+                   help="with --storyboard: animate each scene via image-to-video "
+                   "(fal.ai Kling, needs FAL_KEY; ~$0.25-0.50 per scene). Failed "
+                   "scenes fall back to Ken Burns stills")
     p.add_argument("--char-ref", action="append", metavar="NAME=IMG",
                    help="recurring character for --storyboard: display name + "
                    "reference photo; repeatable. A cached character sheet keeps "
@@ -139,7 +143,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
                  cta: str | None = None, music: str | None = None,
                  storyboard: bool = False, style: str | None = None,
                  char_refs: dict[str, str] | None = None,
-                 titler: str = "api") -> int:
+                 titler: str = "api", animate: bool = False) -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -188,7 +192,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
                                           hook_variant=hook_variant,
                                           safe_area=safe_area, cta=cta,
                                           style=style, char_refs=char_refs,
-                                          titler=titler)
+                                          titler=titler, animate=animate)
         print(f"rendered {len(outs)} storyboard clip(s) to {out}", file=sys.stderr)
         return 0
     from . import render
@@ -216,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
                             cta=args.cta, music=args.music,
                             storyboard=args.storyboard, style=args.style,
                             char_refs=_parse_char_refs(args.char_ref),
-                            titler=args.titler)
+                            titler=args.titler, animate=args.animate)
 
     if args.storyboard:
         print("error: --storyboard renders from a saved spec; run once to get a "
