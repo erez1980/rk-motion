@@ -19,6 +19,21 @@ LOGO="/Users/navotv/Downloads/logo weekly-01.png"   # Weekly Sync wordmark (tran
 
 Needs the transcript cached (run `/sofit-transcribe` first if not).
 
+## Per-show recipes
+
+**הקרנף (audio-only, daily)** — feed `https://feeds.megaphone.fm/POLTD2316968013`:
+```bash
+export SOFIT_MUSIC=~/Downloads/karnaf-theme.mp3   # the show's outro theme (user-confirmed)
+export SOFIT_CTA="הקרנף — בכל אפליקציות הפודקאסטים"
+# no logo; cover art + brand-amber captions come from the mp3's embedded art automatically
+```
+mp3-only ⇒ audiogram mode auto-triggers. If the theme file is missing, re-extract:
+whisper skips music, so the episode's untranscribed-but-loud transcript gaps
+(intro / mid-breaks / outro) are the music candidates — cut them with ffmpeg and
+let the user pick by ear (the outro is the confirmed theme).
+
+**Weekly Sync (video)** — `LOGO` above, no music bed (video path), face-crop active.
+
 ## 0. Refresh the trend playbook — ONLY if stale
 
 Short-form technique moves slowly (the 2026-07-25 pass found the best playbooks were
