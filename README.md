@@ -77,6 +77,25 @@ Example output:
 ‎18:05 — הטעות הכי גדולה שעשינו
 ```
 
+### Animated storytime clips (`--storyboard`)
+
+Render a clip as an AI-illustrated "storytime" reel — generated comic-style
+scenes instead of the recording, Ken-Burns motion, same karaoke captions,
+hook card, and logo:
+
+```bash
+export GEMINI_API_KEY=...   # scene images (Nano Banana)
+sofit --render-from ep.clips.json --storyboard --only clip-3 \
+      --char-ref "Navot=navot.jpg" --char-ref "Guy=guy.jpg" --logo logo.png
+```
+
+Claude splits each beat into ~4-9s scenes with English image prompts; Gemini
+renders one vertical still per scene, kept consistent by a character sheet
+generated once from your `--char-ref` photos (cached as
+`characters.sheet.png`). Stills and prompts land in `<clip>.scenes/` so you
+can inspect or tweak; re-runs reuse existing stills. `--style` overrides the
+default comic-book look (or set `SOFIT_STYLE`).
+
 ## How it works
 
 ```

@@ -1,0 +1,403 @@
+"""AI-illustrated "storytime" clip renderer (the animated comic-reel look).
+
+Replaces a clip's visual track with generated scenes instead of the recording:
+Claude splits the clip's words into ~4-9s beats, each with an English image
+prompt; Gemini (Nano Banana) renders one vertical still per beat, kept visually
+consistent by a character sheet generated once and cached; ffmpeg Ken-Burns
+each still over the clip audio; the existing caption/hook/logo pipeline from
+`render.py` runs unchanged on top.
+
+Needs GEMINI_API_KEY (image generation) plus the usual Claude backend
+(ANTHROPIC_API_KEY or the claude CLI) for scene planning.
+
+Self-check (no network, needs ffmpeg + Pillow):
+    python -m sofit.storyboard --selftest
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import json
+import os
+import sys
+import tempfile
+import urllib.request
+from pathlib import Path
+
+from .generate import GenerationError, call_claude_json
+
+# Default look tuned to the "animated storytime" genre: comic-book stills with
+# subtle motion. Overridable per run with --style.
+DEFAULT_STYLE = (
+    "vibrant comic-book illustration, bold ink outlines, rich warm colors, "
+    "cinematic lighting, detailed backgrounds, expressive characters"
+)
+
+IMAGE_MODEL = os.environ.get("SOFIT_IMAGE_MODEL", "gemini-2.5-flash-image")
+_GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               "{model}:generateContent?key={key}")
+
+# Stills are rendered at 2x the 1080x1920 target so zoompan's integer-rounding
+# jitter lands on subpixels of the source, not visible steps.
+SCENE_W, SCENE_H = 2160, 3840
+FPS = 30
+TARGET_SCENE_SECONDS = 6.0
+
+
+# ---------------------------------------------------------------------------
+# Gemini image generation
+# ---------------------------------------------------------------------------
+
+def _api_key() -> str:
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not set (needed for scene image generation)")
+    return key
+
+
+def _img_part(path: str | Path) -> dict:
+    data = Path(path).read_bytes()
+    mime = "image/jpeg" if str(path).lower().endswith((".jpg", ".jpeg")) else "image/png"
+    return {"inline_data": {"mime_type": mime, "data": base64.b64encode(data).decode()}}
+
+
+def _gemini_image(parts: list[dict], aspect: str = "9:16") -> bytes:
+    """One image out of Gemini, with a single retry. `parts` = text + inline images."""
+    body = json.dumps({
+        "contents": [{"parts": parts}],
+        "generationConfig": {"responseModalities": ["IMAGE"],
+                             "imageConfig": {"aspectRatio": aspect}},
+    }).encode()
+    url = _GEMINI_URL.format(model=IMAGE_MODEL, key=_api_key())
+    last: Exception | None = None
+    for _ in range(2):
+        try:
+            req = urllib.request.Request(
+                url, data=body, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                out = json.loads(resp.read())
+            for part in out["candidates"][0]["content"]["parts"]:
+                if "inlineData" in part:
+                    return base64.b64decode(part["inlineData"]["data"])
+                if "inline_data" in part:
+                    return base64.b64decode(part["inline_data"]["data"])
+            last = RuntimeError("no image in Gemini response")
+        except Exception as e:  # noqa: BLE001 - network/API errors all retry once
+            last = e
+    raise RuntimeError(f"Gemini image generation failed: {last}")
+
+
+def _save_cover(png_bytes: bytes, out_path: Path) -> Path:
+    """Cover-crop the generated image to SCENE_WxSCENE_H (fill, center-crop)."""
+    from PIL import Image
+    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    scale = max(SCENE_W / im.width, SCENE_H / im.height)
+    im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
+    left, top = (im.width - SCENE_W) // 2, (im.height - SCENE_H) // 2
+    im.crop((left, top, left + SCENE_W, top + SCENE_H)).save(out_path)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Character sheet (generated once, cached) + scene planning
+# ---------------------------------------------------------------------------
+
+def character_sheet(char_refs: dict[str, str], style: str, cache_path: Path) -> Path | None:
+    """One reference sheet for all recurring characters, cached on disk.
+
+    `char_refs` maps character name -> reference photo path. The sheet is what
+    keeps the cast looking identical across scenes - every scene generation
+    attaches it as a reference image.
+    """
+    if not char_refs:
+        return None
+    if cache_path.exists():
+        return cache_path
+    names = ", ".join(char_refs)
+    parts: list[dict] = [{"text": (
+        f"Create ONE character reference sheet in this style: {style}. "
+        f"Characters: {names}. "
+        + " ".join(f"Photo {i + 1} is {name}." for i, name in enumerate(char_refs))
+        + " Show each character full-body, front view and three-quarter view, on a "
+          "plain light background, consistent proportions and outfits, with the "
+          "character's name printed under each. No other text.")}]
+    parts += [_img_part(p) for p in char_refs.values()]
+    print("storyboard: generating character sheet (cached for later runs)", file=sys.stderr)
+    cache_path.write_bytes(_gemini_image(parts, aspect="16:9"))
+    return cache_path
+
+
+def plan_scenes(words: list[dict], duration: float, characters: list[str],
+                style: str, titler: str = "api") -> list[dict]:
+    """Split one span's words into contiguous scenes with English image prompts.
+
+    `words` are clip-spec word dicts ({"t": rel_sec, "d": dur, "w": text}).
+    Returns [{"start", "end", "prompt"}, ...] covering [0, duration] exactly.
+    """
+    n_hint = max(1, round(duration / TARGET_SCENE_SECONDS))
+    timed = "\n".join(f'{float(w["t"]):.1f} {w.get("w", "")}' for w in words)
+    cast = (f"Recurring characters you may feature (use their names): "
+            f"{', '.join(characters)}. " if characters else "")
+    system = (
+        "You storyboard short vertical social videos. Given a transcript span with "
+        "per-word start times (seconds, relative to the span), split it into "
+        "consecutive scenes and write ONE image-generation prompt per scene. "
+        'Return ONLY JSON: {"scenes": [{"start": s, "end": s, "prompt": str}, ...]}. '
+        "Rules: scenes are contiguous, cover the full span, each 4-9 seconds "
+        f"(about {n_hint} scenes total). Prompts are in ENGLISH, concrete and "
+        "visual (setting, subjects, action, mood, camera angle), illustrate what "
+        "is being SAID at that moment, and never contain text, captions, logos "
+        "or speech bubbles. " + cast +
+        "The transcript may be in Hebrew; the prompts must still be English."
+    )
+    user = f"Span duration: {duration:.1f}s\nWords:\n{timed}"
+
+    def validate(obj):
+        scenes = obj.get("scenes") if isinstance(obj, dict) else None
+        if not isinstance(scenes, list) or not scenes:
+            raise GenerationError("no scenes")
+        out = []
+        for s in scenes:
+            p = str(s.get("prompt") or "").strip()
+            if not p:
+                raise GenerationError("scene without prompt")
+            out.append({"start": float(s.get("start", 0)),
+                        "end": float(s.get("end", 0)), "prompt": p})
+        return out
+
+    scenes = call_claude_json(system, user, validate, titler=titler)
+    # Enforce contiguity + full coverage regardless of LLM sloppiness: the
+    # audio is the timeline; scene boundaries just have to tile it.
+    scenes.sort(key=lambda s: s["start"])
+    prev = 0.0
+    for s in scenes:
+        s["start"] = prev
+        s["end"] = max(prev + 0.5, min(float(s["end"]), duration))
+        prev = s["end"]
+    scenes = [s for s in scenes if s["start"] < duration]
+    scenes[-1]["end"] = duration
+    return scenes
+
+
+def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) -> Path:
+    parts: list[dict] = [{"text": (
+        f"{style}. {prompt}. Vertical 9:16 composition. "
+        "No text, no captions, no watermarks, no speech bubbles."
+        + (" Use the attached character reference sheet: keep every depicted "
+           "character EXACTLY consistent with it (face, hair, outfit, colors)."
+           if sheet else ""))}]
+    if sheet:
+        parts.append(_img_part(sheet))
+    return _save_cover(_gemini_image(parts, aspect="9:16"), out_path)
+
+
+# ---------------------------------------------------------------------------
+# ffmpeg assembly (Ken Burns over the clip audio) + captions
+# ---------------------------------------------------------------------------
+
+def _render_span(source: Path, start: float, duration: float,
+                 scene_files: list[tuple[Path, float]], output_path: Path,
+                 tw: int, th: int, logo: str | None, logo_pos: str,
+                 safe_area: str, caption_entries: list | None,
+                 hook: str | None, cta: str | None, font: str | None,
+                 accent: tuple[int, int, int, int] | None) -> Path:
+    """Assemble one span: stills Ken-Burnsed and concatenated over the span's
+    audio, then the shared Pillow caption/hook/CTA pass."""
+    from . import render
+
+    cmd = ["ffmpeg", "-ss", str(start), "-t", str(duration), "-i", str(source)]
+    fc, labels = [], []
+    for i, (png, d) in enumerate(scene_files):
+        # -framerate FPS matters: the png demuxer defaults to 25fps and zoompan
+        # (d=1) emits one output frame per input frame, which would cut every
+        # scene short by 5/30ths.
+        cmd += ["-framerate", str(FPS), "-loop", "1", "-t", str(d), "-i", str(png)]
+        frames = max(1, round(d * FPS))
+        # Alternate push-in / pull-out per scene so consecutive stills don't
+        # move identically.
+        z = (f"1+0.08*on/{frames}" if i % 2 == 0 else f"1.08-0.08*on/{frames}")
+        fc.append(f"[{i + 1}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
+                  f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps={FPS},"
+                  f"trim=duration={d},setpts=PTS-STARTPTS[s{i}]")
+        labels.append(f"[s{i}]")
+    fc.append("".join(labels) + f"concat=n={len(scene_files)}:v=1:a=0[bg]")
+    last, idx = "bg", len(scene_files) + 1
+    hook_top_min = 0
+    if logo and os.path.exists(logo):
+        lw, pos, hook_top_min = render._logo_geometry(logo, tw, th, logo_pos, safe_area)
+        cmd += ["-loop", "1", "-i", str(logo)]
+        fc.append(f"[{idx}:v]scale={lw}:-1[lg]")
+        fc.append(f"[{last}][lg]overlay={pos}:format=auto[lgo]")
+        last = "lgo"
+    fc.append(f"[0:a]{render._AUDIO_LIMITER}[aout]")
+
+    burn = bool(caption_entries) or bool(hook and hook.strip()) or bool(cta and cta.strip())
+    temp = output_path.with_suffix(".tmp.mp4") if burn else output_path
+    cmd += ["-filter_complex", ";".join(fc),
+            "-map", f"[{last}]", "-map", "[aout]", "-shortest",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium",
+            "-crf", "23", "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart", "-y", str(temp)]
+    render._run_ffmpeg(cmd)
+
+    if burn:
+        try:
+            render._burn_captions_pillow(temp, caption_entries or [], output_path,
+                                         tw, th, font=font, hook=hook,
+                                         safe_area=safe_area, hook_top_min=hook_top_min,
+                                         accent=accent, cta=cta, clip_dur=duration)
+        finally:
+            temp.unlink(missing_ok=True)
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# Public entry point (mirrors render.render_clips)
+# ---------------------------------------------------------------------------
+
+def render_storyboard_clips(video_path: str, clips: list[dict], out_dir: str,
+                            aspect: str = "9:16", logo: str | None = None,
+                            logo_pos: str = "top-left", hook_card: bool = True,
+                            hook_variant: int = 0, safe_area: str = "none",
+                            cta: str | None = None, style: str | None = None,
+                            char_refs: dict[str, str] | None = None,
+                            font: str | None = None, titler: str = "api") -> list[str]:
+    """Render each clip as an AI-illustrated storytime video to out_dir/<id>.mp4.
+
+    Same clip spec, captions, hook card, CTA and logo behavior as
+    `render.render_clips`; only the visual track differs. Scene stills are kept
+    in out_dir/<id>.scenes/ for inspection and reuse of prompts.
+    """
+    from . import render
+
+    source = Path(video_path)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    style = style or os.environ.get("SOFIT_STYLE") or DEFAULT_STYLE
+    logo = logo or os.environ.get("SOFIT_LOGO") or None
+    cta = cta or os.environ.get("SOFIT_CTA") or None
+    char_refs = char_refs or {}
+
+    logo_ready = None
+    logo_dir = None
+    if logo:
+        logo_dir = tempfile.mkdtemp(prefix="hc_logo_")
+        logo_ready = render._prep_logo(logo, logo_dir)
+
+    tw, th = render._target_resolution(aspect)
+    accent = render._accent_from_art(logo)
+    sheet = character_sheet(char_refs, style, out / "characters.sheet.png")
+
+    outputs: list[str] = []
+    for clip in clips:
+        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+        hook_text = clip.get("hook")
+        suffix = ""
+        if hook_variant > 0:
+            alts = clip.get("hook_variants") or []
+            if hook_variant <= len(alts):
+                hook_text, suffix = alts[hook_variant - 1], f".hook{hook_variant}"
+        output_path = out / f"{clip_id}{suffix}.mp4"
+        scene_dir = out / f"{clip_id}.scenes"
+        scene_dir.mkdir(exist_ok=True)
+
+        ranges = clip.get("segments") or [
+            {"start": clip["start"], "end": clip["end"], "words": clip.get("words")}
+        ]
+        parts: list[Path] = []
+        scene_no = 0
+        for ri, rng in enumerate(ranges):
+            start, end = float(rng["start"]), float(rng["end"])
+            dur = end - start
+            words = rng.get("words") or []
+            scenes = plan_scenes(words, dur, list(char_refs), style, titler=titler)
+            print(f"storyboard: {clip_id} span {ri + 1}/{len(ranges)}: "
+                  f"{len(scenes)} scenes", file=sys.stderr)
+
+            scene_files: list[tuple[Path, float]] = []
+            for s in scenes:
+                scene_no += 1
+                png = scene_dir / f"scene-{scene_no:02d}.png"
+                if not png.exists():  # re-runs reuse already-generated stills
+                    _scene_image(s["prompt"], style, sheet, png)
+                (scene_dir / f"scene-{scene_no:02d}.txt").write_text(
+                    s["prompt"] + "\n", encoding="utf-8")
+                scene_files.append((png, s["end"] - s["start"]))
+
+            caption_entries = None
+            if words:
+                pseudo = {"start": start, "end": end, "words": words}
+                caption_entries = render._caption_entries(
+                    render._clip_transcript(pseudo), start, end)
+
+            part_path = (output_path if len(ranges) == 1
+                         else out / f"{clip_id}{suffix}.part{ri}.tmp.mp4")
+            _render_span(source, start, dur, scene_files, part_path, tw, th,
+                         logo_ready, logo_pos, safe_area, caption_entries,
+                         hook=(hook_text if hook_card and ri == 0 else None),
+                         cta=(cta if ri == len(ranges) - 1 else None),
+                         font=font, accent=accent)
+            parts.append(part_path)
+
+        if len(parts) > 1:
+            render._concat_parts(parts, output_path)
+        outputs.append(str(output_path))
+
+    if logo_dir:
+        import shutil
+        shutil.rmtree(logo_dir, ignore_errors=True)
+    return outputs
+
+
+# ---------------------------------------------------------------------------
+# Self-check: exercises scene tiling + the full ffmpeg/caption assembly with
+# locally generated assets. No LLM, no Gemini, no network.
+# ---------------------------------------------------------------------------
+
+def _selftest() -> None:  # pragma: no cover - manual check
+    import subprocess
+    from PIL import Image
+    from . import render
+
+    # Scene tiling invariants (pure logic, monkeypatch the LLM call).
+    import sofit.storyboard as sb
+    fake = {"scenes": [{"start": 0, "end": 5, "prompt": "a"},
+                       {"start": 7, "end": 20, "prompt": "b"}]}  # gap + overrun
+    orig = sb.call_claude_json
+    sb.call_claude_json = lambda *a, **k: a[2](fake)
+    try:
+        scenes = sb.plan_scenes([{"t": 0, "d": 1, "w": "x"}], 9.0, [], "s")
+    finally:
+        sb.call_claude_json = orig
+    assert scenes[0]["start"] == 0.0 and scenes[-1]["end"] == 9.0
+    assert all(a["end"] == b["start"] for a, b in zip(scenes, scenes[1:])), scenes
+
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        for i, color in enumerate([(200, 60, 40), (40, 90, 200)]):
+            Image.new("RGB", (SCENE_W, SCENE_H), color).save(tdp / f"s{i}.png")
+        wav = tdp / "tone.wav"
+        render._run_ffmpeg(["ffmpeg", "-f", "lavfi", "-i",
+                            "sine=frequency=440:duration=4", "-y", str(wav)])
+        out = tdp / "out.mp4"
+        entries = [{"start": 0.2, "end": 3.5,
+                    "words": [{"text": "שלום", "start": 0.2, "end": 1.0},
+                              {"text": "עולם", "start": 1.0, "end": 2.0}]}]
+        _render_span(wav, 0.0, 4.0, [(tdp / "s0.png", 2.0), (tdp / "s1.png", 2.0)],
+                     out, 1080, 1920, None, "top-left", "none", entries,
+                     hook="בדיקה", cta=None, font=None, accent=None)
+        assert out.exists() and out.stat().st_size > 10_000
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(out)], capture_output=True, text=True)
+        dur = float(probe.stdout.strip())
+        assert 3.5 <= dur <= 4.5, f"unexpected duration {dur}"
+    print("storyboard selftest OK")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    if "--selftest" in sys.argv:
+        _selftest()
+    else:
+        print(__doc__)

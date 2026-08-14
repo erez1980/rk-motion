@@ -94,6 +94,17 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--hook-variant", type=int, default=0, metavar="N",
                    help="use alternate hook line N from the clip spec for the card "
                    "(0 = the primary hook; N>0 writes <id>.hookN.mp4 so A/B renders coexist)")
+    p.add_argument("--storyboard", action="store_true",
+                   help="with --render-from: render AI-illustrated storytime clips "
+                   "(generated comic-style scenes instead of the recording; needs "
+                   "GEMINI_API_KEY + a Claude backend)")
+    p.add_argument("--style", metavar="TEXT",
+                   help="storyboard art style (default: SOFIT_STYLE env, else a "
+                   "comic-book look)")
+    p.add_argument("--char-ref", action="append", metavar="NAME=IMG",
+                   help="recurring character for --storyboard: display name + "
+                   "reference photo; repeatable. A cached character sheet keeps "
+                   "them consistent across scenes")
     p.add_argument("--out", help="base path for sibling output files")
     p.add_argument("--no-cache", action="store_true", help="bypass the transcript cache")
     p.add_argument("--version", action="version", version=f"sofit {__version__}")
@@ -110,11 +121,25 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
         print(f"\n# {kind}\n{body}")
 
 
+def _parse_char_refs(pairs: list[str] | None) -> dict[str, str]:
+    """--char-ref "Name=photo.png" pairs -> {name: path}; hard-fails on typos."""
+    refs: dict[str, str] = {}
+    for pair in pairs or []:
+        name, sep, path = pair.partition("=")
+        if not sep or not name.strip() or not os.path.exists(path):
+            raise SystemExit(f"error: bad --char-ref '{pair}' (want NAME=existing-image)")
+        refs[name.strip()] = path
+    return refs
+
+
 def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None,
                  logo: str | None = None, logo_pos: str = "top-left",
                  hook_card: bool = True, hook_variant: int = 0,
                  safe_area: str = "none", cover: str | None = None,
-                 cta: str | None = None, music: str | None = None) -> int:
+                 cta: str | None = None, music: str | None = None,
+                 storyboard: bool = False, style: str | None = None,
+                 char_refs: dict[str, str] | None = None,
+                 titler: str = "api") -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -147,6 +172,25 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
         return 1
 
     out = out_dir or os.path.dirname(os.path.abspath(clips_path)) or "."
+    if storyboard:
+        # Scene planning needs a Claude backend even though --render-from
+        # normally doesn't; fall back to the CLI when no key is set.
+        if titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+            titler = "claude-cli" if shutil.which("claude") else titler
+        if titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+            print("error: --storyboard needs ANTHROPIC_API_KEY or the claude CLI",
+                  file=sys.stderr)
+            return 1
+        from . import storyboard as sb
+        outs = sb.render_storyboard_clips(video, clips, out, aspect=aspect,
+                                          logo=logo, logo_pos=logo_pos,
+                                          hook_card=hook_card,
+                                          hook_variant=hook_variant,
+                                          safe_area=safe_area, cta=cta,
+                                          style=style, char_refs=char_refs,
+                                          titler=titler)
+        print(f"rendered {len(outs)} storyboard clip(s) to {out}", file=sys.stderr)
+        return 0
     from . import render
     outs = render.render_clips(video, clips, out, aspect=aspect, logo=logo,
                                logo_pos=logo_pos, hook_card=hook_card,
@@ -169,7 +213,16 @@ def main(argv: list[str] | None = None) -> int:
                             hook_card=not args.no_hook_card,
                             hook_variant=args.hook_variant,
                             safe_area=args.safe_area, cover=args.cover,
-                            cta=args.cta, music=args.music)
+                            cta=args.cta, music=args.music,
+                            storyboard=args.storyboard, style=args.style,
+                            char_refs=_parse_char_refs(args.char_ref),
+                            titler=args.titler)
+
+    if args.storyboard:
+        print("error: --storyboard renders from a saved spec; run once to get a "
+              "clips.json, then: sofit --render-from clips.json --storyboard",
+              file=sys.stderr)
+        return 1
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
