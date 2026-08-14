@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -83,7 +84,17 @@ def _gemini_image(parts: list[dict], aspect: str = "9:16") -> bytes:
                 if "inline_data" in part:
                     return base64.b64decode(part["inline_data"]["data"])
             last = RuntimeError("no image in Gemini response")
-        except Exception as e:  # noqa: BLE001 - network/API errors all retry once
+        except urllib.error.HTTPError as e:
+            # Surface the API's own message (quota/billing detail) instead of a
+            # bare status line; a hard quota error won't heal on retry.
+            try:
+                detail = json.loads(e.read()).get("error", {}).get("message", "")
+            except Exception:  # noqa: BLE001
+                detail = ""
+            last = RuntimeError(f"HTTP {e.code}: {detail[:300] or e.reason}")
+            if e.code == 429 and "limit: 0" in detail:
+                break  # zero quota = billing not enabled; retrying is pointless
+        except Exception as e:  # noqa: BLE001 - network errors retry once
             last = e
     raise RuntimeError(f"Gemini image generation failed: {last}")
 
