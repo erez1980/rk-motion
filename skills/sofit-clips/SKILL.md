@@ -75,6 +75,9 @@ Present the table; ask which numbers to render. Build the spec from the picks:
 - Audio-only source (mp3, no video track) ⇒ audiogram mode automatically: blurred
   cover-art background + art card + subtle waveform; captions stay the hero. Cover:
   `--cover PATH` / `SOFIT_COVER` env / the mp3's embedded art / gradient fallback.
+- `--cta "טקסט"` / `SOFIT_CTA` env ⇒ small where-to-listen line, upper zone, final
+  ~2.5s (last span only). `--music theme.mp3` / `SOFIT_MUSIC` ⇒ show's own theme
+  looped + loudness-normalized + ducked under speech (audiogram clips only).
 - Narrative edits: a clip with `segments` (2+ kept spans) renders each span and
   losslessly concats them — the filler between beats is cut automatically. The
   hook card goes on the first span only; captions/face-crop run per span.

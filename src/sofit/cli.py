@@ -73,6 +73,14 @@ def _parser() -> argparse.ArgumentParser:
                    help="cover art image for audiogram clips from audio-only "
                         "sources (default: SOFIT_COVER env, else the mp3's "
                         "embedded art)")
+    p.add_argument("--cta", metavar="TEXT",
+                   help="closing call-to-action line drawn small in the upper "
+                        "zone for the final ~2.5s of each clip (default: "
+                        "SOFIT_CTA env)")
+    p.add_argument("--music", metavar="PATH",
+                   help="theme-music bed mixed quietly under the voice on "
+                        "audiogram clips, ducked so speech stays clear "
+                        "(default: SOFIT_MUSIC env)")
     p.add_argument("--logo", metavar="PATH",
                    help="overlay a logo (PNG, transparent) on every rendered clip")
     p.add_argument("--logo-pos", default="top-left",
@@ -105,7 +113,8 @@ def _emit(kind: str, body: str, out_base: str | None, ext: str = "md") -> None:
 def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | None,
                  logo: str | None = None, logo_pos: str = "top-left",
                  hook_card: bool = True, hook_variant: int = 0,
-                 safe_area: str = "none", cover: str | None = None) -> int:
+                 safe_area: str = "none", cover: str | None = None,
+                 cta: str | None = None, music: str | None = None) -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -142,7 +151,7 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
     outs = render.render_clips(video, clips, out, aspect=aspect, logo=logo,
                                logo_pos=logo_pos, hook_card=hook_card,
                                hook_variant=hook_variant, safe_area=safe_area,
-                               cover=cover)
+                               cover=cover, cta=cta, music=music)
     print(f"rendered {len(outs)} clip(s) to {out}", file=sys.stderr)
     return 0
 
@@ -159,7 +168,8 @@ def main(argv: list[str] | None = None) -> int:
                             logo=args.logo, logo_pos=args.logo_pos,
                             hook_card=not args.no_hook_card,
                             hook_variant=args.hook_variant,
-                            safe_area=args.safe_area, cover=args.cover)
+                            safe_area=args.safe_area, cover=args.cover,
+                            cta=args.cta, music=args.music)
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
@@ -309,7 +319,8 @@ def main(argv: list[str] | None = None) -> int:
                                                hook_card=not args.no_hook_card,
                                                hook_variant=args.hook_variant,
                                                safe_area=args.safe_area,
-                                               cover=args.cover)
+                                               cover=args.cover,
+                                               cta=args.cta, music=args.music)
                     print(f"rendered {len(outs)} clips to {args.render_clips}", file=sys.stderr)
                 except ImportError:
                     print("error: --render-clips needs the render extra: pip install 'sofit-cli[render]'", file=sys.stderr)

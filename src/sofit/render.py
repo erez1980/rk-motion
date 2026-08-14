@@ -870,7 +870,9 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
                           speed: float = 1.0, hook: str | None = None,
                           hook_dur: float = 1.8, safe_area: str = "none",
                           hook_top_min: int = 0,
-                          accent: tuple[int, int, int, int] | None = None) -> Path:
+                          accent: tuple[int, int, int, int] | None = None,
+                          cta: str | None = None, clip_dur: float | None = None,
+                          cta_dur: float = 2.5) -> Path:
     """Burn word-highlighted Hebrew captions: heavy font, raised into the lower
     third, thick outline, the word being spoken popped in an accent colour.
 
@@ -881,10 +883,14 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     If `hook` is given, its text is drawn LARGE in the upper third for the first
     `hook_dur` seconds — a caption-first hook card, so a muted scroller (~85% of
     short-form viewers) is stopped by the frame, not a spoken line.
+
+    If `cta` is given (and `clip_dur` known), it's drawn small in the same upper
+    zone for the final `cta_dur` seconds — a follow/where-to-listen line that
+    rides over the still-playing audio instead of a dead end card.
     """
     from PIL import Image, ImageDraw
 
-    if not entries and not hook:
+    if not entries and not hook and not cta:
         shutil.copy2(str(video_path), str(output_path))
         return output_path
 
@@ -945,6 +951,39 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
     def hook_w(txt: str) -> float:
         return measure.textlength(txt, font=hook_font)
 
+    # Closing CTA line: small, upper zone (empty once the hook card is gone),
+    # shown over the final cta_dur seconds while the audio still plays.
+    cta_lines: list[list[dict]] = []
+    cta_font = None
+    cta_from = None
+    cta_line_h = cta_outline = 0
+    space_w_cta = 0.0
+    if cta and cta.strip() and clip_dur:
+        cta_size = max(24, height // 30)
+        cta_font = _load_caption_font(cta_size, font)
+        cta_outline = max(2, cta_size // 8)
+        cta_line_h = int(cta_size * 1.3)
+        space_w_cta = measure.textlength(" ", font=cta_font)
+        toks = [{"text": t} for t in cta.split()]
+        cur: list[dict] = []
+        cur_w = 0.0
+        for tok in toks:
+            twd = measure.textlength(tok["text"], font=cta_font)
+            add = twd + (space_w_cta if cur else 0)
+            if cur and cur_w + add > max_w:
+                cta_lines.append(cur)
+                cur, cur_w = [tok], twd
+            else:
+                cur.append(tok)
+                cur_w += add
+        if cur:
+            cta_lines.append(cur)
+        out_dur = clip_dur / speed if speed and speed != 1.0 else clip_dur
+        cta_from = max(0.0, out_dur - cta_dur)
+
+    def cta_w(txt: str) -> float:
+        return measure.textlength(txt, font=cta_font)
+
     active_color = accent or _ACCENT
     empty = Image.new("RGBA", (width, height), (0, 0, 0, 0)).tobytes("raw", "RGBA")
 
@@ -965,6 +1004,21 @@ def _burn_captions_pillow(video_path: Path, entries: list[dict], output_path: Pa
                            stroke_width=hook_outline, stroke_fill=_OUTLINE)
                     x += hook_w(w["text"]) + space_w_hook
                 y += hook_line_h
+
+        if cta_lines and cta_from is not None and t >= cta_from:
+            if img is None:
+                img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+                d = ImageDraw.Draw(img)
+            y = top_margin
+            for line in cta_lines:
+                order = _bidi_word_order(line)  # visual left-to-right (base RTL)
+                lw = sum(cta_w(w["text"]) for w in order) + space_w_cta * (len(order) - 1)
+                x = (width - lw) / 2
+                for w in order:
+                    d.text((x, y), w["text"], font=cta_font, fill=_WHITE,
+                           stroke_width=cta_outline, stroke_fill=_OUTLINE)
+                    x += cta_w(w["text"]) + space_w_cta
+                y += cta_line_h
 
         active = None
         for e in entries:
@@ -1325,12 +1379,16 @@ def _audiogram_cmd(source_video: Path, padded_start: float, duration: float,
                    tw: int, th: int, bg_png: str, art_png: str | None,
                    logo: str | None, logo_pos: str, safe_area: str,
                    speed: float, af: str, temp_clip: Path,
-                   card_fade_at: float | None = None) -> tuple[list[str], int]:
+                   card_fade_at: float | None = None,
+                   music: str | None = None) -> tuple[list[str], int]:
     """ffmpeg command for an audio-only source: blurred cover background with a
     slow push-in, optional rounded art card, and a subtle waveform strip (the
     captions burned by the later Pillow pass are the hero element — research
     says over-designed waveforms hurt retention). `card_fade_at` delays the art
     card until the opening hook card leaves, so the two never collide.
+
+    `music` mixes a bed (the show's own theme — rights-cleared by definition)
+    under the voice: looped, quiet, and sidechain-ducked so speech stays clear.
     Returns (cmd, hook_top_min)."""
     fps = 30
     frames = max(1, round(duration * fps))
@@ -1369,10 +1427,25 @@ def _audiogram_cmd(source_video: Path, padded_start: float, duration: float,
         fc.append(f"[{idx}:v]scale={lw}:-1[lg]")
         fc.append(f"[{last}][lg]overlay={pos}:format=auto[lgo]")
         last = "lgo"
+        idx += 1
     if speed and speed != 1.0:
         fc.append(f"[{last}]setpts={1.0/speed}*PTS[spd]")
         last = "spd"
-    fc.append(f"[a_raw]{af}[aout]")
+    if music and os.path.exists(music):
+        # Theme bed: looped input, quiet, ducked by the voice (sidechain), then
+        # mixed without amix's default per-input attenuation. Voice splits into
+        # the duck key and the mix feed.
+        cmd += ["-stream_loop", "-1", "-i", str(music)]
+        fc.append(f"[a_raw]{af},asplit=2[a_key][a_mix]")
+        # loudnorm pins the bed to a fixed loudness (~10dB under typical
+        # speech) whatever the theme file's mastering; the duck then only has
+        # to make room during words, not rescue a bad level.
+        fc.append(f"[{idx}:a]loudnorm=I=-28:TP=-3:LRA=7[bed0]")
+        fc.append("[bed0][a_key]sidechaincompress="
+                  "threshold=0.03:ratio=4:attack=20:release=500[bed]")
+        fc.append("[a_mix][bed]amix=inputs=2:duration=first:normalize=0[aout]")
+    else:
+        fc.append(f"[a_raw]{af}[aout]")
     cmd += [
         "-filter_complex", ";".join(fc),
         "-map", f"[{last}]", "-map", "[aout]", "-shortest",
@@ -1428,6 +1501,8 @@ def extract_clip(
     safe_area: str = "none",
     audiogram: tuple[str, str | None] | None = None,
     accent: tuple[int, int, int, int] | None = None,
+    cta: str | None = None,
+    music: str | None = None,
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
@@ -1455,9 +1530,10 @@ def extract_clip(
     hook_top_min = 0   # raised below when a top-corner logo would collide
     vf = crop_vf if crop_vf else _build_crop_vf(aspect_ratio, crop_position)
 
-    # Word-highlight captions (and/or the opening hook card) render in a second
-    # Pillow pass over the cropped clip.
-    burn_captions = bool(caption_entries) or bool(hook and hook.strip())
+    # Word-highlight captions (and/or the opening hook card / closing CTA line)
+    # render in a second Pillow pass over the cropped clip.
+    burn_captions = (bool(caption_entries) or bool(hook and hook.strip())
+                     or bool(cta and cta.strip()))
 
     # Burn subtitles with libass BEFORE speed-up so subtitle timing matches
     # the original video timestamps (both get sped up together by setpts)
@@ -1494,11 +1570,14 @@ def extract_clip(
         # Audio-only source: generate the canvas (blurred cover + art card +
         # waveform + logo) instead of cropping a video track. Audio filtering
         # rides inside the filter_complex, so af is fully consumed here.
+        # ponytail: music bed is audiogram-only; wire it into the video path
+        # when a video show asks for it.
         cmd, hook_top_min = _audiogram_cmd(
             source_video, padded_start, duration, tw, th,
             audiogram[0], audiogram[1], logo, logo_pos, safe_area,
             speed, af, temp_clip,
-            card_fade_at=(1.8 if hook and hook.strip() else None))
+            card_fade_at=(1.8 if hook and hook.strip() else None),
+            music=music)
     else:
         cmd = ["ffmpeg", "-ss", str(padded_start), "-i", str(source_video)]
         if logo and os.path.exists(logo):
@@ -1539,7 +1618,7 @@ def extract_clip(
             _burn_captions_pillow(temp_clip, caption_entries or [], output_path, tw, th,
                                   font=font, speed=speed, hook=hook,
                                   safe_area=safe_area, hook_top_min=hook_top_min,
-                                  accent=accent)
+                                  accent=accent, cta=cta, clip_dur=duration)
         finally:
             if temp_clip.exists():
                 temp_clip.unlink()
@@ -1623,7 +1702,8 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                  speed: float = 1.0, font: str | None = None,
                  logo: str | None = None, logo_pos: str = "top-left",
                  hook_card: bool = True, hook_variant: int = 0,
-                 safe_area: str = "none", cover: str | None = None) -> list[str]:
+                 safe_area: str = "none", cover: str | None = None,
+                 cta: str | None = None, music: str | None = None) -> list[str]:
     """Render each clip to out_dir/<id>.mp4, cropped-to-fill `aspect` with
     burned Hebrew captions from the clip's word timings. If `logo` is given, it's
     trimmed once and overlaid in the `logo_pos` corner of every clip. When
@@ -1644,9 +1724,11 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    # Env-var default so a logo can be set once and applied to every render
-    # without passing --logo each time. An explicit logo always wins.
+    # Env-var defaults so per-show branding can be set once and applied to
+    # every render without flags. Explicit args always win.
     logo = logo or os.environ.get("SOFIT_LOGO") or None
+    cta = cta or os.environ.get("SOFIT_CTA") or None
+    music = music or os.environ.get("SOFIT_MUSIC") or None
     logo_dir = None
     logo_ready = None
     if logo:
@@ -1752,6 +1834,11 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                 safe_area=safe_area,
                 audiogram=audiogram_assets,
                 accent=accent,
+                # The CTA belongs to the closing seconds — the last span only.
+                # ponytail: the music bed restarts at narrative cuts; add
+                # per-span -ss offsets if it's ever audible.
+                cta=(cta if ri == len(ranges) - 1 else None),
+                music=music,
             )
             parts.append(part_path)
 

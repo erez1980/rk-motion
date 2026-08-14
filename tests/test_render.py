@@ -576,3 +576,29 @@ def test_accent_from_art(tmp_path):
     Image.new("RGB", (64, 64), (240, 240, 240)).save(mono)
     assert _accent_from_art(str(mono)) is None
     assert _accent_from_art(None) is None
+
+
+def test_audiogram_cmd_music_bed():
+    """With a music bed: looped input, voice split into duck key + mix feed,
+    bed sidechain-ducked, mixed without amix attenuation. Without: plain af."""
+    from sofit.render import _audiogram_cmd, _AUDIO_LIMITER
+    import tempfile, os
+
+    with tempfile.NamedTemporaryFile(suffix=".mp3") as m:
+        cmd, _ = _audiogram_cmd(
+            Path("ep.mp3"), 0.0, 10.0, 1080, 1920, "bg.png", "art.png",
+            None, "top-left", "none", 1.0, _AUDIO_LIMITER, Path("out.mp4"),
+            music=m.name)
+        fc = cmd[cmd.index("-filter_complex") + 1]
+        assert "-stream_loop" in cmd
+        assert "sidechaincompress" in fc
+        assert "amix=inputs=2:duration=first:normalize=0" in fc
+        assert fc.count(_AUDIO_LIMITER) == 1     # voice filtered once, pre-split
+        assert "[3:a]loudnorm" in fc             # inputs: 0=voice 1=bg 2=art 3=music
+
+    cmd, _ = _audiogram_cmd(
+        Path("ep.mp3"), 0.0, 10.0, 1080, 1920, "bg.png", "art.png",
+        None, "top-left", "none", 1.0, _AUDIO_LIMITER, Path("out.mp4"),
+        music="/nonexistent/theme.mp3")
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    assert "sidechaincompress" not in fc         # missing file: no bed

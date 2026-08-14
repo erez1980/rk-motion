@@ -180,6 +180,17 @@ a plain dark gradient. Everything else (hook card, logo, captions, trims) works 
 sofit episode.mp3 --render-clips clips_out   # audiogram mode, auto-detected
 ```
 
+**Closing CTA.** `--cta "טקסט"` (or the `SOFIT_CTA` env var) draws a small
+call-to-action line in the upper zone for the final ~2.5s of each clip — a
+"where to listen" nudge over the still-playing audio, instead of a dead end
+card that kills retention and breaks loops.
+
+**Theme-music bed (audiogram clips).** `--music theme.mp3` (or `SOFIT_MUSIC`)
+mixes the show's own theme quietly under the voice: looped, loudness-normalized
+(so any mastering level lands ~10dB under speech), and sidechain-ducked so words
+stay clear. Use the show's own theme — it's rights-cleared by definition; for
+trending audio, add it in-app when posting instead.
+
 **Framing.** By default the crop is centered. With the optional `crop` extra
 (`pip install 'sofit-cli[crop]'`, adds OpenCV) each clip is auto-cropped to
 center on a detected face — so a speaker sitting off to one side is framed instead
