@@ -100,6 +100,12 @@ Add `--animate` (needs `FAL_KEY` from fal.ai) to turn each still into a real
 image-to-video shot via Kling (~$0.25-0.50 per scene); failed scenes fall back
 to Ken Burns stills, and generated shots cache in `<clip>.scenes/*.mp4`.
 
+Prefer the real footage? `--cutaways` keeps the recording and splices 1-2
+short AI-illustrated scenes over it at concrete visual moments ("a Trojan
+horse", "a warehouse of goods") while the audio and captions run uninterrupted
+- combine with `--animate` for moving shots. Cutaways persist in the clip spec
+and cache in `<spec dir>/cutaways/`, so corrected re-renders keep them.
+
 ## How it works
 
 ```
