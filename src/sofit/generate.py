@@ -171,16 +171,20 @@ def _call_api(system: str, user: str, model: str) -> str:
 def _call_claude_cli(system: str, user: str, model: str) -> str:
     """Transport: the `claude -p` CLI (uses your Claude Code / Pro/Max subscription,
     no API key). The large user text goes on stdin to dodge argv limits; the small
-    system prompt rides on --append-system-prompt. Whatever model Claude Code is
-    configured with is used, so `model` is ignored here."""
+    system prompt rides on --append-system-prompt. By default whatever model
+    Claude Code is configured with is used; an explicit --titler-model /
+    SOFIT_TITLER_MODEL override is forwarded via `--model`."""
     import shutil
     import subprocess
 
     if not shutil.which("claude"):
         raise GenerationError("claude CLI not found — install Claude Code or use --titler api")
+    cmd = ["claude", "-p", "--append-system-prompt", system, "--output-format", "text"]
+    if os.environ.get("SOFIT_TITLER_MODEL"):
+        cmd += ["--model", model]
     try:
         proc = subprocess.run(
-            ["claude", "-p", "--append-system-prompt", system, "--output-format", "text"],
+            cmd,
             input=user, capture_output=True, text=True, timeout=CLI_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
@@ -196,13 +200,16 @@ def _call_claude_cli(system: str, user: str, model: str) -> str:
     return proc.stdout.strip()
 
 
-def call_claude_json(system: str, user: str, validate, model: str = CLAUDE_MODEL, titler: str = "api"):
+def call_claude_json(system: str, user: str, validate, model: str | None = None, titler: str = "api"):
     """Call Claude, parse a JSON body, validate it, retry once on failure.
 
     `titler`: "api" (Anthropic API + key) or "claude-cli" (`claude -p`, subscription).
+    `model`: explicit model id; falls back to the SOFIT_TITLER_MODEL env var
+    (set by the --titler-model CLI flag), then the CLAUDE_MODEL default.
     `validate(obj)` must return the accepted value or raise GenerationError.
     Raises GenerationError after the retry is exhausted.
     """
+    model = model or os.environ.get("SOFIT_TITLER_MODEL") or CLAUDE_MODEL
     transport = _call_claude_cli if titler == "claude-cli" else _call_api
     last_err: Exception | None = None
     for _ in range(2):

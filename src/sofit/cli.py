@@ -56,6 +56,9 @@ def _parser() -> argparse.ArgumentParser:
         help="generation backend: api (Anthropic API, needs ANTHROPIC_API_KEY) or "
         "claude-cli (`claude -p`, uses your Claude Code / Pro/Max subscription, no key)",
     )
+    p.add_argument("--titler-model", metavar="MODEL",
+                   help="model for the generation backend (default: claude-sonnet-5 "
+                   "on --titler api; Claude Code's configured model on claude-cli)")
     p.add_argument("--shownotes", action="store_true", help="also generate Hebrew show notes")
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
     p.add_argument("--clips-json", metavar="PATH",
@@ -223,6 +226,11 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+
+    # One env var is the single override channel: every call_claude_json call
+    # site (chapters, notes, quotes, clips, storyboard, cutaways) resolves it.
+    if args.titler_model:
+        os.environ["SOFIT_TITLER_MODEL"] = args.titler_model
 
     from . import feed
 
