@@ -630,6 +630,19 @@ def _selftest() -> None:  # pragma: no cover - manual check
              "-of", "csv=p=0", str(out2)], capture_output=True, text=True)
         dur2 = float(probe.stdout.strip())
         assert 3.5 <= dur2 <= 4.5, f"unexpected cutaway duration {dur2}"
+
+        # Plain-SRT Pillow burn (the no-word-timings fallback path).
+        srt = tdp / "t.srt"
+        srt.write_text("1\n00:00:00,500 --> 00:00:02,000\nשלום עולם\n\n",
+                       encoding="utf-8")
+        out3 = tdp / "out3.mp4"
+        render._burn_subtitles_pillow(src, srt, out3, 1080, 1920)
+        assert out3.exists() and out3.stat().st_size > 10_000
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(out3)], capture_output=True, text=True)
+        dur3 = float(probe.stdout.strip())
+        assert 3.5 <= dur3 <= 4.5, f"unexpected srt-burn duration {dur3}"
     print("storyboard selftest OK")
 
 

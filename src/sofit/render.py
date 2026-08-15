@@ -504,29 +504,6 @@ def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
             entry["start"] /= speed
             entry["end"] /= speed
 
-    # Get video frame rate
-    probe = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
-         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0",
-         str(video_path)],
-        capture_output=True, text=True, timeout=10,
-    )
-    fps_str = probe.stdout.strip()
-    if "/" in fps_str:
-        num, den = fps_str.split("/")
-        fps = float(num) / float(den)
-    else:
-        fps = float(fps_str) if fps_str else 30.0
-
-    # Get video duration
-    dur_probe = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(video_path)],
-        capture_output=True, text=True, timeout=10,
-    )
-    total_duration = float(dur_probe.stdout.strip())
-    total_frames = int(total_duration * fps)
-
     # Font setup -- prefer an explicit override, then Hebrew-capable candidates.
     font_size = max(22, height // 30)
     pil_font = None
@@ -592,52 +569,17 @@ def _burn_subtitles_pillow(video_path: Path, srt_path: Path, output_path: Path,
 
         return img.tobytes("raw", "RGBA")
 
-    # Pipe rendered frames into ffmpeg as a second input and overlay
-    overlay_cmd = [
-        "ffmpeg",
-        "-i", str(video_path),
-        "-f", "rawvideo",
-        "-pix_fmt", "rgba",
-        "-s", f"{width}x{height}",
-        "-r", str(fps),
-        "-i", "pipe:0",
-        "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "medium",
-        "-crf", "23",
-        "-c:a", "copy",
-        "-movflags", "+faststart",
-        "-shortest",
-        "-y",
-        str(output_path),
-    ]
-
-    proc = subprocess.Popen(
-        overlay_cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    # Generate frames and pipe them
-    for frame_idx in range(total_frames):
-        t = frame_idx / fps
-        # Find active subtitle
+    # Probe + frame piping live in the shared helpers (same pattern as
+    # _burn_captions_pillow) - this path only supplies the per-frame image.
+    def make_frame(t: float) -> bytes:
         active_text = None
         for entry in entries:
             if entry["start"] <= t < entry["end"]:
                 active_text = entry["text"]
                 break
-        proc.stdin.write(_render_frame(active_text))
+        return _render_frame(active_text)
 
-    proc.stdin.close()
-    _, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
-
-    if proc.returncode != 0:
-        raise RuntimeError(f"Subtitle overlay failed: {stderr.decode()[-500:]}")
-
-    return output_path
+    return _overlay_pillow_frames(video_path, output_path, width, height, make_frame)
 
 
 # ---------------------------------------------------------------------------
