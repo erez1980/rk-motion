@@ -1593,15 +1593,26 @@ def extract_clip(
             for k, c in enumerate(cw):
                 t0, t1 = float(c["start"]), float(c["end"])
                 d = t1 - t0
-                frames = max(1, round(d * 30))
-                cmd += ["-framerate", "30", "-loop", "1", "-t", str(d),
-                        "-i", str(c["image"])]
-                z = (f"1+0.08*on/{frames}" if k % 2 == 0
-                     else f"1.08-0.08*on/{frames}")
-                fc_parts.append(
-                    f"[{idx}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
-                    f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps=30,"
-                    f"trim=duration={d},setpts=PTS-STARTPTS+{t0}/TB[cw{k}]")
+                vid = c.get("video")
+                if vid and os.path.exists(vid):
+                    # Animated cutaway shot: cover-crop, freeze-hold if the
+                    # shot is shorter than the window, shift into place.
+                    cmd += ["-i", str(vid)]
+                    fc_parts.append(
+                        f"[{idx}:v]scale={tw}:{th}:force_original_aspect_ratio"
+                        f"=increase,crop={tw}:{th},fps=30,"
+                        f"tpad=stop_mode=clone:stop_duration=15,"
+                        f"trim=duration={d},setpts=PTS-STARTPTS+{t0}/TB[cw{k}]")
+                else:
+                    frames = max(1, round(d * 30))
+                    cmd += ["-framerate", "30", "-loop", "1", "-t", str(d),
+                            "-i", str(c["image"])]
+                    z = (f"1+0.08*on/{frames}" if k % 2 == 0
+                         else f"1.08-0.08*on/{frames}")
+                    fc_parts.append(
+                        f"[{idx}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
+                        f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps=30,"
+                        f"trim=duration={d},setpts=PTS-STARTPTS+{t0}/TB[cw{k}]")
                 fc_parts.append(
                     f"[{last}][cw{k}]overlay=0:0:enable="
                     f"'between(t,{t0},{t1})':eof_action=pass[ov{k}]")

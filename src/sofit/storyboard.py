@@ -290,7 +290,8 @@ def _scene_video(prompt: str, still: Path, dur: float, out_path: Path) -> Path |
 # ---------------------------------------------------------------------------
 
 def add_cutaways(doc: dict, spec_path: str, only: str | None = None,
-                 style: str | None = None, titler: str = "api") -> int:
+                 style: str | None = None, titler: str = "api",
+                 animate: bool = False) -> int:
     """Plan and generate cutaway scenes for clips in a clips.json doc, write
     them into each clip's `cutaways` list, and save the spec. Returns how many
     cutaways were added. Images land in <spec dir>/cutaways/<clip id>/ and the
@@ -364,6 +365,14 @@ def add_cutaways(doc: dict, spec_path: str, only: str | None = None,
                       f"({c['prompt'][:60]}...)", file=sys.stderr)
                 _scene_image(c["prompt"], style, None, png)
             c["image"] = str(png)
+            if animate:
+                mp4 = cw_dir / f"cw-{n}.mp4"
+                if not mp4.exists():
+                    print(f"storyboard: {cid}: animating cutaway {n}...",
+                          file=sys.stderr)
+                    _scene_video(c["prompt"], png, c["end"] - c["start"], mp4)
+                if mp4.exists():
+                    c["video"] = str(mp4)
         clip["cutaways"] = cws
         added += len(cws)
     Path(spec_path).write_text(
@@ -610,8 +619,11 @@ def _selftest() -> None:  # pragma: no cover - manual check
         out2 = tdp / "out2.mp4"
         render.extract_clip(src, 0.0, 4.0, out2, aspect_ratio="9:16",
                             caption_entries=entries,
-                            cutaways=[{"start": 1.0, "end": 2.6,
-                                       "image": str(tdp / "s1.png")}])
+                            cutaways=[{"start": 0.6, "end": 1.5,
+                                       "image": str(tdp / "s1.png")},
+                                      {"start": 2.0, "end": 3.4,
+                                       "image": str(tdp / "s0.png"),
+                                       "video": str(vid)}])
         assert out2.exists() and out2.stat().st_size > 10_000
         probe = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",

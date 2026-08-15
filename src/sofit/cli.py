@@ -189,7 +189,8 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
                   file=sys.stderr)
             return 1
         from . import storyboard as sb
-        n = sb.add_cutaways(doc, clips_path, only=only, style=style, titler=titler)
+        n = sb.add_cutaways(doc, clips_path, only=only, style=style,
+                            titler=titler, animate=animate)
         print(f"added {n} cutaway(s); spec updated", file=sys.stderr)
         clips = [c for c in doc["clips"] if not only or c.get("id") == only]
     if storyboard:
