@@ -101,6 +101,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--style", metavar="TEXT",
                    help="storyboard art style (default: SOFIT_STYLE env, else a "
                    "comic-book look)")
+    p.add_argument("--cutaways", action="store_true",
+                   help="with --render-from: splice 1-2 short AI-illustrated "
+                   "scenes over the footage at concrete visual moments "
+                   "(needs GEMINI_API_KEY + a Claude backend)")
     p.add_argument("--animate", action="store_true",
                    help="with --storyboard: animate each scene via image-to-video "
                    "(fal.ai Kling, needs FAL_KEY; ~$0.25-0.50 per scene). Failed "
@@ -143,7 +147,8 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
                  cta: str | None = None, music: str | None = None,
                  storyboard: bool = False, style: str | None = None,
                  char_refs: dict[str, str] | None = None,
-                 titler: str = "api", animate: bool = False) -> int:
+                 titler: str = "api", animate: bool = False,
+                 cutaways: bool = False) -> int:
     """Render clips from a saved (possibly corrected) clips.json, no transcription.
     Output goes to `out_dir` if given, else the clips.json's own folder."""
     import json
@@ -176,6 +181,17 @@ def _render_from(clips_path: str, out_dir: str | None, aspect: str, only: str | 
         return 1
 
     out = out_dir or os.path.dirname(os.path.abspath(clips_path)) or "."
+    if cutaways:
+        if titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+            titler = "claude-cli" if shutil.which("claude") else titler
+        if titler == "api" and not os.environ.get("ANTHROPIC_API_KEY"):
+            print("error: --cutaways needs ANTHROPIC_API_KEY or the claude CLI",
+                  file=sys.stderr)
+            return 1
+        from . import storyboard as sb
+        n = sb.add_cutaways(doc, clips_path, only=only, style=style, titler=titler)
+        print(f"added {n} cutaway(s); spec updated", file=sys.stderr)
+        clips = [c for c in doc["clips"] if not only or c.get("id") == only]
     if storyboard:
         # Scene planning needs a Claude backend even though --render-from
         # normally doesn't; fall back to the CLI when no key is set.
@@ -220,7 +236,8 @@ def main(argv: list[str] | None = None) -> int:
                             cta=args.cta, music=args.music,
                             storyboard=args.storyboard, style=args.style,
                             char_refs=_parse_char_refs(args.char_ref),
-                            titler=args.titler, animate=args.animate)
+                            titler=args.titler, animate=args.animate,
+                            cutaways=args.cutaways)
 
     if args.storyboard:
         print("error: --storyboard renders from a saved spec; run once to get a "

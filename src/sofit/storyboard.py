@@ -286,6 +286,92 @@ def _scene_video(prompt: str, still: Path, dur: float, out_path: Path) -> Path |
 
 
 # ---------------------------------------------------------------------------
+# Cutaways: 1-2 short generated scenes spliced over the REAL footage
+# ---------------------------------------------------------------------------
+
+def add_cutaways(doc: dict, spec_path: str, only: str | None = None,
+                 style: str | None = None, titler: str = "api") -> int:
+    """Plan and generate cutaway scenes for clips in a clips.json doc, write
+    them into each clip's `cutaways` list, and save the spec. Returns how many
+    cutaways were added. Images land in <spec dir>/cutaways/<clip id>/ and the
+    normal render path (render.extract_clip) splices them over the footage."""
+    style = style or os.environ.get("SOFIT_STYLE") or DEFAULT_STYLE
+    spec_dir = Path(spec_path).resolve().parent
+    added = 0
+    for clip in doc["clips"]:
+        cid = str(clip.get("id"))
+        if only and cid != only:
+            continue
+        spans = clip.get("segments") or [
+            {"start": clip["start"], "end": clip["end"], "words": clip.get("words")}]
+        span_texts = []
+        for i, rng in enumerate(spans):
+            dur = float(rng["end"]) - float(rng["start"])
+            timed = " ".join(f'[{float(w["t"]):.1f}]{w.get("w", "")}'
+                             for w in (rng.get("words") or []))
+            span_texts.append(f"span {i} (0..{dur:.1f}s): {timed}")
+        system = (
+            "You pick CUTAWAY moments for a talking-head podcast clip: short "
+            "generated illustration shots spliced over the footage while the "
+            "audio keeps running. Given the clip's spans with per-word times "
+            "(seconds, relative to each span's own start), return ONLY JSON: "
+            '{"cutaways": [{"span": i, "start": s, "end": s, "prompt": str}, ...]}. '
+            "Rules: at most 2 cutaways TOTAL (0 or 1 is fine - most sentences "
+            "deserve none); ONLY when a CONCRETE visual object, scene, or "
+            "metaphor is being said aloud (a warehouse of goods, a Trojan "
+            "horse, a scar) - never for abstract talk; each 2.5-5.0s, fully "
+            "inside its span, starting when the visual thing is being said; "
+            "never within the first 3s of span 0 (hook card) or the last 2.5s "
+            "of the final span. Prompts are ENGLISH, concrete and visual, and "
+            "never contain text or captions."
+        )
+        user = "\n".join(span_texts)
+
+        def validate(obj):
+            cws = obj.get("cutaways") if isinstance(obj, dict) else None
+            if cws is None or not isinstance(cws, list):
+                raise GenerationError("no cutaways list")
+            out = []
+            for c in cws[:2]:
+                s, e = float(c.get("start", 0)), float(c.get("end", 0))
+                i = int(c.get("span", 0))
+                p = str(c.get("prompt") or "").strip()
+                if not p or not (0 <= i < len(spans)):
+                    continue
+                dur = float(spans[i]["end"]) - float(spans[i]["start"])
+                s, e = max(0.0, s), min(e, dur)
+                if e - s >= 2.0:
+                    out.append({"span": i, "start": round(s, 2),
+                                "end": round(e, 2), "prompt": p})
+            return out
+
+        try:
+            cws = call_claude_json(system, user, validate, titler=titler)
+        except GenerationError as e:
+            print(f"warning: cutaway planning failed for {cid}: {e}", file=sys.stderr)
+            continue
+        if not cws:
+            print(f"storyboard: {cid}: no concrete visual moment - no cutaways",
+                  file=sys.stderr)
+            clip.pop("cutaways", None)
+            continue
+        cw_dir = spec_dir / "cutaways" / cid
+        cw_dir.mkdir(parents=True, exist_ok=True)
+        for n, c in enumerate(cws, 1):
+            png = cw_dir / f"cw-{n}.png"
+            if not png.exists():
+                print(f"storyboard: {cid}: generating cutaway {n} "
+                      f"({c['prompt'][:60]}...)", file=sys.stderr)
+                _scene_image(c["prompt"], style, None, png)
+            c["image"] = str(png)
+        clip["cutaways"] = cws
+        added += len(cws)
+    Path(spec_path).write_text(
+        json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    return added
+
+
+# ---------------------------------------------------------------------------
 # ffmpeg assembly (Ken Burns over the clip audio) + captions
 # ---------------------------------------------------------------------------
 
@@ -513,6 +599,25 @@ def _selftest() -> None:  # pragma: no cover - manual check
              "-of", "csv=p=0", str(out)], capture_output=True, text=True)
         dur = float(probe.stdout.strip())
         assert 3.5 <= dur <= 4.5, f"unexpected duration {dur}"
+
+        # Cutaway splice over a real video source (the normal render path).
+        src = tdp / "src.mp4"
+        render._run_ffmpeg(["ffmpeg", "-f", "lavfi", "-i",
+                            "color=c=darkgreen:s=1080x1920:d=4:r=30",
+                            "-f", "lavfi", "-i", "sine=frequency=330:duration=4",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", "-y", str(src)])
+        out2 = tdp / "out2.mp4"
+        render.extract_clip(src, 0.0, 4.0, out2, aspect_ratio="9:16",
+                            caption_entries=entries,
+                            cutaways=[{"start": 1.0, "end": 2.6,
+                                       "image": str(tdp / "s1.png")}])
+        assert out2.exists() and out2.stat().st_size > 10_000
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(out2)], capture_output=True, text=True)
+        dur2 = float(probe.stdout.strip())
+        assert 3.5 <= dur2 <= 4.5, f"unexpected cutaway duration {dur2}"
     print("storyboard selftest OK")
 
 

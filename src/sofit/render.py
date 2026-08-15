@@ -1503,6 +1503,7 @@ def extract_clip(
     accent: tuple[int, int, int, int] | None = None,
     cta: str | None = None,
     music: str | None = None,
+    cutaways: list[dict] | None = None,
 ) -> Path:
     """Extract a clip, crop-to-fill the target aspect, and burn captions.
 
@@ -1580,16 +1581,44 @@ def extract_clip(
             music=music)
     else:
         cmd = ["ffmpeg", "-ss", str(padded_start), "-i", str(source_video)]
-        if logo and os.path.exists(logo):
-            # Overlay a fixed logo AFTER the crop (so it doesn't pan with the
-            # face track) and before captions. Sized to a fraction of frame
-            # width, inset from the chosen corner; PNG aspect preserved.
-            lw, pos, hook_top_min = _logo_geometry(logo, tw, th, logo_pos,
-                                                   safe_area)
-            fc = (f"[0:v]{vf}[base];[1:v]scale={lw}:-1[lg];"
-                  f"[base][lg]overlay={pos}:format=auto[v]")
-            cmd += ["-loop", "1", "-i", str(logo), "-t", str(duration),
-                    "-filter_complex", fc, "-map", "[v]", "-map", "0:a?"]
+        # Cutaways: short generated scenes spliced over the footage while the
+        # audio keeps running - each is a Ken-Burnsed still shifted to its
+        # window. Times are relative to this span's start.
+        # ponytail: assumes speed==1.0 (cutaway windows aren't setpts-scaled);
+        # scale the times if a sped-up show ever uses cutaways.
+        cw = [c for c in (cutaways or []) if os.path.exists(c["image"])]
+        if (logo and os.path.exists(logo)) or cw:
+            fc_parts = [f"[0:v]{vf}[base]"]
+            last, idx = "base", 1
+            for k, c in enumerate(cw):
+                t0, t1 = float(c["start"]), float(c["end"])
+                d = t1 - t0
+                frames = max(1, round(d * 30))
+                cmd += ["-framerate", "30", "-loop", "1", "-t", str(d),
+                        "-i", str(c["image"])]
+                z = (f"1+0.08*on/{frames}" if k % 2 == 0
+                     else f"1.08-0.08*on/{frames}")
+                fc_parts.append(
+                    f"[{idx}:v]zoompan=z='{z}':x='(iw-iw/zoom)/2'"
+                    f":y='(ih-ih/zoom)/2':d=1:s={tw}x{th}:fps=30,"
+                    f"trim=duration={d},setpts=PTS-STARTPTS+{t0}/TB[cw{k}]")
+                fc_parts.append(
+                    f"[{last}][cw{k}]overlay=0:0:enable="
+                    f"'between(t,{t0},{t1})':eof_action=pass[ov{k}]")
+                last, idx = f"ov{k}", idx + 1
+            if logo and os.path.exists(logo):
+                # Overlay a fixed logo AFTER the crop (so it doesn't pan with
+                # the face track) and above cutaways, before captions. Sized to
+                # a fraction of frame width; PNG aspect preserved.
+                lw, pos, hook_top_min = _logo_geometry(logo, tw, th, logo_pos,
+                                                       safe_area)
+                cmd += ["-loop", "1", "-i", str(logo)]
+                fc_parts.append(f"[{idx}:v]scale={lw}:-1[lg]")
+                fc_parts.append(f"[{last}][lg]overlay={pos}:format=auto[vout]")
+                last = "vout"
+            cmd += ["-t", str(duration),
+                    "-filter_complex", ";".join(fc_parts),
+                    "-map", f"[{last}]", "-map", "0:a?"]
         else:
             cmd += ["-t", str(duration), "-vf", vf]
         if af:
@@ -1839,6 +1868,8 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
                 # per-span -ss offsets if it's ever audible.
                 cta=(cta if ri == len(ranges) - 1 else None),
                 music=music,
+                cutaways=[c for c in (clip.get("cutaways") or [])
+                          if int(c.get("span", 0)) == ri],
             )
             parts.append(part_path)
 
