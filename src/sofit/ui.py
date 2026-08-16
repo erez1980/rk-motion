@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -118,11 +119,78 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         route = urlparse(self.path).path
         if route == "/api/analyse":
             return self._analyse_upload()
+        if route == "/api/prepare":
+            return self._prepare_batch()
         if route == "/api/export":
             return self._export()
         if route.startswith("/api/music/"):
             return self._upload_music(route.rsplit("/", 1)[-1])
+        if route.startswith("/api/video/"):
+            return self._upload_video(route.rsplit("/", 1)[-1])
+        if route.startswith("/api/analyse-batch/"):
+            return self._analyse_batch(route.rsplit("/", 1)[-1])
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _prepare_batch(self) -> None:
+        job_id = uuid.uuid4().hex
+        folder = Path(tempfile.mkdtemp(prefix="rk-motion-"))
+        JOBS[job_id] = {"folder": folder, "inputs": []}
+        return self._json(HTTPStatus.OK, {"job_id": job_id})
+
+    def _upload_video(self, job_id: str) -> None:
+        job = JOBS.get(job_id)
+        size = int(self.headers.get("Content-Length", "0"))
+        if not job:
+            return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
+        if not size or size > 30 * 1024 * 1024 * 1024:
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose video files smaller than 30GB."})
+        suffix = Path(unquote(self.headers.get("X-Filename", "ride.mp4"))).suffix or ".mp4"
+        target = Path(job["folder"]) / f"input-{len(job['inputs']):03d}{suffix}"
+        remaining = size
+        with target.open("wb") as handle:
+            while remaining:
+                chunk = self.rfile.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    return self._json(HTTPStatus.BAD_REQUEST, {"error": "Video upload ended early."})
+                handle.write(chunk)
+                remaining -= len(chunk)
+        job["inputs"].append(target)
+        return self._json(HTTPStatus.OK, {"index": len(job["inputs"])})
+
+    def _analyse_batch(self, job_id: str) -> None:
+        job = JOBS.get(job_id)
+        if not job or not job.get("inputs"):
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
+        try:
+            source = self._combine_videos(job["inputs"], Path(job["folder"]))
+            job["source"] = source
+            report = analyse_action(str(source))
+            job["report"] = report
+            report["job_id"] = job_id
+            return self._json(HTTPStatus.OK, report)
+        except Exception as exc:
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+
+    @staticmethod
+    def _combine_videos(inputs: list[Path], folder: Path) -> Path:
+        """Normalise clips then concatenate, preserving their drag/drop order."""
+        from .action import _has_audio
+        normalised = []
+        for index, source in enumerate(inputs):
+            target = folder / f"normalised-{index:03d}.mp4"
+            cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(source), "-f", "lavfi", "-i",
+                   "anullsrc=r=48000:cl=stereo", "-vf",
+                   "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih),setsar=1,fps=30",
+                   "-map", "0:v:0", "-map", "0:a:0" if _has_audio(str(source)) else "1:a:0",
+                   "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac", "-shortest", str(target)]
+            subprocess.run(cmd, check=True, capture_output=True)
+            normalised.append(target)
+        listing = folder / "videos.txt"
+        listing.write_text("".join("file '" + str(item).replace("'", "'\\''") + "'\n" for item in normalised))
+        output = folder / "source.mp4"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
+                        "-c", "copy", "-movflags", "+faststart", str(output)], check=True, capture_output=True)
+        return output
 
     def _upload_music(self, job_id: str) -> None:
         job = JOBS.get(job_id)
