@@ -71,11 +71,14 @@ Open RK Motion's local interface:
 rk-motion --ui
 ```
 
-Then drag a video into the window. RK Motion will show scored action
-suggestions beside a video preview. You can select or deselect each suggestion,
-adjust its start/end time, change the order, and click **Export selected edit**
-to create one MP4 containing the approved clips. The interface runs at
-`127.0.0.1` on your Mac; the source video and the rendered result stay local.
+Before selecting a video, optionally set **Max scene length** in seconds. Leave
+it blank to keep each detected action range at its natural length. RK Motion
+will show scored action suggestions beside a video preview. You can select or
+deselect each suggestion, adjust its start/end time, change the order, or click
+**Random order** to shuffle the selected clips' export order. Click **Export
+selected edit** to create one MP4 containing the approved clips. The interface
+runs at `127.0.0.1` on your Mac; the source video and the rendered result stay
+local.
 
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your

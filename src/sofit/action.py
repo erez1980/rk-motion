@@ -93,7 +93,7 @@ def _audio_per_second(path: str, sample_rate: int = 8000) -> dict[int, float]:
 
 
 def _ranges(scores: dict[int, float], threshold: float, min_duration: int,
-            padding: int, total_duration: float) -> list[dict]:
+            padding: int, total_duration: float, max_duration: float | None = None) -> list[dict]:
     active = [sec for sec in sorted(scores) if scores[sec] >= threshold]
     groups: list[list[int]] = []
     for sec in active:
@@ -107,14 +107,24 @@ def _ranges(scores: dict[int, float], threshold: float, min_duration: int,
         if end - start < min_duration:
             continue
         clip_scores = [scores.get(sec, 0.0) for sec in range(group[0], group[-1] + 1)]
-        clips.append({"start": round(start, 2), "end": round(end, 2),
-                      "duration": round(end - start, 2),
-                      "score": round(sum(clip_scores) / len(clip_scores), 3)})
+        score = round(sum(clip_scores) / len(clip_scores), 3)
+        # A creator can ask for bite-size suggestions.  Split, don't discard,
+        # so every detected action moment remains available for review.
+        if max_duration and end - start > max_duration:
+            cursor = start
+            while cursor < end:
+                chunk_end = min(end, cursor + max_duration)
+                clips.append({"start": round(cursor, 2), "end": round(chunk_end, 2),
+                              "duration": round(chunk_end - cursor, 2), "score": score})
+                cursor = chunk_end
+        else:
+            clips.append({"start": round(start, 2), "end": round(end, 2),
+                          "duration": round(end - start, 2), "score": score})
     return sorted(clips, key=lambda clip: clip["score"], reverse=True)
 
 
 def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
-                   padding: int = 2) -> dict:
+                   padding: int = 2, max_duration: float | None = None) -> dict:
     """Return ranked, reviewable action candidates for ``path``.
 
     Score weights deliberately favor motion (65%) over sound (35%), so music
@@ -124,6 +134,8 @@ def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
         raise ValueError("threshold must be in the range 0..1")
     if min_duration < 1 or padding < 0:
         raise ValueError("min_duration must be >= 1 and padding must be >= 0")
+    if max_duration is not None and max_duration < 1:
+        raise ValueError("max_duration must be at least 1 second")
     total = duration(path)
     motion = _motion_per_second(path)
     audio = _audio_per_second(path)
@@ -135,8 +147,9 @@ def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
         "source": str(Path(path).resolve()),
         "duration": round(total, 2),
         "detector": {"video_fps": 2, "score": "65% motion + 35% loudness",
-                     "threshold": threshold, "padding": padding},
-        "clips": _ranges(scores, threshold, min_duration, padding, total),
+                     "threshold": threshold, "padding": padding,
+                     "max_duration": max_duration},
+        "clips": _ranges(scores, threshold, min_duration, padding, total, max_duration),
     }
 
 

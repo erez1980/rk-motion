@@ -72,6 +72,8 @@ def _parser() -> argparse.ArgumentParser:
                    help="minimum candidate length in seconds (default: 5)")
     p.add_argument("--action-padding", type=int, default=2,
                    help="seconds retained before/after an action candidate (default: 2)")
+    p.add_argument("--action-max-duration", type=float,
+                   help="optional maximum duration (seconds) per action suggestion")
     p.add_argument("--action-render", metavar="DIR",
                    help="with --action-clips, export each candidate as an MP4 to DIR")
     p.add_argument("--ui", action="store_true",
@@ -286,7 +288,8 @@ def main(argv: list[str] | None = None) -> int:
             report = write_action_report(args.media, args.action_clips,
                                          threshold=args.action_threshold,
                                          min_duration=args.action_min_duration,
-                                         padding=args.action_padding)
+                                         padding=args.action_padding,
+                                         max_duration=args.action_max_duration)
             if args.action_render:
                 outputs = render_action_clips(args.media, report["clips"], args.action_render)
                 report["rendered_clips"] = outputs

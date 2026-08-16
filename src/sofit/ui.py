@@ -122,7 +122,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 handle.write(chunk)
                 remaining -= len(chunk)
         try:
-            report = analyse_action(str(source))
+            raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
+            max_duration = float(raw_max) if raw_max else None
+            report = analyse_action(str(source), max_duration=max_duration)
         except Exception as exc:  # keep UI errors actionable, never crash its server
             shutil.rmtree(folder, ignore_errors=True)
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
