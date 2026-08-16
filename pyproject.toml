@@ -11,7 +11,8 @@ dependencies = []
 
 [project.optional-dependencies]
 podcast = ["faster-whisper>=1.0", "anthropic>=0.40"]  # transcribe + generate pipeline
-dev = ["pytest>=8"]
+lan = ["qrcode>=7"]  # terminal QR code for --ui --lan (phone access)
+dev = ["pytest>=8", "qrcode>=7"]
 mcp = ["mcp>=1.2,<2"]  # 2.0 removed mcp.server.fastmcp; code targets the 1.x API
 youtube = ["yt-dlp>=2024.1"]
 render = ["pillow>=10", "python-bidi>=0.4"]

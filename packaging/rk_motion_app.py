@@ -27,9 +27,12 @@ def main() -> int:
         port = candidate
         break
 
+    # Set RK_MOTION_LAN=1 to let a phone on the same Wi-Fi drive the editor.
+    lan = os.environ.get("RK_MOTION_LAN", "").strip().lower() in ("1", "true", "yes")
+
     from sofit.ui import launch_ui
 
-    return launch_ui(port)
+    return launch_ui(port, lan=lan)
 
 
 if __name__ == "__main__":

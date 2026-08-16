@@ -92,6 +92,24 @@ Open RK Motion's local interface:
 rk-motion --ui
 ```
 
+#### Drive it from your phone (same Wi-Fi)
+
+RK Motion does its video work on this computer, but you can control it from an
+iPhone or Android on the **same Wi-Fi**. Start it with `--lan`:
+
+```bash
+rk-motion --ui --lan          # from source
+RK_MOTION_LAN=1 open "RK Motion.app"   # packaged macOS app
+```
+
+It prints a `http://<your-ip>:8787` address and (with `pip install qrcode`) a
+QR code — scan it from your phone's camera to open the editor. Pick a ride
+video straight from your phone's camera roll; this computer analyses and
+exports it, and the finished movie plays back on the phone with a download
+link. LAN mode is off by default: without `--lan` the app stays on this
+machine only. Only turn it on at home — while it runs, anyone on the same
+Wi-Fi can reach it.
+
 Before selecting a video, optionally set **Max scene length** in seconds. Leave
 it blank to keep each detected action range at its natural length. RK Motion
 will show scored action suggestions beside a video preview. You can select or

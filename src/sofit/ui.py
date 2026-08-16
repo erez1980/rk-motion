@@ -377,11 +377,64 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             job["export_status"].update({"state": "error", "message": f"Export failed: {detail}"})
 
 
-def launch_ui(port: int = 8787) -> int:
-    """Start RK Motion and open it in the default browser."""
-    server = ThreadingHTTPServer(("127.0.0.1", port), RKMotionHandler)
+def _lan_ip() -> str | None:
+    """Best-effort local network address of this machine (no traffic is sent)."""
+    import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("192.0.2.1", 9))  # TEST-NET-1: routable-looking, never contacted
+        ip = probe.getsockname()[0]
+        return ip if not ip.startswith("127.") else None
+    except OSError:
+        return None
+    finally:
+        probe.close()
+
+
+def _print_qr(text: str) -> bool:
+    """Print a scannable QR code to the terminal. Returns False if unavailable."""
+    try:
+        import qrcode
+    except ImportError:
+        return False
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(text)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    # Two rows per line via half-block characters, so the code stays roughly square.
+    for y in range(0, len(matrix), 2):
+        line = []
+        for x in range(len(matrix[0])):
+            top = matrix[y][x]
+            bottom = matrix[y + 1][x] if y + 1 < len(matrix) else False
+            line.append("█" if top and bottom else "▀" if top else "▄" if bottom else " ")
+        print("".join(line))
+    return True
+
+
+def launch_ui(port: int = 8787, lan: bool = False) -> int:
+    """Start RK Motion and open it in the default browser.
+
+    With ``lan=True`` the server also accepts connections from other devices on
+    the same Wi-Fi (e.g. an iPhone), so a phone can drive the editor while this
+    machine does the processing. Off by default: the server stays on localhost.
+    """
+    host = "0.0.0.0" if lan else "127.0.0.1"
+    server = ThreadingHTTPServer((host, port), RKMotionHandler)
     url = f"http://127.0.0.1:{port}"
     print(f"RK Motion is running at {url} (Ctrl+C to stop)")
+    if lan:
+        ip = _lan_ip()
+        if ip:
+            lan_url = f"http://{ip}:{port}"
+            print(f"\nOn your phone (same Wi-Fi), open: {lan_url}")
+            print("Scan this QR code to open it directly:\n")
+            if not _print_qr(lan_url):
+                print("(Install 'qrcode' for a scannable code here — pip install qrcode)")
+            print("\nAnyone on this Wi-Fi can reach the app while it runs.\n")
+        else:
+            print("\nLAN mode is on, but no network address was found. "
+                  "Connect to Wi-Fi and restart to share with a phone.\n")
     threading.Timer(.3, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()

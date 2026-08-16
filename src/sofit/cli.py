@@ -80,6 +80,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="open RK Motion's local visual action-editor interface")
     p.add_argument("--ui-port", type=int, default=8787,
                    help="local port for --ui (default: 8787)")
+    p.add_argument("--lan", action="store_true",
+                   help="with --ui, also accept connections from other devices on the same "
+                   "Wi-Fi (e.g. an iPhone); prints a URL and QR code to scan")
     p.add_argument("--render-clips", metavar="DIR",
                    help="render each pull-quote to DIR as a vertical (9:16) clip with burned "
                    "Hebrew captions (needs the [render] extra + ffmpeg)")
@@ -273,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ui:
         from .ui import launch_ui
-        return launch_ui(args.ui_port)
+        return launch_ui(args.ui_port, lan=args.lan)
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
