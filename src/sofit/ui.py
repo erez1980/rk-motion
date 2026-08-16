@@ -121,8 +121,12 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._analyse_upload()
         if route == "/api/prepare":
             return self._prepare_batch()
+        if route == "/api/youtube/search":
+            return self._youtube_search()
         if route == "/api/export":
             return self._export()
+        if route.startswith("/api/youtube/download/"):
+            return self._youtube_download(route.rsplit("/", 1)[-1])
         if route.startswith("/api/music/"):
             return self._upload_music(route.rsplit("/", 1)[-1])
         if route.startswith("/api/video/"):
@@ -130,6 +134,52 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if route.startswith("/api/analyse-batch/"):
             return self._analyse_batch(route.rsplit("/", 1)[-1])
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _youtube_search(self) -> None:
+        try:
+            query = str(self._read_json().get("query", "")).strip()
+            if not query:
+                raise ValueError("Enter a search query.")
+            if not shutil.which("yt-dlp"):
+                raise RuntimeError("YouTube search needs yt-dlp. Install it with: brew install yt-dlp")
+            result = subprocess.run(["yt-dlp", "--flat-playlist", "--dump-single-json", f"ytsearch5:{query}"],
+                                    capture_output=True, text=True, check=True, timeout=45)
+            entries = json.loads(result.stdout).get("entries", [])
+            items = [{"id": item.get("id"), "title": item.get("title", "Untitled"),
+                      "channel": item.get("channel") or item.get("uploader", ""),
+                      "duration": item.get("duration") or 0,
+                      "thumbnail": item.get("thumbnail", "")}
+                     for item in entries if item.get("id")]
+            return self._json(HTTPStatus.OK, {"results": items})
+        except Exception as exc:
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+
+    def _youtube_download(self, job_id: str) -> None:
+        try:
+            job, request = JOBS.get(job_id), self._read_json()
+            if not job:
+                raise ValueError("Video session not found.")
+            if not request.get("rights_confirmed"):
+                raise ValueError("Confirm you have permission to download and use this track.")
+            video_id = str(request.get("id", ""))
+            if not video_id or not all(char.isalnum() or char in "-_" for char in video_id):
+                raise ValueError("Invalid YouTube video.")
+            if not shutil.which("yt-dlp"):
+                raise RuntimeError("YouTube download needs yt-dlp. Install it with: brew install yt-dlp")
+            output = str(Path(job["folder"]) / f"youtube-{video_id}.%(ext)s")
+            subprocess.run(["yt-dlp", "--no-playlist", "-x", "--audio-format", "mp3", "--audio-quality", "0",
+                            "-o", output, f"https://www.youtube.com/watch?v={video_id}"],
+                           capture_output=True, text=True, check=True, timeout=600)
+            tracks = list(Path(job["folder"]).glob(f"youtube-{video_id}.mp3"))
+            if not tracks:
+                raise RuntimeError("MP3 conversion did not produce a file.")
+            job.setdefault("music", []).append(tracks[0])
+            return self._json(HTTPStatus.OK, {"name": tracks[0].name})
+        except subprocess.CalledProcessError as exc:
+            detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": detail})
+        except Exception as exc:
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
 
     def _prepare_batch(self) -> None:
         job_id = uuid.uuid4().hex
