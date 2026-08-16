@@ -120,7 +120,32 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._analyse_upload()
         if route == "/api/export":
             return self._export()
+        if route.startswith("/api/music/"):
+            return self._upload_music(route.rsplit("/", 1)[-1])
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _upload_music(self, job_id: str) -> None:
+        job = JOBS.get(job_id)
+        size = int(self.headers.get("Content-Length", "0"))
+        if not job:
+            return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
+        if not size or size > 2 * 1024 * 1024 * 1024:
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an audio file smaller than 2GB."})
+        name = Path(unquote(self.headers.get("X-Filename", "music.mp3"))).name
+        suffix = Path(name).suffix.lower() or ".mp3"
+        if suffix not in {".mp3", ".m4a", ".aac", ".wav", ".ogg"}:
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an MP3, M4A, AAC, WAV or OGG file."})
+        target = Path(job["folder"]) / f"music{suffix}"
+        remaining = size
+        with target.open("wb") as handle:
+            while remaining:
+                chunk = self.rfile.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    return self._json(HTTPStatus.BAD_REQUEST, {"error": "Music upload ended early."})
+                handle.write(chunk)
+                remaining -= len(chunk)
+        job["music"] = target
+        return self._json(HTTPStatus.OK, {"name": name})
 
     def _analyse_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -166,7 +191,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                                     "message": "מכינה את קטעי הווידאו…"}
             threading.Thread(target=self._run_export,
                              args=(job, clips, request.get("transition", "cut"),
-                                   float(request.get("transition_duration", .5))), daemon=True).start()
+                                   float(request.get("transition_duration", .5)),
+                                   bool(request.get("use_music")), float(request.get("music_start", 0))), daemon=True).start()
             return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -181,12 +207,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                               {"error": f"Export failed: {detail}"})
 
     @staticmethod
-    def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float) -> None:
+    def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float,
+                    use_music: bool, music_start: float) -> None:
         try:
             job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
             output = Path(job["folder"]) / "RK-Motion-edit.mp4"
             export_edited_movie(str(job["source"]), clips, str(output),
-                                transition=transition, transition_duration=transition_duration)
+                                transition=transition, transition_duration=transition_duration,
+                                music_path=str(job["music"]) if use_music and job.get("music") else None,
+                                music_start=music_start)
             job["export"] = output
             job["export_status"].update({"state": "done", "progress": 100,
                                          "message": "הסרט מוכן.", "download": f"/api/export/{job['report']['job_id']}"})

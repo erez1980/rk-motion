@@ -191,7 +191,8 @@ def _has_audio(path: str) -> bool:
 
 
 def export_edited_movie(path: str, clips: list[dict], output: str,
-                        transition: str = "cut", transition_duration: float = .5) -> str:
+                        transition: str = "cut", transition_duration: float = .5,
+                        music_path: str | None = None, music_start: float = 0) -> str:
     """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
@@ -203,7 +204,15 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
     if transition != "cut" and len(clips) > 1:
-        return _export_with_transitions(path, clips, target, transition, transition_duration)
+        _export_with_transitions(path, clips, target, transition, transition_duration)
+    else:
+        _export_hard_cuts(path, clips, target)
+    if music_path:
+        _mix_music(target, music_path, music_start)
+    return str(target)
+
+
+def _export_hard_cuts(path: str, clips: list[dict], target: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
         parts = []
         for index, clip in enumerate(clips, 1):
@@ -224,7 +233,29 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
                         "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(target)],
                        check=True, capture_output=True)
-    return str(target)
+
+
+def _mix_music(target: Path, music_path: str, music_start: float) -> None:
+    """Loop and mix a local music file from ``music_start`` until movie end."""
+    music = Path(music_path)
+    if not music.is_file():
+        raise ValueError("selected music file is unavailable")
+    if music_start < 0:
+        raise ValueError("music start must not be negative")
+    movie_duration = duration(str(target))
+    delay_ms = round(music_start * 1000)
+    mixed = target.with_name(target.stem + ".with-music.mp4")
+    audio_filter = f"[1:a]adelay={delay_ms}:all=1,volume=0.65[music]"
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target), "-stream_loop", "-1", "-i", str(music)]
+    if _has_audio(str(target)):
+        audio_filter += ";[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]"
+        maps = ["-map", "0:v:0", "-map", "[mixed]"]
+    else:
+        maps = ["-map", "0:v:0", "-map", "[music]"]
+    cmd.extend(["-filter_complex", audio_filter, *maps, "-t", str(movie_duration),
+                "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", str(mixed)])
+    subprocess.run(cmd, check=True, capture_output=True)
+    mixed.replace(target)
 
 
 def _export_with_transitions(path: str, clips: list[dict], target: Path,
