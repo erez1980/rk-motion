@@ -39,7 +39,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
-    def _file(self, path: Path, content_type: str | None = None) -> None:
+    def _file(self, path: Path, content_type: str | None = None, attachment: bool = False) -> None:
         if not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -62,6 +62,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type or mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+        if attachment:
+            self.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
         self.send_header("Content-Length", str(end - start + 1))
         self.send_header("Accept-Ranges", "bytes")
         self.end_headers()
@@ -96,7 +98,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            return self._file(Path(path), "video/mp4")
+            return self._file(Path(path), "video/mp4", attachment=parts[1] == "export")
         if len(parts) == 3 and parts[:2] == ["api", "export-status"]:
             job = JOBS.get(parts[2])
             if not job or "export_status" not in job:
