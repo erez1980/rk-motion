@@ -427,6 +427,11 @@ const applyTheme = day => {
 applyTheme(localStorage.getItem('rk-motion-theme') === 'day');
 $('#themeToggle').onclick = () => applyTheme(!document.body.classList.contains('day'));
 
+/* YouTube search appears only when yt-dlp is installed on this computer. */
+fetch('/api/capabilities').then(r => r.json()).then(caps => {
+  if (!caps.youtube) document.querySelectorAll('.youtube-search,.rights,.sep,#ytResults').forEach(el => el.hidden = true);
+}).catch(() => {});
+
 /* ---- Shared helpers ---- */
 function setStatus(msg, p = 0, error = false, working = false) {
   statusBox.className = 'status show' + (error ? ' error' : '') + (working ? ' working' : '');

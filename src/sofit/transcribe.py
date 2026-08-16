@@ -123,7 +123,13 @@ def transcribe(
             return cached
 
     # Imported lazily so `--help`, cache hits, and tests don't pay the import cost.
-    from faster_whisper import WhisperModel
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Transcription needs the podcast extras. Install them with: "
+            "pip install 'rk-motion[podcast]'"
+        ) from exc
 
     wm = WhisperModel(model, compute_type=compute_type)
     raw_segments, _info = wm.transcribe(media_path, language=lang, word_timestamps=True)

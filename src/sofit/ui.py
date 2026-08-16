@@ -112,6 +112,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if started:
                 state["elapsed_seconds"] = round(time.monotonic() - started, 1)
             return self._json(HTTPStatus.OK, state)
+        if parts == ["api", "capabilities"]:
+            return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp"))})
         if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
             job = JOBS.get(parts[2])
             track = job.get("pending_music") if job else None
@@ -153,7 +155,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not query:
                 raise ValueError("Enter a search query.")
             if not shutil.which("yt-dlp"):
-                raise RuntimeError("YouTube search needs yt-dlp. Install it with: brew install yt-dlp")
+                raise RuntimeError("YouTube search needs yt-dlp installed on this computer (https://github.com/yt-dlp/yt-dlp).")
             result = subprocess.run(["yt-dlp", "--flat-playlist", "--dump-single-json", f"ytsearch5:{query}"],
                                     capture_output=True, text=True, check=True, timeout=45)
             entries = json.loads(result.stdout).get("entries", [])
@@ -177,7 +179,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not video_id or not all(char.isalnum() or char in "-_" for char in video_id):
                 raise ValueError("Invalid YouTube video.")
             if not shutil.which("yt-dlp"):
-                raise RuntimeError("YouTube download needs yt-dlp. Install it with: brew install yt-dlp")
+                raise RuntimeError("YouTube download needs yt-dlp installed on this computer (https://github.com/yt-dlp/yt-dlp).")
             output = str(Path(job["folder"]) / f"youtube-{video_id}.%(ext)s")
             subprocess.run(["yt-dlp", "--no-playlist", "--extractor-args", "youtube:player_client=android_vr,web_safari",
                             "-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "0",
@@ -191,7 +193,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
             if "HTTP Error 403" in detail or "Forbidden" in detail:
-                detail = "YouTube blocked this download. Run: brew upgrade yt-dlp, then restart RK Motion."
+                detail = "YouTube blocked this download. Update yt-dlp to its latest version, then restart RK Motion."
             elif "Requested format is not available" in detail:
                 detail = "No downloadable audio format was exposed by YouTube for this result. Try another result or update yt-dlp."
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": detail})

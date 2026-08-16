@@ -5,12 +5,12 @@ description = "Private, local action-scene finder and visual editor for rider vi
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = [
-    "faster-whisper>=1.0",
-    "anthropic>=0.40",
-]
+# The RK Motion editor (action detection + local UI) is stdlib-only and needs
+# just FFmpeg on PATH. The podcast/transcript pipeline pulls its own extras.
+dependencies = []
 
 [project.optional-dependencies]
+podcast = ["faster-whisper>=1.0", "anthropic>=0.40"]  # transcribe + generate pipeline
 dev = ["pytest>=8"]
 mcp = ["mcp>=1.2,<2"]  # 2.0 removed mcp.server.fastmcp; code targets the 1.x API
 youtube = ["yt-dlp>=2024.1"]

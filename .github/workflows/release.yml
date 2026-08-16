@@ -1,24 +1,115 @@
-name: release
-# Publishes to PyPI on a version tag push (e.g. `git tag v0.1.0 && git push --tags`).
-# Uses PyPI Trusted Publishing (OIDC) — no API token stored in the repo.
-# One-time setup: on PyPI, add a trusted publisher for this repo pointing at
-# this workflow (release.yml) and the `pypi` environment.
+name: Build desktop apps
+
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write  # required for trusted publishing
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            artifact: RK-Motion-macOS-AppleSilicon
+          - os: windows-latest
+            artifact: RK-Motion-Windows
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install build
-      - run: python -m build
-      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Install build dependencies
+        run: pip install . pyinstaller pillow
+
+      - name: Bundle static FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p packaging/ffmpeg-bin
+          curl -fL -o /tmp/ffmpeg.zip  "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
+          curl -fL -o /tmp/ffprobe.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip"
+          unzip -o /tmp/ffmpeg.zip  -d packaging/ffmpeg-bin
+          unzip -o /tmp/ffprobe.zip -d packaging/ffmpeg-bin
+          chmod +x packaging/ffmpeg-bin/ffmpeg packaging/ffmpeg-bin/ffprobe
+          packaging/ffmpeg-bin/ffmpeg -version | head -1
+
+      - name: Bundle static FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force packaging/ffmpeg-bin | Out-Null
+          curl.exe -fL -o ffmpeg.zip "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-tmp
+          $bin = Get-ChildItem ffmpeg-tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          Copy-Item $bin.FullName packaging/ffmpeg-bin/
+          $probe = Get-ChildItem ffmpeg-tmp -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          Copy-Item $probe.FullName packaging/ffmpeg-bin/
+          packaging/ffmpeg-bin/ffmpeg.exe -version | Select-Object -First 1
+
+      - name: Build with PyInstaller
+        run: pyinstaller packaging/rk-motion.spec --noconfirm
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/RK Motion.app" "${{ matrix.artifact }}.zip"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/RK Motion.exe" -DestinationPath "${{ matrix.artifact }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
+          body: |
+            ## RK Motion — desktop app
+
+            Turn a long ride video into reviewed action clips and one exported
+            highlight movie. Everything runs locally; nothing is uploaded.
+
+            **Download:** pick the file for your computer below, unzip it and
+            run it. FFmpeg is bundled — no other installs needed.
+
+            ### First launch (the app is not code-signed yet)
+
+            - **macOS:** right-click **RK Motion.app** → **Open** → **Open**.
+              If macOS still refuses, allow it under **System Settings →
+              Privacy & Security → Open Anyway** (one time only).
+            - **Windows:** if SmartScreen shows "Windows protected your PC",
+              click **More info → Run anyway** (one time only).
+
+            The app opens your browser at a local address (127.0.0.1). Closing
+            the app window/terminal stops it and deletes its temporary files.
+
+            ---
+
+            ### עברית — הפעלה ראשונה
+
+            ההורדה: בוחרים את הקובץ המתאים למחשב, מחלצים ומריצים. FFmpeg כבר
+            כלול — אין צורך בהתקנות נוספות.
+
+            - **מק:** קליק ימני על **RK Motion.app** ← **פתיחה** ← **פתיחה**
+              (פעם אחת בלבד, כי האפליקציה עדיין לא חתומה).
+            - **Windows:** אם מופיעה אזהרת SmartScreen — **More info ←
+              Run anyway** (פעם אחת בלבד).

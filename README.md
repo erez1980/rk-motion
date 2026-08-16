@@ -6,6 +6,27 @@ long ride into reviewed action clips and one exported highlight movie.
 Built on the open-source Sofit codebase, RK Motion adds a visual workflow for
 mountain-bike footage and other action video.
 
+## Download the desktop app (Mac / Windows)
+
+Prebuilt apps are published on the
+[Releases page](https://github.com/erez1980/rk-motion/releases): download the
+file for your computer, unzip and run. FFmpeg is bundled — no other installs
+are needed. The builds are not code-signed yet, so the first launch needs one
+extra click:
+
+- **macOS (Apple Silicon):** right-click `RK Motion.app` → **Open** → **Open**.
+  If macOS still refuses, allow it once under *System Settings → Privacy &
+  Security → Open Anyway*. (Intel Macs: install from source below.)
+- **Windows:** if SmartScreen appears, click **More info → Run anyway**.
+
+The app opens your browser at a local `127.0.0.1` address; everything is
+processed on your machine and temporary files are deleted when it closes.
+YouTube music search appears only if [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+is installed separately on the computer.
+
+Maintainers: pushing a `v*` tag builds and publishes both apps via GitHub
+Actions (`.github/workflows/release.yml`).
+
 ## Local action-scene finder (MVP)
 
 This fork adds a **transcript-free action finder** for long videos. It samples
@@ -36,7 +57,7 @@ git clone https://github.com/erez1980/rk-motion.git
 cd rk-motion
 python3 -m venv .venv
 source .venv/bin/activate
-pip install --no-deps -e .
+pip install -e .   # the editor is dependency-free; add [podcast] for the transcript pipeline
 ```
 
 ### Use it

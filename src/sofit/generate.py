@@ -152,7 +152,13 @@ class GenerationError(RuntimeError):
 
 
 def _client():
-    import anthropic  # lazy import so tests / --help don't require the SDK
+    try:
+        import anthropic  # lazy import so tests / --help don't require the SDK
+    except ImportError as exc:
+        raise GenerationError(
+            "Post generation needs the podcast extras. Install them with: "
+            "pip install 'rk-motion[podcast]'"
+        ) from exc
 
     return anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
 
