@@ -1,6 +1,6 @@
 [project]
 name = "rk-motion"
-version = "0.5.0"
+version = "0.5.1"
 description = "Private, local action-scene finder and visual editor for rider videos."
 readme = "README.md"
 license = { text = "MIT" }
