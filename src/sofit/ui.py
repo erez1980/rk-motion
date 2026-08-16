@@ -109,6 +109,13 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if started:
                 state["elapsed_seconds"] = round(time.monotonic() - started, 1)
             return self._json(HTTPStatus.OK, state)
+        if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
+            job = JOBS.get(parts[2])
+            track = job.get("pending_music") if job else None
+            if not track:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            return self._file(Path(track), "audio/mpeg")
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def _read_json(self) -> dict:
@@ -127,6 +134,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._export()
         if route.startswith("/api/youtube/download/"):
             return self._youtube_download(route.rsplit("/", 1)[-1])
+        if route.startswith("/api/music/attach/"):
+            return self._attach_pending_music(route.rsplit("/", 1)[-1])
         if route.startswith("/api/music/"):
             return self._upload_music(route.rsplit("/", 1)[-1])
         if route.startswith("/api/video/"):
@@ -174,7 +183,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             tracks = list(Path(job["folder"]).glob(f"youtube-{video_id}.mp3"))
             if not tracks:
                 raise RuntimeError("MP3 conversion did not produce a file.")
-            job.setdefault("music", []).append(tracks[0])
+            job["pending_music"] = tracks[0]
             return self._json(HTTPStatus.OK, {"name": tracks[0].name})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
@@ -185,6 +194,13 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": detail})
         except Exception as exc:
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+
+    def _attach_pending_music(self, job_id: str) -> None:
+        job = JOBS.get(job_id)
+        if not job or not job.get("pending_music"):
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "No downloaded music is waiting to be added."})
+        job.setdefault("music", []).append(job.pop("pending_music"))
+        return self._json(HTTPStatus.OK, {"ok": True})
 
     def _prepare_batch(self) -> None:
         job_id = uuid.uuid4().hex
