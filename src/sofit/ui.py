@@ -71,7 +71,13 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 chunk = handle.read(min(1024 * 1024, remaining))
                 if not chunk:
                     break
-                self.wfile.write(chunk)
+                try:
+                    self.wfile.write(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    # Browsers routinely cancel an old byte-range request when
+                    # the user seeks or a new preview starts. That is expected,
+                    # not an application/export failure.
+                    return
                 remaining -= len(chunk)
 
     def do_GET(self) -> None:  # noqa: N802
@@ -146,7 +152,14 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:
-            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+            detail = str(exc)
+            stderr = getattr(exc, "stderr", None)
+            if stderr:
+                if isinstance(stderr, bytes):
+                    stderr = stderr.decode("utf-8", "replace")
+                detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY,
+                              {"error": f"Export failed: {detail}"})
 
 
 def launch_ui(port: int = 8787) -> int:
