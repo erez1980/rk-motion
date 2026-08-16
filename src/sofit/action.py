@@ -193,7 +193,7 @@ def _has_audio(path: str) -> bool:
 def export_edited_movie(path: str, clips: list[dict], output: str,
                         transition: str = "cut", transition_duration: float = .5,
                         music_paths: list[str] | None = None, music_start: float = 0,
-                        speed: float = 1.0) -> str:
+                        speed: float = 1.0, remove_original_audio: bool = False) -> str:
     """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
@@ -212,6 +212,8 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         raise ValueError("speed must be 1, 1.25, 1.5 or 2")
     if speed != 1:
         _speed_up_movie(target, speed)
+    if remove_original_audio:
+        _strip_audio(target)
     if music_paths:
         _mix_music(target, music_paths, music_start)
     return str(target)
@@ -250,6 +252,15 @@ def _speed_up_movie(target: Path, speed: float) -> None:
     cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", str(fast)])
     subprocess.run(cmd, check=True, capture_output=True)
     fast.replace(target)
+
+
+def _strip_audio(target: Path) -> None:
+    """Remove original camera/ride audio before optional music is mixed."""
+    silent = target.with_name(target.stem + ".silent.mp4")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(target), "-map", "0:v:0",
+                    "-c:v", "copy", "-an", "-movflags", "+faststart", str(silent)],
+                   check=True, capture_output=True)
+    silent.replace(target)
 
 
 def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None:

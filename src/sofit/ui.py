@@ -193,7 +193,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                              args=(job, clips, request.get("transition", "cut"),
                                    float(request.get("transition_duration", .5)),
                                    bool(request.get("use_music")), float(request.get("music_start", 0)),
-                                   float(request.get("speed", 1))), daemon=True).start()
+                                   float(request.get("speed", 1)), bool(request.get("remove_original_audio"))), daemon=True).start()
             return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -209,14 +209,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float,
-                    use_music: bool, music_start: float, speed: float) -> None:
+                    use_music: bool, music_start: float, speed: float,
+                    remove_original_audio: bool) -> None:
         try:
             job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
             output = Path(job["folder"]) / "RK-Motion-edit.mp4"
             export_edited_movie(str(job["source"]), clips, str(output),
                                 transition=transition, transition_duration=transition_duration,
                                 music_paths=[str(item) for item in job["music"]] if use_music and job.get("music") else None,
-                                music_start=music_start, speed=speed)
+                                music_start=music_start, speed=speed,
+                                remove_original_audio=remove_original_audio)
             job["export"] = output
             job["export_status"].update({"state": "done", "progress": 100,
                                          "message": "הסרט מוכן.", "download": f"/api/export/{job['report']['job_id']}"})
