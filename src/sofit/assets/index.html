@@ -1,51 +1,931 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RK Motion — היילייטים של אקשן</title>
 <style>
-:root{--pine:#063b2b;--green:#0a7d4d;--leaf:#dff5e7;--lime:#b8ec71;--paper:#f7faf8;--card:#fff;--ink:#10241d;--soft:#5b7067;--line:#d9e8df;--danger:#9a3421;--shadow:0 16px 46px #063b2b12}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,Arial,sans-serif}.app{max-width:1200px;margin:auto;padding:28px 22px 48px}.brand{display:flex;align-items:center;gap:12px;direction:ltr}.brand img{width:49px;height:49px;border-radius:50%;box-shadow:0 5px 15px #063b2b24}.brand h1{margin:0;color:var(--pine);font-size:25px;letter-spacing:-.04em}.brand p{margin:0;color:var(--soft);font-size:13px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:27px}.privacy{font-size:12px;color:var(--green);background:var(--leaf);padding:7px 11px;border-radius:20px}.steps{display:flex;gap:7px;margin:0 0 23px;padding:0;list-style:none}.steps li{color:var(--soft);font-size:13px;display:flex;align-items:center;gap:7px}.steps li:not(:last-child):after{content:"";height:1px;width:36px;background:var(--line);margin-inline:4px}.steps b{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#e8efeb;font-size:12px}.steps .active{color:var(--pine);font-weight:700}.steps .active b{background:var(--green);color:#fff}.upload{border:1.5px dashed #93bea6;background:radial-gradient(circle at 15% 15%,#d6ff88 0,transparent 22%),linear-gradient(130deg,#073b2b,#0b8050 58%,#0b5c3a);color:#fff;box-shadow:0 24px 55px #063b2b25;border-radius:22px;padding:39px 24px;text-align:center;transition:.2s}.upload.over{transform:scale(1.01);background:var(--leaf);border-color:var(--green);box-shadow:var(--shadow)}.upload h2{margin:0 0 7px;font-size:25px;color:#fff}.upload p{margin:0;color:#d8eee2}.settings{display:flex;align-items:center;justify-content:center;gap:9px;margin:21px 0 19px;font-size:14px;color:var(--pine)}.settings input{width:95px;padding:8px 10px;border:1px solid var(--line);background:#fff;border-radius:9px;text-align:center;font:inherit}.hint{font-size:12px;color:var(--soft)}button,.button{border:0;border-radius:10px;padding:10px 15px;font:inherit;font-weight:700;cursor:pointer;transition:.18s}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #80c8a2;outline-offset:2px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:var(--green);color:#fff;box-shadow:0 5px 12px #0a7d4d28}.primary:hover{background:#07663e;transform:translateY(-1px)}.secondary{background:#fff;color:var(--pine);border:1px solid var(--line)}.secondary:hover{background:var(--leaf);border-color:#93bea6}.ghost{padding:6px 8px;background:#fff;color:var(--green);border:1px solid var(--line)}input[type=file]{display:none}.status{display:none;margin:18px 0;padding:14px 16px;border-radius:12px;background:var(--leaf);color:var(--pine)}.status.show{display:block}.status.error{background:#ffebe6;color:var(--danger)}.bar{height:7px;background:#c9e5d4;border-radius:9px;overflow:hidden;margin-top:8px}.bar i{display:block;width:0;height:100%;background:var(--green);transition:width .2s}.status.working .bar i{width:76%!important;animation:pulse 1.2s ease-in-out infinite alternate}@keyframes pulse{to{opacity:.35}}.workspace{display:none;grid-template-columns:minmax(0,1.18fr) minmax(330px,.82fr);gap:22px;margin-top:24px}.workspace.show{display:grid}.preview,.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.preview{padding:12px}.preview video{display:block;width:100%;background:#07120d;border-radius:12px;max-height:62vh}.timeline{height:32px;background:#e7f0ea;border-radius:8px;margin:11px 2px 2px;position:relative;overflow:hidden}.timeline i{position:absolute;top:7px;bottom:7px;background:var(--green);border-radius:5px;cursor:pointer}.panel{padding:18px}.panel-head,.export-head{display:flex;align-items:center;justify-content:space-between;gap:9px}.panel h2,.export h2{font-size:17px;color:var(--pine);margin:0}.count{color:var(--soft);font-weight:400;font-size:13px}.clip-list{max-height:52vh;overflow:auto;margin-top:7px;padding-left:2px}.clip{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:13px 7px;border-bottom:1px solid #edf3ef;border-radius:9px}.clip.selected{background:#f4fbf6}.clip.active{box-shadow:inset 3px 0 var(--green)}.clip:last-child{border:0}.clip input[type=checkbox]{width:17px;height:17px;accent-color:var(--green)}.clip-title{display:flex;align-items:center;gap:8px}.score{font-size:12px;font-weight:800;color:#12613e;background:var(--leaf);border-radius:20px;padding:2px 8px}.timing{display:flex;align-items:center;gap:4px;color:var(--soft);font-size:12px;margin-top:4px}.timing input{width:57px;border:1px solid var(--line);border-radius:6px;padding:3px 4px;text-align:center;font:inherit;font-size:12px}.controls{display:flex;gap:4px}.empty{color:var(--soft);text-align:center;padding:30px 12px}.export{grid-column:1/-1;display:none;background:var(--pine);color:#fff;border-radius:18px;padding:17px 19px;align-items:center;justify-content:space-between;gap:14px}.export.show{display:flex}.export h2{color:#fff}.export p{margin:2px 0 0;color:#d2e2d9;font-size:12px}.export-options{display:flex;align-items:center;gap:8px}.export select{background:#fff;color:var(--ink);border:0;border-radius:8px;padding:9px;font:inherit}.youtube{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%}.youtube input[placeholder]{width:170px;padding:8px;border-radius:8px;border:0}.youtube iframe{width:220px;height:124px;border:0}.youtube #ytResults{width:100%;max-height:180px;overflow:auto}.yt-result{display:flex;gap:6px;align-items:center;padding:5px;background:#ffffff16;margin-top:4px}.yt-result img{width:48px;height:27px;object-fit:cover}.music-studio{grid-column:1/-1;background:linear-gradient(120deg,#fff,#ecf8ef);border:1px solid var(--line);border-radius:20px;padding:20px;display:grid;grid-template-columns:1fr auto;gap:14px;box-shadow:var(--shadow)}.music-studio h2{margin:2px 0;color:var(--pine)}.music-studio p{margin:0;color:var(--soft)}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--green)}.music-row,.youtube-search{display:flex;align-items:center;gap:9px;flex-wrap:wrap;grid-column:1/-1}.track-state{background:var(--leaf);color:var(--pine);padding:7px 10px;border-radius:18px;font-size:13px;font-weight:700}.start-control{display:flex;align-items:center;gap:7px;color:var(--pine)}.start-control input{width:150px}.youtube-search input{min-width:250px;padding:10px;border:1px solid var(--line);border-radius:9px;font:inherit}.youtube-search label{font-size:12px;color:var(--soft)}.yt-results{grid-column:1/-1;width:100%}.yt-result{display:grid;grid-template-columns:58px 1fr auto auto;gap:9px;align-items:center;padding:8px;background:#fff;border:1px solid var(--line);margin-top:6px;border-radius:10px;color:var(--ink)}.yt-result img{width:58px;height:33px;object-fit:cover;border-radius:4px}.yt-modal{position:fixed;z-index:10;inset:0;background:#001b10bf;display:grid;place-items:center;padding:18px}.yt-modal[hidden]{display:none}.yt-dialog{position:relative;width:min(860px,100%);background:#000;border-radius:16px;padding:42px 12px 12px}.yt-dialog button{position:absolute;top:8px;left:8px;color:#fff;background:#ffffff20}.yt-dialog iframe{width:100%;aspect-ratio:16/9;border:0}.music{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.music audio{height:32px;max-width:180px}.music input[type=range]{width:115px}.download{display:none;text-decoration:none}.download.show{display:inline-block}@media(max-width:820px){.app{padding:19px 14px}.privacy{display:none}.workspace.show{display:block}.panel{margin-top:16px}.clip-list{max-height:none}.export.show{display:flex;flex-wrap:wrap}.export-options{flex-wrap:wrap}.steps li:not(:last-child):after{width:14px}.upload{padding:30px 16px}.settings{flex-wrap:wrap}}
+/* Rubik ships with the app (variable weight, Hebrew + Latin) so the UI needs no network. */
+@font-face{font-family:Rubik;src:url('/assets/rubik.ttf') format('truetype');font-weight:300 900;font-display:swap}
 
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&family=Rubik:wght@700;800;900&display=swap');
-:root{--pine:#051c12;--green:#65d1a7;--leaf:#103d2b;--lime:#bdf5d6;--paper:#051c12;--card:#082b1e;--ink:#edf7f0;--soft:#a8cabc;--line:rgba(129,218,181,.2);--shadow:none}body{background:radial-gradient(circle at 12% 13%,#12543b 0,transparent 29%),radial-gradient(circle at 90% 84%,#0f4b36 0,transparent 27%),#051c12;color:var(--ink);font-family:Heebo,Arial,sans-serif}.app{max-width:none;padding:0 7vw 80px}.top{height:72px;margin:0 -7vw 40px;padding:0 7vw;border-bottom:1px solid var(--line);background:#051c12bb;backdrop-filter:blur(12px);position:sticky;top:0;z-index:7}.brand h1{font:900 25px Rubik;color:var(--ink);letter-spacing:-1px}.brand h1 em{font-style:normal;color:var(--green)}.brand p{color:var(--soft);font-weight:700}.brand img{width:48px;height:48px;border:1px solid var(--line);box-shadow:none}.privacy{color:#062418;background:var(--green);font:800 11px Rubik;letter-spacing:.06em;border-radius:0}.steps{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:13px 0;margin-bottom:0}.steps li{color:var(--soft);font-weight:700}.steps .active{color:var(--ink)}.steps .active b{color:#062418;background:var(--green)}.steps b{background:#0c3424;color:var(--soft)}.upload{border:0;border-radius:0;margin:0 -7vw;padding:clamp(75px,12vw,150px) 7vw 85px;text-align:right;background:radial-gradient(circle at 80% 30%,#12543b 0,transparent 28%),linear-gradient(115deg,#051c12 15%,#082b1e);box-shadow:none;min-height:460px}.upload.over{transform:none;background:linear-gradient(115deg,#082b1e,#12543b);box-shadow:inset 0 0 0 1px var(--green)}.kicker{display:block;color:var(--green);font:800 13px Rubik;letter-spacing:2px;margin-bottom:16px}.upload h2{font:900 clamp(48px,7.4vw,104px)/.9 Rubik;letter-spacing:-4px;max-width:850px;margin:0 0 22px}.upload h2 b{color:var(--green);font-weight:inherit}.upload p{max-width:600px;font-size:19px;color:var(--soft)}.settings{justify-content:flex-start;margin:27px 0;color:var(--ink)}.settings input{background:#092b1e;border-color:var(--line);color:var(--ink)}.button,.primary,.secondary{border-radius:0;font-family:Rubik;font-size:13px}.primary{background:var(--green);color:#062418;box-shadow:none}.primary:hover{background:#bdf5d6}.secondary{background:transparent;color:var(--green);border-color:var(--line)}.status{border-radius:0;background:#103d2b;color:var(--ink)}.workspace{gap:1px;background:var(--line);border:1px solid var(--line)}.preview,.panel,.music-studio{border:0!important;border-radius:0!important;background:#082b1e!important;box-shadow:none!important}.preview{padding:18px}.timeline{background:#061f15;border-radius:0}.timeline i{background:var(--green);border-radius:0}.panel{padding:22px}.panel h2,.music-studio h2{font-family:Rubik;color:var(--ink)}.clip{border-bottom-color:var(--line);border-radius:0}.clip.selected{background:#0d3828}.score,.track-state{background:#103d2b;color:var(--green);border-radius:0}.timing input{background:#061f15;color:var(--ink);border-color:var(--line)}.ghost{border-radius:0;background:#0c3424;border-color:var(--line);color:var(--green)}.music-studio{padding:28px!important;grid-template-columns:1fr!important}.eyebrow{font-family:Rubik;color:var(--green)}.music-studio p{color:var(--soft)}.youtube-search input{background:#061f15;color:var(--ink);border-color:var(--line);border-radius:0}.yt-result{background:#061f15;border-color:var(--line);border-radius:0;color:var(--ink)}.export{border-radius:0;background:#103d2b}.export-options select{border-radius:0;background:#061f15;color:var(--ink);border:1px solid var(--line)}.yt-modal{background:#020b07e8}.yt-dialog{border-radius:0;border:1px solid var(--line)}@media(max-width:820px){.app{padding:0 5vw 50px}.top,.upload{margin-left:-5vw;margin-right:-5vw;padding-left:5vw;padding-right:5vw}.upload{min-height:390px}.upload h2{letter-spacing:-2px}.privacy{display:none}.workspace{display:block}.music-studio{padding:20px!important}.youtube-search input{min-width:0;width:100%}}
+/* ---- Design tokens: dark is the default, body.day switches to daylight. ---- */
+:root{
+  --bg:#0a0d0b;
+  --bg-glow-1:rgba(200,245,66,.07);
+  --bg-glow-2:rgba(61,220,132,.06);
+  --card:#141a15;
+  --card-2:#0f1410;
+  --ink:#f0f6f0;
+  --soft:#9fb4a7;
+  --line:#263029;
+  --accent:#c8f542;
+  --accent-ink:#182505;
+  --accent-soft:rgba(200,245,66,.13);
+  --accent-soft-ink:#d9fb7e;
+  --ok:#3ddc84;
+  --danger:#ff8b6b;
+  --danger-soft:rgba(255,139,107,.14);
+  --radius:16px;
+  --radius-s:10px;
+  --shadow:0 18px 50px rgba(0,0,0,.35);
+}
+body.day{
+  --bg:#f4f8f3;
+  --bg-glow-1:rgba(140,200,40,.12);
+  --bg-glow-2:rgba(30,150,90,.08);
+  --card:#ffffff;
+  --card-2:#eef4ec;
+  --ink:#17211a;
+  --soft:#586b5e;
+  --line:#dce5da;
+  --accent:#3f6d0a;
+  --accent-ink:#ffffff;
+  --accent-soft:#e8f5cd;
+  --accent-soft-ink:#33530b;
+  --ok:#1d7a4b;
+  --danger:#a33a22;
+  --danger-soft:#ffe9e2;
+  --shadow:0 14px 40px rgba(23,49,30,.10);
+}
 
-.header-actions{display:flex;align-items:center;gap:10px}.start-control{display:flex!important;align-items:center;gap:9px;color:var(--ink)!important;font-size:15px;font-weight:700;padding:8px 10px;background:#061f15;border:1px solid var(--line)}.start-control b{color:var(--green);font-family:Rubik;min-width:48px}.start-control small{font-size:11px;color:var(--soft);font-weight:500}.start-control input[type=range]{accent-color:var(--green)}.music-row{padding:12px;background:#061f15;border:1px solid var(--line)}.music-studio label{color:var(--ink)}body.day{--paper:#eef7f1;--card:#fff;--ink:#082517;--soft:#426453;--line:rgba(8,80,48,.22);--leaf:#dff5e7;background:radial-gradient(circle at 10% 8%,#c7f4d9 0,transparent 28%),#eef7f1;color:var(--ink)}body.day .top{background:#f8fcf9e8}body.day .brand h1,body.day .panel h2,body.day .music-studio h2{color:#082517}body.day .brand p{color:#426453}body.day .steps .active{color:#082517}body.day .upload{background:radial-gradient(circle at 80% 25%,#bdf5d6 0,transparent 26%),linear-gradient(115deg,#e6f8ee,#aee8c7);color:#082517}body.day .upload h2{color:#082517}body.day .upload p{color:#315946}body.day .preview,body.day .panel,body.day .music-studio{background:#fff!important}body.day .workspace{background:rgba(8,80,48,.22)}body.day .clip.selected{background:#e9f8ee}body.day .music-row,body.day .youtube-search input,body.day .yt-result,body.day .start-control,body.day .timeline{background:#f2faf5;color:#082517}body.day .timing input,body.day .export-options select{background:#fff;color:#082517}body.day .export{background:#0d3828}body.day .secondary{color:#0a6b43;background:#fff}.header-actions .secondary{white-space:nowrap}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--ink);
+  background:
+    radial-gradient(900px 500px at 85% -5%,var(--bg-glow-1),transparent 60%),
+    radial-gradient(800px 500px at 5% 100%,var(--bg-glow-2),transparent 60%),
+    var(--bg);
+  font:15px/1.55 Rubik,system-ui,"Segoe UI",Arial,sans-serif;
+  min-height:100vh;
+}
+.app{max-width:1240px;margin:auto;padding:0 22px 70px}
 
-/* Light-mode contrast pass: every informational surface uses dark ink on a light field. */
-body.day .status{background:#dff5e7;color:#082517;border:1px solid #87cda5}body.day .status.error{background:#ffe8e2;color:#7b2819;border-color:#e59b8b}body.day .status .bar{background:#b8ddc7}body.day .status .bar i{background:#087243}body.day .track-state,body.day .score{background:#d7f2e1;color:#075b36}body.day .ghost{background:#e8f6ed;color:#075b36;border-color:#87cda5}body.day .ghost:hover{background:#d1efdc}body.day .hint,body.day .count,body.day .timing,body.day .music-studio p,body.day .youtube-search label{color:#315946}body.day .kicker,body.day .eyebrow{color:#087243}body.day .settings{color:#082517}body.day .settings input{background:#fff;color:#082517;border-color:#87cda5}body.day .panel-head .secondary,body.day .header-actions .secondary{background:#fff;color:#075b36;border-color:#5bab7b}body.day .start-control{background:#edf8f1!important;color:#082517!important;border-color:#87cda5}body.day .start-control b{color:#087243}body.day .music-row{background:#f5fbf7!important;border-color:#b6ddc3}body.day .yt-result small{color:#426453}body.day .export p{color:#d8eee2}body.day .export label{color:#edf7f0}body.day .export .primary{background:#65d1a7;color:#062418}body.day .export .primary:disabled{color:#315946}body.day .download{color:#062418}body.day .privacy{color:#062418}body.day .steps b{background:#d7f2e1;color:#075b36}body.day .steps li{color:#315946}body.day .clip.active{box-shadow:inset 3px 0 #087243}
+/* ---- Header ---- */
+.top{
+  position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 0;margin-bottom:10px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);
+}
+.brand{display:flex;align-items:center;gap:12px;direction:ltr}
+.brand img{width:44px;height:44px;border-radius:12px;border:1px solid var(--line)}
+.brand h1{margin:0;font-size:22px;font-weight:900;letter-spacing:-.5px}
+.brand h1 em{font-style:normal;color:var(--accent)}
+body.day .brand h1 em{color:#4c7c12}
+.brand p{margin:0;color:var(--soft);font-size:12px;font-weight:600}
+.header-actions{display:flex;align-items:center;gap:10px}
+.privacy{font-size:11.5px;font-weight:700;color:var(--accent-soft-ink);background:var(--accent-soft);padding:7px 12px;border-radius:99px}
 
-/* Product-first hero: keep the import action above the fold instead of a landing-page billboard. */
-.upload{min-height:0!important;padding:clamp(38px,5vw,68px) 7vw 48px!important}.upload h2{font-size:clamp(34px,4.5vw,62px)!important;line-height:.98!important;max-width:700px;letter-spacing:-2.5px!important}.upload p{font-size:16px!important;max-width:520px}.upload .kicker{margin-bottom:10px}.upload .settings{margin:18px 0 15px}.upload .button.primary{padding:12px 20px}.steps{margin-top:0}.workspace{margin-top:18px}.music-studio{grid-row:1}.preview,.panel{grid-row:2}.export{grid-row:3}@media(max-width:820px){.upload{padding:38px 5vw 34px!important}.upload h2{font-size:38px!important;letter-spacing:-1.5px!important}.upload p{font-size:15px!important}}
+/* ---- Steps rail ---- */
+.steps{display:flex;gap:8px;margin:14px 0 20px;padding:0;list-style:none;flex-wrap:wrap}
+.steps li{
+  display:flex;align-items:center;gap:8px;color:var(--soft);font-size:13px;font-weight:600;
+  padding:8px 14px;border:1px solid var(--line);border-radius:99px;background:var(--card-2);
+}
+.steps b{width:21px;height:21px;display:grid;place-items:center;border-radius:50%;background:var(--line);color:var(--soft);font-size:11.5px}
+.steps .active{color:var(--ink);border-color:var(--accent)}
+.steps .active b{background:var(--accent);color:var(--accent-ink)}
+.steps .done{color:var(--ink)}
+.steps .done b{background:var(--ok);color:#06180d}
+body.day .steps .done b{color:#fff}
+
+/* ---- Upload hero (compact: the import action stays above the fold) ---- */
+.upload{
+  border:1.5px dashed var(--line);border-radius:22px;padding:clamp(30px,4.5vw,52px) clamp(22px,4vw,48px);
+  background:
+    radial-gradient(500px 260px at 88% 8%,var(--bg-glow-1),transparent 70%),
+    var(--card);
+  transition:border-color .2s,background .2s;
+}
+.upload.over{border-color:var(--accent);background:var(--accent-soft)}
+.kicker{display:block;color:var(--accent);font-size:12px;font-weight:800;letter-spacing:2.5px;margin-bottom:10px}
+body.day .kicker{color:#4c7c12}
+.upload h2{margin:0 0 12px;font-size:clamp(30px,4.2vw,54px);line-height:1.02;font-weight:900;letter-spacing:-1.5px;max-width:660px}
+.upload h2 b{color:var(--accent);font-weight:inherit}
+body.day .upload h2 b{color:#3f6d0a}
+.upload>p{margin:0;color:var(--soft);font-size:16px;max-width:520px}
+.settings{display:flex;align-items:center;gap:9px;margin:20px 0 16px;font-size:14px;flex-wrap:wrap}
+.settings input{
+  width:96px;padding:9px 10px;border:1px solid var(--line);background:var(--card-2);color:var(--ink);
+  border-radius:var(--radius-s);text-align:center;font:inherit;
+}
+.hint{font-size:12px;color:var(--soft)}
+.upload-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.drag-hint{color:var(--soft);font-size:13px}
+
+/* ---- Buttons & inputs ---- */
+button,.button{
+  border:0;border-radius:12px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer;
+  transition:transform .15s,background .15s,opacity .15s;display:inline-block;
+}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.primary:hover:not(:disabled){transform:translateY(-1px)}
+.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.secondary:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+body.day .secondary:hover:not(:disabled){color:#3f6d0a;border-color:#3f6d0a}
+.ghost{padding:7px 10px;background:var(--card-2);color:var(--accent-soft-ink);border:1px solid var(--line);border-radius:var(--radius-s)}
+.ghost:hover:not(:disabled){border-color:var(--accent)}
+input[type=file]{display:none}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
+body.day input[type=checkbox]{accent-color:#3f6d0a}
+input[type=range]{accent-color:var(--accent)}
+select{
+  background:var(--card-2);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-s);
+  padding:9px 10px;font:inherit;
+}
+
+/* ---- Status ---- */
+.status{display:none;margin:16px 0 0;padding:13px 16px;border-radius:var(--radius);background:var(--card);border:1px solid var(--line)}
+.status.show{display:block}
+.status.error{background:var(--danger-soft);color:var(--danger);border-color:var(--danger)}
+.bar{height:6px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:9px}
+.bar i{display:block;width:0;height:100%;background:var(--accent);border-radius:9px;transition:width .25s}
+.status.working .bar i{animation:pulse 1.1s ease-in-out infinite alternate}
+@keyframes pulse{to{opacity:.35}}
+
+/* ---- Workspace ---- */
+.workspace{display:none;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:18px;margin-top:20px}
+.workspace.show{display:grid}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.preview{padding:14px}
+.preview video{display:block;width:100%;background:#000;border-radius:12px;max-height:60vh}
+.time-readout{display:flex;justify-content:space-between;color:var(--soft);font-size:12px;margin:8px 2px 4px;font-variant-numeric:tabular-nums}
+
+/* Timeline: clip marks + live playhead; click to seek. */
+.timeline{height:34px;background:var(--card-2);border:1px solid var(--line);border-radius:9px;position:relative;overflow:hidden;cursor:pointer}
+.timeline i{position:absolute;top:6px;bottom:6px;background:var(--accent);opacity:.85;border-radius:4px;cursor:pointer}
+.timeline i:hover,.timeline i.active{opacity:1;box-shadow:0 0 0 2px var(--accent-soft)}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);pointer-events:none}
+
+/* ---- Clips panel ---- */
+.panel{padding:16px 16px 8px;display:flex;flex-direction:column;min-height:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.panel h2{font-size:16px;margin:0}
+.count{color:var(--soft);font-weight:400;font-size:12.5px}
+.clip-list{max-height:56vh;overflow:auto;margin-top:8px}
+.clip{
+  display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;
+  padding:10px 6px;border-bottom:1px solid var(--line);border-radius:var(--radius-s);
+}
+.clip:last-child{border-bottom:0}
+.clip.selected{background:var(--card-2)}
+.clip.active{box-shadow:inset 3px 0 var(--accent)}
+.clip.dragging{opacity:.4}
+.clip.drop-target{box-shadow:0 -2px 0 var(--accent)}
+.thumb{
+  width:74px;height:42px;border-radius:7px;background:var(--card-2);object-fit:cover;flex:none;
+  border:1px solid var(--line);cursor:grab;
+}
+.thumb:active{cursor:grabbing}
+.clip-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.score{font-size:11.5px;font-weight:800;color:var(--accent-soft-ink);background:var(--accent-soft);border-radius:99px;padding:2px 9px}
+.timing{display:flex;align-items:center;gap:4px;color:var(--soft);font-size:12px;margin-top:4px;flex-wrap:wrap}
+.timing input{
+  width:58px;border:1px solid var(--line);background:var(--card-2);color:var(--ink);
+  border-radius:6px;padding:3px 4px;text-align:center;font:inherit;font-size:12px;
+}
+.controls{display:flex;flex-direction:column;gap:4px}
+.controls .ghost{padding:4px 8px;font-size:12px;line-height:1.2}
+.empty{color:var(--soft);text-align:center;padding:34px 12px}
+
+/* ---- Music studio ---- */
+.music-studio{grid-column:1/-1;padding:20px;display:grid;gap:14px}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--accent)}
+body.day .eyebrow{color:#4c7c12}
+.music-studio h2{margin:2px 0 2px;font-size:18px}
+.music-studio>header p{margin:0;color:var(--soft);font-size:13.5px}
+.music-sources{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.music-sources .sep{color:var(--soft);font-size:12.5px}
+.youtube-search{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex:1;min-width:min(340px,100%)}
+.youtube-search input[type=search]{
+  flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-s);
+  background:var(--card-2);color:var(--ink);font:inherit;
+}
+.rights{font-size:12.5px;color:var(--soft);display:flex;align-items:center;gap:6px}
+.yt-results{display:grid;gap:6px}
+.yt-result{
+  display:grid;grid-template-columns:64px 1fr auto auto;gap:10px;align-items:center;padding:8px;
+  background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);
+}
+.yt-result img{width:64px;height:36px;object-fit:cover;border-radius:5px}
+.yt-result small{color:var(--soft)}
+.track-list{display:grid;gap:6px}
+.track{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;flex-wrap:wrap;
+  background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);font-size:13.5px;
+}
+.track .name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+.track .meta{color:var(--soft);font-size:12px;font-variant-numeric:tabular-nums}
+.track .state{margin-inline-start:auto;font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent-soft-ink)}
+.track.pending .state{background:var(--danger-soft);color:var(--danger)}
+.track audio{height:30px;max-width:220px}
+.start-control{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 12px;
+  background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);font-size:14px;
+}
+.start-control strong{font-weight:700}
+.start-control input[type=range]{flex:1;min-width:140px;max-width:340px}
+.start-control b{color:var(--accent-soft-ink);min-width:46px;font-variant-numeric:tabular-nums}
+.start-control small{flex-basis:100%;color:var(--soft);font-size:11.5px}
+
+/* ---- Export bar & result ---- */
+.export{grid-column:1/-1;display:none;padding:16px 20px;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.export.show{display:flex}
+.export h2{margin:0;font-size:16px}
+.export p{margin:3px 0 0;color:var(--soft);font-size:12.5px}
+.export-options{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.export-options label{font-size:13px;display:flex;align-items:center;gap:5px}
+.download{display:none;text-decoration:none}
+.download.show{display:inline-block}
+.result{grid-column:1/-1;display:none;padding:18px 20px}
+.result.show{display:block}
+.result h2{margin:0 0 4px;font-size:17px}
+.result p{margin:0 0 12px;color:var(--soft);font-size:13px}
+.result video{display:block;width:100%;max-height:52vh;background:#000;border-radius:12px;margin-bottom:12px}
+
+/* ---- YouTube preview modal ---- */
+.yt-modal{position:fixed;z-index:20;inset:0;background:rgba(2,8,4,.85);display:grid;place-items:center;padding:18px}
+.yt-modal[hidden]{display:none}
+.yt-dialog{position:relative;width:min(860px,100%);background:#000;border:1px solid var(--line);border-radius:var(--radius);padding:46px 12px 12px}
+.yt-dialog>button{position:absolute;top:8px;left:8px;color:#fff;background:rgba(255,255,255,.14);border-radius:8px}
+.yt-dialog iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:8px}
+
+/* ---- Responsive ---- */
+@media(max-width:860px){
+  .app{padding:0 14px 50px}
+  .privacy{display:none}
+  .workspace.show{display:flex;flex-direction:column}
+  .clip-list{max-height:none}
+  .upload h2{letter-spacing:-1px}
+  .export{position:sticky;bottom:10px;z-index:6}
+  .export-options{width:100%}
+  .export-options .primary,.export-options .download{flex:1 1 100%;text-align:center}
+  .track .name{max-width:100%}
+  .clip{grid-template-columns:auto auto 1fr}
+  .controls{grid-column:1/-1;flex-direction:row;justify-content:flex-end}
+  .thumb{width:92px;height:52px}
+  .timing input{width:64px}
+}
+@media(prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  html{scroll-behavior:auto}
+}
 </style>
 </head>
-<body><main class="app">
-<header class="top"><div class="brand"><img src="/assets/rk-logo.png" alt="RK Motion"><div><h1>RK <em>Motion</em></h1><p>רוכבים קבוע · Edit your ride</p></div></div><div class="header-actions"><button id="themeToggle" class="secondary" aria-label="החלפת מצב תצוגה">☀ מצב יום</button><div class="privacy">עיבוד מקומי · קבצים זמניים נמחקים בסגירת האפליקציה</div></div></header>
-<ol class="steps"><li class="active" id="step1"><b>1</b>בוחרים סרטון</li><li id="step2"><b>2</b>בוחרים קטעים</li><li id="step3"><b>3</b>מייצאים סרט</li></ol>
-<section id="drop" class="upload"><span class="kicker">ROCHVIM KAVUA / MOTION LAB</span><h2>הופכים רכיבה<br><b>לסרט שאי אפשר לעצור.</b></h2><p>גררו לכאן סרטון אחד או כמה סרטוני רכיבה; הם יחוברו לפי סדר הגרירה.</p><div class="settings"><label for="maxLength">אורך מרבי לקטע</label><input id="maxLength" type="number" min="1" step="1" placeholder="ללא הגבלה"><span>שניות</span><span class="hint">השאירו ריק לאורך טבעי</span></div><label class="button primary" for="file">בחירת סרטון</label><input id="file" type="file" multiple accept="video/*"></section>
-<div id="status" class="status"><b id="statusText">מכינים…</b><div class="bar"><i id="bar"></i></div></div>
-<section id="workspace" class="workspace"><section class="music-studio"><div><span class="eyebrow">SOUNDTRACK STUDIO</span><h2>המוזיקה של הסרט</h2><p>מוסיפים קבצים מהמחשב או מחפשים ב־YouTube, קובעים התחלה וממשיכים לייצוא.</p></div><div class="music-row"><label class="button secondary" for="musicFile">הוספת מוזיקה</label><input id="musicFile" type="file" multiple accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg"><span id="musicName" class="track-state">ללא מוזיקה</span><audio id="musicPreview" controls hidden></audio><button id="attachYoutubeMusic" class="button primary" hidden>הוסף לסרטון מנקודה זו</button><label id="musicStartWrap" class="start-control"><strong>התחל את הסרט מהשנייה ב־MP3:</strong> <input id="musicStart" type="range" min="0" value="0" step=".1"><b id="musicStartLabel">00:00</b><small>לדוגמה 00:10 = הסרט מתחיל מהמוזיקה בשנייה 10</small></label></div><div class="youtube-search"><input id="ytQuery" placeholder="חפש שיר או אמן ב־YouTube"><button id="ytSearch" class="button primary">חיפוש ב־YouTube</button><label><input id="ytRights" type="checkbox"> יש לי רשות להוריד ולהשתמש בתוכן</label></div><div id="ytResults" class="yt-results"></div></section><div class="preview"><video id="video" controls playsinline></video><div id="timeline" class="timeline" aria-label="ציר זמן של קטעי אקשן"></div></div><aside class="panel"><div class="panel-head"><h2>הצעות אקשן <span id="count" class="count"></span></h2><span><button id="undoRandom" class="secondary" hidden>ביטול ערבוב</button> <button id="random" class="secondary">ערבוב סדר</button></span></div><div id="clips" class="clip-list"></div></aside><section id="exportBox" class="export"><div><h2>הסרט שלך מוכן לעריכה</h2><p id="exportHint">בחרו קטעים ומעבר, ואז ייצאו לסרט אחד.</p></div><div class="export-options"><label><input id="muteOriginal" type="checkbox"> השתק קול מקורי</label><label for="speed">מהירות</label><select id="speed"><option value="1">רגילה</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><label for="transition">מעבר</label><select id="transition"><option value="cut">חיתוך חד</option><option value="fade">Fade</option><option value="dissolve">Dissolve</option><option value="wipeleft">Wipe</option><option value="slideright">Slide</option></select><select id="transitionDuration" aria-label="אורך מעבר"><option value=".3">0.3 שנ׳</option><option value=".5" selected>0.5 שנ׳</option><option value="1">1 שנ׳</option></select><button id="export" class="button primary">ייצוא הסרט</button><a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a></div></section></section>
-</main><div id="ytModal" class="yt-modal" hidden><div class="yt-dialog"><button id="closeYt" class="ghost" aria-label="סגירה">✕</button><iframe id="ytPreview" title="YouTube preview" allow="autoplay" allowfullscreen></iframe></div></div><script>
-const $=s=>document.querySelector(s),drop=$('#drop'),file=$('#file'),status=$('#status'),bar=$('#bar'),text=$('#statusText'),workspace=$('#workspace'),video=$('#video'),clipsEl=$('#clips');let report,activeIndex=-1,orderBeforeShuffle,saveHandle=null,musicReady=false,musicUploading=false,musicDuration=0;
-const applyTheme=day=>{document.body.classList.toggle('day',day);$('#themeToggle').textContent=day?'☾ מצב לילה':'☀ מצב יום';localStorage.setItem('rk-motion-theme',day?'day':'dark')};applyTheme(localStorage.getItem('rk-motion-theme')==='day');$('#themeToggle').onclick=()=>applyTheme(!document.body.classList.contains('day'));
-function setStatus(msg,p=0,error=false,working=false){status.className='status show'+(error?' error':'')+(working?' working':'');text.textContent=msg;bar.style.width=p+'%'}
-function invalidateDownload(){$('#download').classList.remove('show')}
-function step(n){for(let i=1;i<=3;i++)$('#step'+i).classList.toggle('active',i<=n)}
-async function request(url,body,headers={}){const r=await fetch(url,{method:'POST',body,headers});const d=await r.json();if(!r.ok||d.error)throw Error(d.error||'הפעולה נכשלה');return d}
-async function upload(files){files=[...files].filter(f=>f.type.startsWith('video/'));if(!files.length)return;$('#download').classList.remove('show');try{setStatus(`מכינה ${files.length} סרטונים…`,0);const session=await request('/api/prepare','');let sent=0,total=files.reduce((sum,f)=>sum+f.size,0);for(let i=0;i<files.length;i++){const f=files[i];setStatus(`מעלה סרטון ${i+1}/${files.length}: ${f.name}`,Math.round(sent/total*65));await new Promise((resolve,reject)=>{const x=new XMLHttpRequest;x.open('POST','/api/video/'+session.job_id);x.setRequestHeader('X-Filename',encodeURIComponent(f.name));x.upload.onprogress=e=>{if(e.lengthComputable)setStatus(`מעלה סרטון ${i+1}/${files.length}: ${f.name}`,Math.round((sent+e.loaded)/total*65))};x.onload=()=>x.status===200?resolve():reject(new Error(x.responseText));x.onerror=reject;x.send(f)});sent+=f.size}setStatus(files.length>1?'מחברת ומנתחת את הסרטונים…':'מנתחת את רגעי האקשן…',72,false,true);report=await request('/api/analyse-batch/'+session.job_id,'');setStatus('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.',100);show()}catch(error){setStatus(error.message||'לא ניתן לנתח את הסרטונים.',0,true)}}
-file.onchange=()=>upload(file.files);['dragenter','dragover'].forEach(name=>drop.addEventListener(name,e=>{e.preventDefault();drop.classList.add('over')}));['dragleave','drop'].forEach(name=>drop.addEventListener(name,e=>{e.preventDefault();drop.classList.remove('over')}));drop.addEventListener('drop',e=>upload(e.dataTransfer.files));
-function fmt(v){v=Math.max(0,Number(v));return String(Math.floor(v/60)).padStart(2,'0')+':'+String(Math.floor(v%60)).padStart(2,'0')}
-function selected(){return report.clips.filter(c=>c.selected!==false)}
-function updateSummary(){const chosen=selected(),n=chosen.length,total=chosen.reduce((sum,c)=>sum+c.duration,0),speed=+$('#speed').value,transition=$('#transition').value==='cut'?0:+$('#transitionDuration').value,finalLength=Math.max(0,(total-transition*Math.max(0,n-1))/speed);const start=$('#musicStart');if(start){start.max=Math.max(0,musicDuration);if(+start.value>musicDuration)start.value=musicDuration;$('#musicStartLabel').textContent=fmt(start.value)}$('#count').textContent=`(${n} נבחרו מתוך ${report.clips.length})`;$('#exportHint').textContent=n?`${n} קטעים · ${fmt(finalLength)} אורך הסרט הסופי · לפי סדר הייצוא.`:'בחרו לפחות קטע אחד כדי לייצא.';$('#export').textContent=n?`ייצוא ובחירת מיקום · ${n} קטעים`:'ייצוא הסרט';$('#export').disabled=!n}
-function show(){workspace.classList.add('show');$('#exportBox').classList.add('show');video.src='/api/video/'+report.job_id;step(2);render()}
-async function uploadMusic(files){if(!files.length||!report)return;musicReady=false;musicUploading=true;musicDuration=0;invalidateDownload();try{for(let i=0;i<files.length;i++){const f=files[i];$('#musicName').textContent=`מעלה ${i+1}/${files.length}: ${f.name}`;const x=new XMLHttpRequest;x.open('POST','/api/music/'+report.job_id);x.setRequestHeader('X-Filename',encodeURIComponent(f.name));const done=new Promise((resolve,reject)=>{x.onload=()=>x.status===200?resolve(JSON.parse(x.responseText)):reject(new Error(x.responseText));x.onerror=reject});x.send(f);const uploaded=await done;musicDuration+=uploaded.duration||0}musicReady=true;updateSummary();$('#musicName').textContent=`${files.length} קבצי מוזיקה ברצף`;const preview=$('#musicPreview');preview.src=URL.createObjectURL(files[0]);preview.hidden=false;$('#musicStart').disabled=false;setStatus('רשימת המוזיקה נוספה. הקבצים יתנגנו לפי הסדר שנבחר.',100)}catch{musicReady=false;$('#musicName').textContent='העלאת המוזיקה נכשלה';setStatus('לא ניתן להוסיף את קובצי המוזיקה.',0,true)}finally{musicUploading=false}}
-$('#musicFile').onchange=()=>uploadMusic([...$('#musicFile').files]);$('#musicStart').oninput=()=>{$('#musicStartLabel').textContent=fmt($('#musicStart').value);invalidateDownload()};$('#speed').onchange=updateSummary;$('#transition').onchange=updateSummary;$('#transitionDuration').onchange=updateSummary;
-$('#closeYt').onclick=()=>{$('#ytPreview').src='';$('#ytModal').hidden=true};$('#ytModal').onclick=e=>{if(e.target===$('#ytModal'))$('#closeYt').click()};$('#ytSearch').onclick=async()=>{const query=$('#ytQuery').value.trim();if(!query)return;$('#ytResults').textContent='מחפשת…';try{const r=await request('/api/youtube/search',JSON.stringify({query}),{'Content-Type':'application/json'});$('#ytResults').innerHTML='';r.results.forEach(item=>{const row=document.createElement('div');row.className='yt-result';row.innerHTML=`<img src="${item.thumbnail}" alt=""><span>${item.title}<br><small>${item.channel} · ${fmt(item.duration)}</small></span><button class="ghost">▶</button><button class="secondary">הוספה כ-MP3</button>`;const buttons=row.querySelectorAll('button');buttons[0].onclick=()=>{const frame=$('#ytPreview');frame.src='https://www.youtube.com/embed/'+item.id+'?autoplay=1';$('#ytModal').hidden=false};buttons[1].onclick=()=>downloadYoutube(item);$('#ytResults').append(row)})}catch(e){$('#ytResults').textContent=e.message||'החיפוש נכשל'}};
-async function downloadYoutube(item){if(!$('#ytRights').checked)return setStatus('יש לאשר שיש לך זכות להשתמש בקטע.',0,true);try{setStatus('מורידה וממירה ל-MP3…',60,false,true);const downloaded=await request('/api/youtube/download/'+report.job_id,JSON.stringify({id:item.id,rights_confirmed:true}),{'Content-Type':'application/json'});musicDuration=downloaded.duration||0;updateSummary();musicReady=false;$('#musicName').textContent='מוכן לבדיקה: '+item.title;const preview=$('#musicPreview');preview.src='/api/music-preview/'+report.job_id;preview.hidden=false;$('#musicStart').disabled=false;$('#attachYoutubeMusic').hidden=false;setStatus('הקובץ מוכן. לחץ Play, בחר נקודת התחלה ואז הוסף לסרטון.',100)}catch(e){setStatus(e.message||'ההורדה נכשלה.',0,true)}};
-$('#attachYoutubeMusic').onclick=async()=>{try{await request('/api/music/attach/'+report.job_id,'');musicReady=true;$('#attachYoutubeMusic').hidden=true;$('#musicName').textContent='✓ הסרט יתחיל מה־MP3 בשנייה '+fmt($('#musicStart').value);setStatus('המוזיקה נוספה: הסרט מתחיל מהשנייה שבחרת בתוך ה־MP3.',100)}catch(e){setStatus(e.message||'לא ניתן להוסיף את המוזיקה.',0,true)}};
-function render(){clipsEl.innerHTML='';const timeline=$('#timeline');timeline.innerHTML='';if(!report.clips.length){clipsEl.innerHTML='<div class="empty">לא נמצאו קטעי אקשן ברורים. נסו סרטון אחר או הגדרת אורך אחרת.</div>';return updateSummary()}report.clips.forEach((c,i)=>{const row=document.createElement('div');row.className='clip '+(c.selected===false?'':'selected')+(activeIndex===i?' active':'');row.innerHTML=`<input aria-label="בחירת קטע ${i+1}" type="checkbox" ${c.selected===false?'':'checked'}><div><div class="clip-title"><strong>קטע ${i+1}</strong><span class="score">${Math.round(c.score*100)}% אקשן</span></div><div class="timing"><input aria-label="התחלה בשניות" type="number" min="0" step=".1" value="${c.start}"> עד <input aria-label="סיום בשניות" type="number" min="0" step=".1" value="${c.end}"> · ${fmt(c.duration)}</div></div><div class="controls"><button class="ghost" aria-label="תצוגה מקדימה" title="תצוגה מקדימה">▶</button><button class="ghost" aria-label="הזזה למעלה" title="הזזה למעלה" ${i===0?'disabled':''}>↑</button><button class="ghost" aria-label="הזזה למטה" title="הזזה למטה" ${i===report.clips.length-1?'disabled':''}>↓</button></div>`;const [check,start,end]=row.querySelectorAll('input');check.onchange=()=>{c.selected=check.checked;invalidateDownload();render()};const applyTimes=()=>{const nextStart=+start.value,nextEnd=+end.value;if(nextStart<0||nextEnd<=nextStart){setStatus('זמן הסיום חייב להיות אחרי זמן ההתחלה.',0,true);return render()}c.start=nextStart;c.end=nextEnd;c.duration=c.end-c.start;invalidateDownload();render()};start.onchange=applyTimes;end.onchange=applyTimes;const b=row.querySelectorAll('button');b[0].onclick=()=>{activeIndex=i;video.currentTime=c.start;video.play();render()};b[1].onclick=()=>move(i,-1);b[2].onclick=()=>move(i,1);clipsEl.append(row);const mark=document.createElement('i');mark.style.right=(c.start/report.duration*100)+'%';mark.style.width=Math.max(1,c.duration/report.duration*100)+'%';mark.title=`קטע ${i+1}`;mark.onclick=()=>{activeIndex=i;video.currentTime=c.start;render()};timeline.append(mark)});updateSummary()}
-function move(i,d){const j=i+d;if(j<0||j>=report.clips.length)return;[report.clips[i],report.clips[j]]=[report.clips[j],report.clips[i]];activeIndex=j;invalidateDownload();render()}
-$('#random').onclick=()=>{orderBeforeShuffle=[...report.clips];for(let i=report.clips.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[report.clips[i],report.clips[j]]=[report.clips[j],report.clips[i]]}invalidateDownload();$('#undoRandom').hidden=false;render();setStatus('סדר הקטעים עורבב. אפשר לבטל או להזיז ידנית.',100)};$('#undoRandom').onclick=()=>{if(orderBeforeShuffle){report.clips=orderBeforeShuffle;orderBeforeShuffle=null;$('#undoRandom').hidden=true;invalidateDownload();render();setStatus('סדר הקטעים שוחזר.',100)}};
-async function saveFinishedMovie(url){if(!saveHandle)return false;setStatus('שומרת את הסרט במיקום שבחרת…',99,false,true);const response=await fetch(url),blob=await response.blob(),writer=await saveHandle.createWritable();await writer.write(blob);await writer.close();return true}
-function exportProgress(statusUrl,btn){const timer=setInterval(async()=>{try{const r=await fetch(statusUrl),d=await r.json();if(d.error)throw Error(d.error);const elapsed=d.elapsed_seconds||0,estimate=d.estimated_seconds||1;const percent=d.state==='done'?100:Math.min(97,Math.max(3,Math.round(elapsed/estimate*100)));const remaining=Math.max(0,Math.round(estimate-elapsed));const suffix=d.state==='done'?'':` · נשאר בערך ${fmt(remaining)}`;setStatus((d.message||'מייצאת…')+suffix,percent,d.state==='error',d.state==='running');if(d.state==='done'){clearInterval(timer);try{const saved=await saveFinishedMovie(d.download);if(saved){setStatus('הסרט נשמר במיקום שבחרת.',100)}else{const a=$('#download');a.href=d.download;a.classList.add('show');setStatus('הסרט מוכן. לחץ על הורדת MP4 כדי לשמור אותו.',100)}}catch{const a=$('#download');a.href=d.download;a.classList.add('show');setStatus('הסרט מוכן. לחץ על הורדת MP4 כדי לשמור אותו.',100)}btn.disabled=false;step(3)}else if(d.state==='error'){clearInterval(timer);btn.disabled=false}}catch{clearInterval(timer);setStatus('לא ניתן לעקוב אחר הייצוא. נסו שוב.',0,true);btn.disabled=false}},1000)}
-$('#export').onclick=async()=>{const chosen=selected();if(!chosen.length)return setStatus('בחרו לפחות קטע אחד.',0,true);if(musicUploading)return setStatus('ממתינים שהמוזיקה תעלה.',0,true);const btn=$('#export');btn.disabled=true;saveHandle=null;try{if('showSaveFilePicker' in window){saveHandle=await window.showSaveFilePicker({suggestedName:'RK-Motion-edit.mp4',types:[{description:'MP4 video',accept:{'video/mp4':['.mp4']}}]})}}catch(error){if(error.name==='AbortError'){btn.disabled=false;return}setStatus('לא ניתן לפתוח בחירת מיקום. הסרט יורד לאחר הייצוא.',0,true)}step(3);invalidateDownload();setStatus('מתחילה ייצוא…',3,false,true);try{const r=await fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:report.job_id,clips:chosen,transition:$('#transition').value,transition_duration:+$('#transitionDuration').value,use_music:musicReady,music_start:+$('#musicStart').value,speed:+$('#speed').value,remove_original_audio:$('#muteOriginal').checked})}),d=await r.json();if(d.error){setStatus(d.error,0,true);btn.disabled=false;return}exportProgress(d.status_url,btn)}catch{setStatus('הייצוא נכשל. נסו שוב.',0,true);btn.disabled=false}};
-</script></body></html>
+<body>
+<main class="app">
+
+<header class="top">
+  <div class="brand">
+    <img src="/assets/rk-logo.png" alt="RK Motion">
+    <div>
+      <h1>RK <em>Motion</em></h1>
+      <p>רוכבים קבוע · Edit your ride</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button id="themeToggle" class="secondary" aria-label="החלפת מצב תצוגה">☀ מצב יום</button>
+    <div class="privacy">עיבוד מקומי · הקבצים נמחקים בסגירת האפליקציה</div>
+  </div>
+</header>
+
+<ol class="steps">
+  <li class="active" id="step1"><b>1</b>בוחרים סרטון</li>
+  <li id="step2"><b>2</b>בוחרים קטעים</li>
+  <li id="step3"><b>3</b>מייצאים סרט</li>
+</ol>
+
+<section id="drop" class="upload">
+  <span class="kicker">ROCHVIM KAVUA / MOTION LAB</span>
+  <h2>הופכים רכיבה<br><b>לסרט שאי אפשר לעצור.</b></h2>
+  <p>גררו לכאן סרטון אחד או כמה סרטוני רכיבה — הם יחוברו לפי סדר הגרירה, והאקשן יזוהה אוטומטית.</p>
+  <div class="settings">
+    <label for="maxLength">אורך מרבי לקטע</label>
+    <input id="maxLength" type="number" min="1" step="1" placeholder="ללא הגבלה">
+    <span>שניות</span>
+    <span class="hint">השאירו ריק לאורך טבעי</span>
+  </div>
+  <div class="upload-cta">
+    <label class="button primary" for="file">בחירת סרטון</label>
+    <span class="drag-hint">או גררו קבצים לכאן</span>
+  </div>
+  <input id="file" type="file" multiple accept="video/*">
+</section>
+
+<div id="status" class="status" role="status" aria-live="polite">
+  <b id="statusText">מכינים…</b>
+  <div class="bar"><i id="bar"></i></div>
+</div>
+
+<section id="workspace" class="workspace">
+
+  <div class="preview card">
+    <video id="video" controls playsinline></video>
+    <div class="time-readout"><span id="curTime">00:00</span><span id="totalTime">00:00</span></div>
+    <div id="timeline" class="timeline" aria-label="ציר זמן של קטעי אקשן"><span id="playhead" class="playhead"></span></div>
+  </div>
+
+  <aside class="panel card">
+    <div class="panel-head">
+      <h2>הצעות אקשן <span id="count" class="count"></span></h2>
+      <span>
+        <button id="undoRandom" class="secondary" hidden>ביטול ערבוב</button>
+        <button id="random" class="secondary">ערבוב סדר</button>
+      </span>
+    </div>
+    <div id="clips" class="clip-list"></div>
+  </aside>
+
+  <section class="music-studio card">
+    <header>
+      <span class="eyebrow">SOUNDTRACK STUDIO</span>
+      <h2>המוזיקה של הסרט</h2>
+      <p>מוסיפים קבצים מהמחשב או מחפשים ב־YouTube. הרצועות יתנגנו לפי סדר ההוספה.</p>
+    </header>
+    <div class="music-sources">
+      <label class="button secondary" for="musicFile">הוספת קובצי מוזיקה</label>
+      <input id="musicFile" type="file" multiple accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg">
+      <span class="sep">או</span>
+      <div class="youtube-search">
+        <input id="ytQuery" type="search" placeholder="חפש שיר או אמן ב־YouTube" aria-label="חיפוש ב-YouTube">
+        <button id="ytSearch" class="button primary">חיפוש</button>
+      </div>
+    </div>
+    <label class="rights"><input id="ytRights" type="checkbox"> יש לי רשות להוריד ולהשתמש בתוכן מ־YouTube</label>
+    <div id="ytResults" class="yt-results"></div>
+    <div id="trackList" class="track-list" hidden></div>
+    <button id="attachYoutubeMusic" class="button primary" hidden>הוסף לסרטון מנקודה זו</button>
+    <label id="musicStartWrap" class="start-control" hidden>
+      <strong>התחלת הפסקול בשנייה:</strong>
+      <input id="musicStart" type="range" min="0" value="0" step=".1">
+      <b id="musicStartLabel">00:00</b>
+      <small>לדוגמה 00:10 — הסרט מתחיל מהמוזיקה בשנייה 10</small>
+    </label>
+  </section>
+
+  <section id="exportBox" class="export card">
+    <div>
+      <h2>הסרט שלך מוכן לעריכה</h2>
+      <p id="exportHint">בחרו קטעים ומעבר, ואז ייצאו לסרט אחד.</p>
+    </div>
+    <div class="export-options">
+      <label><input id="muteOriginal" type="checkbox"> השתק קול מקורי</label>
+      <label for="speed">מהירות</label>
+      <select id="speed">
+        <option value="1">רגילה</option><option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option><option value="2">2×</option>
+      </select>
+      <label for="transition">מעבר</label>
+      <select id="transition">
+        <option value="cut">חיתוך חד</option><option value="fade">Fade</option>
+        <option value="dissolve">Dissolve</option><option value="wipeleft">Wipe</option>
+        <option value="slideright">Slide</option>
+      </select>
+      <select id="transitionDuration" aria-label="אורך מעבר">
+        <option value=".3">0.3 שנ׳</option><option value=".5" selected>0.5 שנ׳</option><option value="1">1 שנ׳</option>
+      </select>
+      <button id="export" class="button primary">ייצוא הסרט</button>
+      <a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a>
+    </div>
+  </section>
+
+  <section id="result" class="result card">
+    <h2>🎬 הסרט מוכן!</h2>
+    <p id="resultHint">אפשר לצפות בו כאן, להוריד אותו, או לחזור ולשנות קטעים ולייצא שוב.</p>
+    <video id="resultVideo" controls playsinline></video>
+  </section>
+
+</section>
+</main>
+
+<div id="ytModal" class="yt-modal" hidden>
+  <div class="yt-dialog">
+    <button id="closeYt" class="ghost" aria-label="סגירה">✕</button>
+    <iframe id="ytPreview" title="YouTube preview" allow="autoplay" allowfullscreen></iframe>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const drop = $('#drop'), file = $('#file'), statusBox = $('#status'), bar = $('#bar'), text = $('#statusText');
+const workspace = $('#workspace'), video = $('#video'), clipsEl = $('#clips'), timeline = $('#timeline');
+let report, activeIndex = -1, orderBeforeShuffle = null, saveHandle = null;
+let musicReady = false, musicUploading = false, musicDuration = 0, previewEnd = null, dragIndex = null;
+const tracks = []; // {name, duration, kind:'file'|'youtube', pending}
+const totalMusicDuration = () => tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+
+/* ---- Theme ---- */
+const applyTheme = day => {
+  document.body.classList.toggle('day', day);
+  $('#themeToggle').textContent = day ? '☾ מצב לילה' : '☀ מצב יום';
+  localStorage.setItem('rk-motion-theme', day ? 'day' : 'dark');
+};
+applyTheme(localStorage.getItem('rk-motion-theme') === 'day');
+$('#themeToggle').onclick = () => applyTheme(!document.body.classList.contains('day'));
+
+/* ---- Shared helpers ---- */
+function setStatus(msg, p = 0, error = false, working = false) {
+  statusBox.className = 'status show' + (error ? ' error' : '') + (working ? ' working' : '');
+  text.textContent = msg;
+  bar.style.width = p + '%';
+}
+function invalidateDownload() { $('#download').classList.remove('show'); $('#result').classList.remove('show'); }
+function step(n) {
+  for (let i = 1; i <= 3; i++) {
+    const li = $('#step' + i);
+    li.classList.toggle('active', i === n);
+    li.classList.toggle('done', i < n);
+  }
+}
+function fmt(v) {
+  v = Math.max(0, Number(v));
+  return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(Math.floor(v % 60)).padStart(2, '0');
+}
+async function request(url, body, headers = {}) {
+  const r = await fetch(url, { method: 'POST', body, headers });
+  const d = await r.json();
+  if (!r.ok || d.error) throw Error(d.error || 'הפעולה נכשלה');
+  return d;
+}
+function selected() { return report.clips.filter(c => c.selected !== false); }
+
+/* ---- Upload & analyse ---- */
+async function upload(files) {
+  files = [...files].filter(f => f.type.startsWith('video/'));
+  if (!files.length) return;
+  invalidateDownload();
+  try {
+    setStatus(`מכינה ${files.length} סרטונים…`, 0);
+    const session = await request('/api/prepare', '');
+    let sent = 0, total = files.reduce((sum, f) => sum + f.size, 0);
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setStatus(`מעלה סרטון ${i + 1}/${files.length}: ${f.name}`, Math.round(sent / total * 65));
+      await new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open('POST', '/api/video/' + session.job_id);
+        x.setRequestHeader('X-Filename', encodeURIComponent(f.name));
+        x.upload.onprogress = e => {
+          if (e.lengthComputable) setStatus(`מעלה סרטון ${i + 1}/${files.length}: ${f.name}`, Math.round((sent + e.loaded) / total * 65));
+        };
+        x.onload = () => x.status === 200 ? resolve() : reject(new Error(x.responseText));
+        x.onerror = reject;
+        x.send(f);
+      });
+      sent += f.size;
+    }
+    setStatus(files.length > 1 ? 'מחברת ומנתחת את הסרטונים…' : 'מנתחת את רגעי האקשן…', 72, false, true);
+    const maxLen = $('#maxLength').value.trim();
+    report = await request('/api/analyse-batch/' + session.job_id, '', maxLen ? { 'X-Max-Scene-Length': maxLen } : {});
+    setStatus('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+    show();
+  } catch (error) {
+    setStatus(error.message || 'לא ניתן לנתח את הסרטונים.', 0, true);
+  }
+}
+file.onchange = () => upload(file.files);
+['dragenter', 'dragover'].forEach(name => drop.addEventListener(name, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(name => drop.addEventListener(name, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => upload(e.dataTransfer.files));
+
+function show() {
+  workspace.classList.add('show');
+  $('#exportBox').classList.add('show');
+  video.src = '/api/video/' + report.job_id;
+  $('#totalTime').textContent = fmt(report.duration || 0);
+  report.clips.forEach((c, i) => c.uid = i + '-' + c.start);
+  step(2);
+  render();
+  makeThumbs();
+  workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---- Clip thumbnails: captured locally from the already-uploaded source. ---- */
+let thumbsRun = 0;
+async function makeThumbs() {
+  const run = ++thumbsRun;
+  const v = document.createElement('video');
+  v.muted = true; v.preload = 'auto'; v.src = video.src;
+  await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = rej; }).catch(() => null);
+  const canvas = document.createElement('canvas');
+  canvas.width = 148; canvas.height = 84;
+  const ctx = canvas.getContext('2d');
+  for (const clip of report.clips) {
+    if (run !== thumbsRun) return;
+    if (clip.thumb) continue;
+    try {
+      v.currentTime = Math.min(clip.start + .4, (clip.start + clip.end) / 2);
+      await new Promise((res, rej) => { v.onseeked = res; v.onerror = rej; setTimeout(res, 4000); });
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      clip.thumb = canvas.toDataURL('image/jpeg', .62);
+      const el = clipsEl.querySelector(`img[data-uid="${clip.uid}"]`);
+      if (el) el.src = clip.thumb;
+    } catch { /* thumbnails are decorative; keep going */ }
+  }
+}
+
+/* ---- Video preview: playhead + stop at the end of the previewed clip ---- */
+video.addEventListener('timeupdate', () => {
+  $('#curTime').textContent = fmt(video.currentTime);
+  if (report && report.duration) $('#playhead').style.right = (video.currentTime / report.duration * 100) + '%';
+  if (previewEnd !== null && video.currentTime >= previewEnd) { video.pause(); previewEnd = null; }
+});
+video.addEventListener('seeking', () => { if (previewEnd !== null && video.currentTime < (report.clips[activeIndex]?.start ?? 0)) previewEnd = null; });
+timeline.addEventListener('click', e => {
+  if (!report || !report.duration) return;
+  const rect = timeline.getBoundingClientRect();
+  const frac = (rect.right - e.clientX) / rect.width; // RTL: time flows right-to-left
+  previewEnd = null;
+  video.currentTime = Math.max(0, Math.min(report.duration, frac * report.duration));
+});
+function previewClip(i) {
+  const c = report.clips[i];
+  activeIndex = i;
+  previewEnd = c.end;
+  video.currentTime = c.start;
+  video.play();
+  render();
+}
+
+/* ---- Clip list ---- */
+function updateSummary() {
+  const chosen = selected(), n = chosen.length;
+  const total = chosen.reduce((sum, c) => sum + c.duration, 0);
+  const speed = +$('#speed').value;
+  const transition = $('#transition').value === 'cut' ? 0 : +$('#transitionDuration').value;
+  const finalLength = Math.max(0, (total - transition * Math.max(0, n - 1)) / speed);
+  const start = $('#musicStart');
+  start.max = Math.max(0, musicDuration);
+  if (+start.value > musicDuration) start.value = musicDuration;
+  $('#musicStartLabel').textContent = fmt(start.value);
+  $('#count').textContent = `(${n} נבחרו מתוך ${report.clips.length})`;
+  $('#exportHint').textContent = n
+    ? `${n} קטעים · ${fmt(finalLength)} אורך הסרט הסופי · לפי סדר הרשימה.`
+    : 'בחרו לפחות קטע אחד כדי לייצא.';
+  $('#export').textContent = n ? `ייצוא ובחירת מיקום · ${n} קטעים` : 'ייצוא הסרט';
+  $('#export').disabled = !n;
+}
+
+function render() {
+  clipsEl.innerHTML = '';
+  [...timeline.querySelectorAll('i')].forEach(m => m.remove());
+  if (!report.clips.length) {
+    clipsEl.innerHTML = '<div class="empty">לא נמצאו קטעי אקשן ברורים. נסו סרטון אחר או הגדרת אורך אחרת.</div>';
+    return updateSummary();
+  }
+  report.clips.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'clip' + (c.selected === false ? '' : ' selected') + (activeIndex === i ? ' active' : '');
+    row.dataset.index = i;
+    row.innerHTML = `
+      <input aria-label="בחירת קטע ${i + 1}" type="checkbox" ${c.selected === false ? '' : 'checked'}>
+      <img class="thumb" data-uid="${c.uid}" alt="" draggable="true" title="גררו לשינוי סדר">
+      <div>
+        <div class="clip-title"><strong>קטע ${i + 1}</strong><span class="score">${Math.round(c.score * 100)}% אקשן</span></div>
+        <div class="timing">
+          <input aria-label="התחלה בשניות" type="number" min="0" step=".1" value="${c.start}">
+          עד
+          <input aria-label="סיום בשניות" type="number" min="0" step=".1" value="${c.end}">
+          · ${fmt(c.duration)}
+        </div>
+      </div>
+      <div class="controls">
+        <button class="ghost" aria-label="תצוגה מקדימה" title="תצוגה מקדימה">▶</button>
+        <button class="ghost" aria-label="הזזה למעלה" title="הזזה למעלה" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="ghost" aria-label="הזזה למטה" title="הזזה למטה" ${i === report.clips.length - 1 ? 'disabled' : ''}>↓</button>
+      </div>`;
+    const [check, start, end] = row.querySelectorAll('input');
+    if (c.thumb) row.querySelector('img').src = c.thumb;
+    check.onchange = () => { c.selected = check.checked; invalidateDownload(); render(); };
+    const applyTimes = () => {
+      const nextStart = +start.value, nextEnd = +end.value;
+      if (nextStart < 0 || nextEnd <= nextStart) {
+        setStatus('זמן הסיום חייב להיות אחרי זמן ההתחלה.', 0, true);
+        return render();
+      }
+      c.start = nextStart; c.end = nextEnd; c.duration = c.end - c.start;
+      delete c.thumb;
+      invalidateDownload(); render(); makeThumbs();
+    };
+    start.onchange = applyTimes;
+    end.onchange = applyTimes;
+    const [play, up, down] = row.querySelectorAll('button');
+    play.onclick = () => previewClip(i);
+    up.onclick = () => move(i, -1);
+    down.onclick = () => move(i, 1);
+    // Drag & drop reordering (thumbnail is the handle; arrows stay for keyboard/mobile).
+    const thumb = row.querySelector('img');
+    thumb.addEventListener('dragstart', () => { dragIndex = i; row.classList.add('dragging'); });
+    thumb.addEventListener('dragend', () => { dragIndex = null; row.classList.remove('dragging'); });
+    row.addEventListener('dragover', e => { if (dragIndex !== null) { e.preventDefault(); row.classList.add('drop-target'); } });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      row.classList.remove('drop-target');
+      if (dragIndex === null || dragIndex === i) return;
+      const [moved] = report.clips.splice(dragIndex, 1);
+      report.clips.splice(i, 0, moved);
+      activeIndex = i; dragIndex = null;
+      invalidateDownload(); render();
+    });
+    clipsEl.append(row);
+    // Timeline mark
+    const mark = document.createElement('i');
+    mark.style.right = (c.start / report.duration * 100) + '%';
+    mark.style.width = Math.max(1, c.duration / report.duration * 100) + '%';
+    mark.title = `קטע ${i + 1}`;
+    if (activeIndex === i) mark.classList.add('active');
+    mark.onclick = e => { e.stopPropagation(); previewClip(i); };
+    timeline.append(mark);
+  });
+  updateSummary();
+}
+
+function move(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= report.clips.length) return;
+  [report.clips[i], report.clips[j]] = [report.clips[j], report.clips[i]];
+  activeIndex = j;
+  invalidateDownload();
+  render();
+}
+
+$('#random').onclick = () => {
+  orderBeforeShuffle = [...report.clips];
+  for (let i = report.clips.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [report.clips[i], report.clips[j]] = [report.clips[j], report.clips[i]];
+  }
+  invalidateDownload();
+  $('#undoRandom').hidden = false;
+  render();
+  setStatus('סדר הקטעים עורבב. אפשר לבטל או להזיז ידנית.', 100);
+};
+$('#undoRandom').onclick = () => {
+  if (!orderBeforeShuffle) return;
+  report.clips = orderBeforeShuffle;
+  orderBeforeShuffle = null;
+  $('#undoRandom').hidden = true;
+  invalidateDownload();
+  render();
+  setStatus('סדר הקטעים שוחזר.', 100);
+};
+
+/* ---- Music ---- */
+function renderTracks() {
+  const list = $('#trackList');
+  list.innerHTML = '';
+  list.hidden = !tracks.length;
+  $('#musicStartWrap').hidden = !tracks.length;
+  tracks.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'track' + (t.pending ? ' pending' : '');
+    const num = document.createElement('span');
+    num.className = 'meta';
+    num.textContent = (i + 1) + '.';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = t.name;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = fmt(t.duration);
+    const state = document.createElement('span');
+    state.className = 'state';
+    state.textContent = t.pending ? 'ממתין לאישור' : (t.kind === 'youtube' ? '✓ YouTube' : '✓ מהמחשב');
+    row.append(num, name, meta, state);
+    if (t.previewUrl) {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = t.previewUrl;
+      row.append(audio);
+    }
+    list.append(row);
+  });
+}
+
+async function uploadMusic(files) {
+  if (!files.length || !report) return;
+  musicReady = false; musicUploading = true;
+  invalidateDownload();
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setStatus(`מעלה מוזיקה ${i + 1}/${files.length}: ${f.name}`, Math.round(i / files.length * 90), false, true);
+      const x = new XMLHttpRequest();
+      x.open('POST', '/api/music/' + report.job_id);
+      x.setRequestHeader('X-Filename', encodeURIComponent(f.name));
+      const done = new Promise((resolve, reject) => {
+        x.onload = () => x.status === 200 ? resolve(JSON.parse(x.responseText)) : reject(new Error(x.responseText));
+        x.onerror = reject;
+      });
+      x.send(f);
+      const uploaded = await done;
+      tracks.push({ name: f.name, duration: uploaded.duration || 0, kind: 'file', previewUrl: URL.createObjectURL(f) });
+      musicDuration = totalMusicDuration();
+    }
+    musicReady = true;
+    renderTracks();
+    updateSummary();
+    setStatus('המוזיקה נוספה. הרצועות יתנגנו לפי סדר ההוספה.', 100);
+  } catch {
+    musicReady = tracks.some(t => !t.pending);
+    setStatus('לא ניתן להוסיף את קובצי המוזיקה.', 0, true);
+  } finally {
+    musicUploading = false;
+  }
+}
+$('#musicFile').onchange = () => { uploadMusic([...$('#musicFile').files]); $('#musicFile').value = ''; };
+$('#musicStart').oninput = () => { $('#musicStartLabel').textContent = fmt($('#musicStart').value); invalidateDownload(); };
+$('#speed').onchange = updateSummary;
+$('#transition').onchange = updateSummary;
+$('#transitionDuration').onchange = updateSummary;
+
+/* ---- YouTube search & download ---- */
+$('#closeYt').onclick = () => { $('#ytPreview').src = ''; $('#ytModal').hidden = true; };
+$('#ytModal').onclick = e => { if (e.target === $('#ytModal')) $('#closeYt').click(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ytModal').hidden) $('#closeYt').click(); });
+$('#ytQuery').addEventListener('keydown', e => { if (e.key === 'Enter') $('#ytSearch').click(); });
+
+$('#ytSearch').onclick = async () => {
+  const query = $('#ytQuery').value.trim();
+  if (!query) return;
+  const box = $('#ytResults');
+  box.textContent = 'מחפשת…';
+  try {
+    const r = await request('/api/youtube/search', JSON.stringify({ query }), { 'Content-Type': 'application/json' });
+    box.innerHTML = '';
+    if (!r.results.length) { box.textContent = 'לא נמצאו תוצאות.'; return; }
+    r.results.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'yt-result';
+      const img = document.createElement('img');
+      img.src = item.thumbnail; img.alt = '';
+      const info = document.createElement('span');
+      const title = document.createElement('span');
+      title.textContent = item.title;
+      const sub = document.createElement('small');
+      sub.textContent = `${item.channel} · ${fmt(item.duration)}`;
+      info.append(title, document.createElement('br'), sub);
+      const play = document.createElement('button');
+      play.className = 'ghost';
+      play.textContent = '▶';
+      play.setAttribute('aria-label', 'האזנה');
+      play.onclick = () => {
+        $('#ytPreview').src = 'https://www.youtube.com/embed/' + item.id + '?autoplay=1';
+        $('#ytModal').hidden = false;
+      };
+      const add = document.createElement('button');
+      add.className = 'secondary';
+      add.textContent = 'הוספה כ-MP3';
+      add.onclick = () => downloadYoutube(item, add);
+      row.append(img, info, play, add);
+      box.append(row);
+    });
+  } catch (e) {
+    box.textContent = e.message || 'החיפוש נכשל';
+  }
+};
+
+async function downloadYoutube(item, btn) {
+  if (!$('#ytRights').checked) return setStatus('יש לאשר שיש לך רשות להשתמש בקטע.', 0, true);
+  btn.disabled = true;
+  try {
+    setStatus('מורידה וממירה ל-MP3…', 60, false, true);
+    const downloaded = await request('/api/youtube/download/' + report.job_id,
+      JSON.stringify({ id: item.id, rights_confirmed: true }), { 'Content-Type': 'application/json' });
+    tracks.push({ name: item.title, duration: downloaded.duration || 0, kind: 'youtube', pending: true, previewUrl: '/api/music-preview/' + report.job_id });
+    musicDuration = totalMusicDuration();
+    musicReady = false;
+    renderTracks();
+    updateSummary();
+    $('#attachYoutubeMusic').hidden = false;
+    setStatus('הקובץ מוכן. האזינו, בחרו נקודת התחלה ואז הוסיפו לסרטון.', 100);
+  } catch (e) {
+    setStatus(e.message || 'ההורדה נכשלה.', 0, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('#attachYoutubeMusic').onclick = async () => {
+  try {
+    await request('/api/music/attach/' + report.job_id, '');
+    musicReady = true;
+    tracks.forEach(t => { if (t.kind === 'youtube') t.pending = false; });
+    renderTracks();
+    $('#attachYoutubeMusic').hidden = true;
+    setStatus('המוזיקה נוספה: הסרט יתחיל מהשנייה שבחרת בתוך הרצועה.', 100);
+  } catch (e) {
+    setStatus(e.message || 'לא ניתן להוסיף את המוזיקה.', 0, true);
+  }
+};
+
+/* ---- Export ---- */
+async function saveFinishedMovie(url) {
+  if (!saveHandle) return false;
+  setStatus('שומרת את הסרט במיקום שבחרת…', 99, false, true);
+  const response = await fetch(url), blob = await response.blob();
+  const writer = await saveHandle.createWritable();
+  await writer.write(blob);
+  await writer.close();
+  return true;
+}
+
+function showResult(url) {
+  const box = $('#result');
+  $('#resultVideo').src = url;
+  box.classList.add('show');
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function exportProgress(statusUrl, btn) {
+  const timer = setInterval(async () => {
+    try {
+      const r = await fetch(statusUrl), d = await r.json();
+      if (d.error) throw Error(d.error);
+      const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
+      const percent = d.state === 'done' ? 100 : Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100)));
+      const remaining = Math.max(0, Math.round(estimate - elapsed));
+      const suffix = d.state === 'done' ? '' : ` · נשאר בערך ${fmt(remaining)}`;
+      setStatus((d.message || 'מייצאת…') + suffix, percent, d.state === 'error', d.state === 'running');
+      if (d.state === 'done') {
+        clearInterval(timer);
+        try {
+          const saved = await saveFinishedMovie(d.download);
+          setStatus(saved ? 'הסרט נשמר במיקום שבחרת.' : 'הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
+          if (!saved) { const a = $('#download'); a.href = d.download; a.classList.add('show'); }
+        } catch {
+          const a = $('#download');
+          a.href = d.download;
+          a.classList.add('show');
+          setStatus('הסרט מוכן. לחצו על הורדת MP4 כדי לשמור אותו.', 100);
+        }
+        showResult(d.download);
+        btn.disabled = false;
+        step(3);
+      } else if (d.state === 'error') {
+        clearInterval(timer);
+        btn.disabled = false;
+      }
+    } catch {
+      clearInterval(timer);
+      setStatus('לא ניתן לעקוב אחר הייצוא. נסו שוב.', 0, true);
+      btn.disabled = false;
+    }
+  }, 1000);
+}
+
+$('#export').onclick = async () => {
+  const chosen = selected();
+  if (!chosen.length) return setStatus('בחרו לפחות קטע אחד.', 0, true);
+  if (musicUploading) return setStatus('ממתינים שהמוזיקה תעלה.', 0, true);
+  const btn = $('#export');
+  btn.disabled = true;
+  saveHandle = null;
+  try {
+    if ('showSaveFilePicker' in window) {
+      saveHandle = await window.showSaveFilePicker({
+        suggestedName: 'RK-Motion-edit.mp4',
+        types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
+      });
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') { btn.disabled = false; return; }
+    setStatus('לא ניתן לפתוח בחירת מיקום. הסרט יורד לאחר הייצוא.', 0, true);
+  }
+  step(3);
+  invalidateDownload();
+  setStatus('מתחילה ייצוא…', 3, false, true);
+  try {
+    const r = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job_id: report.job_id,
+        clips: chosen.map(({ thumb, uid, ...clip }) => clip),
+        transition: $('#transition').value,
+        transition_duration: +$('#transitionDuration').value,
+        use_music: musicReady,
+        music_start: +$('#musicStart').value,
+        speed: +$('#speed').value,
+        remove_original_audio: $('#muteOriginal').checked,
+      }),
+    });
+    const d = await r.json();
+    if (d.error) { setStatus(d.error, 0, true); btn.disabled = false; return; }
+    exportProgress(d.status_url, btn);
+  } catch {
+    setStatus('הייצוא נכשל. נסו שוב.', 0, true);
+    btn.disabled = false;
+  }
+};
+
+// Local debugging hook: loads a canned report without uploading a video.
+window.__rkDebugLoad = r => { report = r; show(); };
+</script>
+</body>
+</html>

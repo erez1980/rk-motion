@@ -23,6 +23,7 @@ from .action import analyse_action, duration, export_edited_movie
 
 LOGO = Path(__file__).with_name("assets") / "rk-logo.png"
 INDEX = Path(__file__).with_name("assets") / "index.html"
+FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
 
 
@@ -90,6 +91,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._file(INDEX, "text/html; charset=utf-8")
         if parts == ["assets", "rk-logo.png"]:
             return self._file(LOGO, "image/png")
+        if parts == ["assets", "rubik.ttf"]:
+            return self._file(FONT, "font/ttf")
         if len(parts) == 3 and parts[0] == "api" and parts[1] in {"video", "export"}:
             job = JOBS.get(parts[2])
             if not job:
@@ -235,7 +238,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         try:
             source = self._combine_videos(job["inputs"], Path(job["folder"]))
             job["source"] = source
-            report = analyse_action(str(source))
+            raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
+            report = analyse_action(str(source), max_duration=float(raw_max) if raw_max else None)
             job["report"] = report
             report["job_id"] = job_id
             return self._json(HTTPStatus.OK, report)
@@ -274,7 +278,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         suffix = Path(name).suffix.lower() or ".mp3"
         if suffix not in {".mp3", ".m4a", ".aac", ".wav", ".ogg"}:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an MP3, M4A, AAC, WAV or OGG file."})
-        target = Path(job["folder"]) / f"music{suffix}"
+        target = Path(job["folder"]) / f"music-{len(job.get('music', [])):02d}{suffix}"
         remaining = size
         with target.open("wb") as handle:
             while remaining:
