@@ -2,23 +2,56 @@
 
 ## Local action-scene finder (MVP)
 
-This fork adds a transcript-free action finder for long videos. It samples the
-image at low resolution, combines sustained camera/scene movement (65%) with
-audio loudness (35%), and writes ranked candidates for human review. Nothing is
-uploaded and it does not use an API key or a speech model.
+This fork adds a **transcript-free action finder** for long videos. It samples
+image motion and shot changes at low resolution, combines them with audio
+loudness, and returns the most active ranges as reviewable clips. Nothing is
+uploaded: no API key, speech model, or cloud service is required.
+
+### What it does
+
+- Finds sustained visual activity: camera movement, cuts, explosions, fights
+  and other fast-changing scenes.
+- Uses a weighted score: **65% image motion / 35% loudness**.
+- Writes a portable JSON report with timestamps and confidence scores.
+- Optionally exports every candidate as a standalone MP4 for quick review.
+- Does **not** claim to understand plot or quality: candidates are meant for a
+  human to approve before a final edit.
+
+### Install the action finder
+
+Requires Python 3.10+ and [FFmpeg](https://ffmpeg.org/).
 
 ```bash
-# Report candidates only
-sofit movie.mp4 --action-clips action-candidates.json
+# macOS
+brew install ffmpeg
 
-# Also make one MP4 per candidate for reviewing/editing
-sofit movie.mp4 --action-clips action-candidates.json --action-render action-clips
+# Get this repository, then install its CLI
+pip install .
 ```
 
-Use `--action-threshold .40` to find more, noisier candidates or `.70` for a
-shorter, stricter list. The detector finds activity, not narrative quality, so
-the exported clips are intentionally review candidates rather than automatic
-final edits.
+### Use it
+
+```bash
+# Analyse only: creates a ranked list of timestamps
+sofit movie.mp4 --action-clips action-candidates.json
+
+# Analyse and export one MP4 per candidate for reviewing/editing
+sofit movie.mp4 --action-clips action-candidates.json --action-render action-clips
+
+# More candidates (less strict), useful for calm footage
+sofit movie.mp4 --action-clips action.json --action-threshold .40
+
+# Fewer, stronger candidates
+sofit movie.mp4 --action-clips action.json --action-threshold .70
+```
+
+The JSON report contains `start`, `end`, `duration` and `score` for each clip.
+By default the detector includes two seconds before and after detected action.
+Tune that with `--action-padding`; use `--action-min-duration` to exclude very
+short cuts.
+
+> This is an activity detector, not an automatic editor: a loud concert or a
+> fast camera pan can score highly even when it is not the best story moment.
 
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
