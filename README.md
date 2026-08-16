@@ -80,6 +80,11 @@ selected edit** to create one MP4 containing the approved clips. The interface
 runs at `127.0.0.1` on your Mac; the source video and the rendered result stay
 local.
 
+At export, choose one of the built-in transitions: **hard cut**, **fade**,
+**dissolve**, **wipe**, or **slide**, plus a 0.3, 0.5 or 1-second duration. A
+transition is applied only between selected clips, in the order shown in the
+list. “Random order” changes that order before exporting.
+
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
 machine.

@@ -138,7 +138,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             job = JOBS[request["job_id"]]
             clips = request["clips"]
             output = Path(job["folder"]) / "RK-Motion-edit.mp4"
-            export_edited_movie(str(job["source"]), clips, str(output))
+            export_edited_movie(str(job["source"]), clips, str(output),
+                                transition=request.get("transition", "cut"),
+                                transition_duration=float(request.get("transition_duration", .5)))
             job["export"] = output
             return self._json(HTTPStatus.OK, {"download": f"/api/export/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:

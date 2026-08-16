@@ -180,13 +180,30 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
     return outputs
 
 
-def export_edited_movie(path: str, clips: list[dict], output: str) -> str:
-    """Join editor-approved clips in their supplied order into one MP4."""
+TRANSITIONS = {"cut", "fade", "wipeleft", "slideright", "dissolve"}
+
+
+def _has_audio(path: str) -> bool:
+    result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
+                             "-show_entries", "stream=index", "-of", "csv=p=0", path],
+                            capture_output=True, text=True, check=True)
+    return bool(result.stdout.strip())
+
+
+def export_edited_movie(path: str, clips: list[dict], output: str,
+                        transition: str = "cut", transition_duration: float = .5) -> str:
+    """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
     _need_ffmpeg()
+    if transition not in TRANSITIONS:
+        raise ValueError(f"unsupported transition: {transition}")
+    if not .1 <= transition_duration <= 3:
+        raise ValueError("transition duration must be between 0.1 and 3 seconds")
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
+    if transition != "cut" and len(clips) > 1:
+        return _export_with_transitions(path, clips, target, transition, transition_duration)
     with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
         parts = []
         for index, clip in enumerate(clips, 1):
@@ -207,4 +224,45 @@ def export_edited_movie(path: str, clips: list[dict], output: str) -> str:
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
                         "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(target)],
                        check=True, capture_output=True)
+    return str(target)
+
+
+def _export_with_transitions(path: str, clips: list[dict], target: Path,
+                             transition: str, transition_duration: float) -> str:
+    """Use xfade/acrossfade directly from the source for smooth joined clips."""
+    audio = _has_audio(path)
+    durations: list[float] = []
+    cmd = ["ffmpeg", "-y", "-v", "error"]
+    for clip in clips:
+        start, end = float(clip["start"]), float(clip["end"])
+        if end <= start or start < 0:
+            raise ValueError("every clip needs a valid start and end time")
+        durations.append(end - start)
+        cmd.extend(["-ss", str(start), "-t", str(end - start), "-i", path])
+    filters: list[str] = []
+    for index in range(len(clips)):
+        filters.append(f"[{index}:v]setpts=PTS-STARTPTS[v{index}]")
+        if audio:
+            filters.append(f"[{index}:a]asetpts=PTS-STARTPTS[a{index}]")
+    current_video, current_audio = "v0", "a0"
+    timeline = durations[0]
+    for index in range(1, len(clips)):
+        # A transition cannot be longer than either side of its join.
+        fade = min(transition_duration, durations[index] / 2, timeline / 2)
+        next_video = f"vx{index}"
+        filters.append(f"[{current_video}][v{index}]xfade=transition={transition}:duration={fade:.3f}:offset={timeline - fade:.3f}[{next_video}]")
+        current_video = next_video
+        if audio:
+            next_audio = f"ax{index}"
+            filters.append(f"[{current_audio}][a{index}]acrossfade=d={fade:.3f}[{next_audio}]")
+            current_audio = next_audio
+        timeline += durations[index] - fade
+    cmd.extend(["-filter_complex", ";".join(filters), "-map", f"[{current_video}]"])
+    if audio:
+        cmd.extend(["-map", f"[{current_audio}]"])
+    cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium"])
+    if audio:
+        cmd.extend(["-c:a", "aac"])
+    cmd.extend(["-movflags", "+faststart", str(target)])
+    subprocess.run(cmd, check=True, capture_output=True)
     return str(target)
