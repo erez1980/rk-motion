@@ -10,6 +10,7 @@ import mimetypes
 import shutil
 import tempfile
 import threading
+import time
 import uuid
 import webbrowser
 from http import HTTPStatus
@@ -96,6 +97,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             return self._file(Path(path), "video/mp4")
+        if len(parts) == 3 and parts[:2] == ["api", "export-status"]:
+            job = JOBS.get(parts[2])
+            if not job or "export_status" not in job:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Export job not found."})
+            state = dict(job["export_status"])
+            started = state.get("started")
+            if started:
+                state["elapsed_seconds"] = round(time.monotonic() - started, 1)
+            return self._json(HTTPStatus.OK, state)
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def _read_json(self) -> dict:
@@ -143,12 +153,19 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             request = self._read_json()
             job = JOBS[request["job_id"]]
             clips = request["clips"]
-            output = Path(job["folder"]) / "RK-Motion-edit.mp4"
-            export_edited_movie(str(job["source"]), clips, str(output),
-                                transition=request.get("transition", "cut"),
-                                transition_duration=float(request.get("transition_duration", .5)))
-            job["export"] = output
-            return self._json(HTTPStatus.OK, {"download": f"/api/export/{request['job_id']}"})
+            if not clips:
+                raise ValueError("select at least one clip before exporting")
+            # A conservative local estimate. It is clearly presented as an
+            # estimate; actual FFmpeg speed changes with codec and Mac model.
+            edit_seconds = sum(float(clip["end"]) - float(clip["start"]) for clip in clips)
+            estimate = max(12, round(edit_seconds * 1.25 + 8))
+            job["export_status"] = {"state": "running", "started": time.monotonic(),
+                                    "estimated_seconds": estimate,
+                                    "message": "מכינה את קטעי הווידאו…"}
+            threading.Thread(target=self._run_export,
+                             args=(job, clips, request.get("transition", "cut"),
+                                   float(request.get("transition_duration", .5))), daemon=True).start()
+            return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:
@@ -160,6 +177,25 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY,
                               {"error": f"Export failed: {detail}"})
+
+    @staticmethod
+    def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float) -> None:
+        try:
+            job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
+            output = Path(job["folder"]) / "RK-Motion-edit.mp4"
+            export_edited_movie(str(job["source"]), clips, str(output),
+                                transition=transition, transition_duration=transition_duration)
+            job["export"] = output
+            job["export_status"].update({"state": "done", "progress": 100,
+                                         "message": "הסרט מוכן.", "download": f"/api/export/{job['report']['job_id']}"})
+        except Exception as exc:
+            detail = str(exc)
+            stderr = getattr(exc, "stderr", None)
+            if stderr:
+                if isinstance(stderr, bytes):
+                    stderr = stderr.decode("utf-8", "replace")
+                detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
+            job["export_status"].update({"state": "error", "message": f"Export failed: {detail}"})
 
 
 def launch_ui(port: int = 8787) -> int:
