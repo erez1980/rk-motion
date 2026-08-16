@@ -1,5 +1,25 @@
 # sofit
 
+## Local action-scene finder (MVP)
+
+This fork adds a transcript-free action finder for long videos. It samples the
+image at low resolution, combines sustained camera/scene movement (65%) with
+audio loudness (35%), and writes ranked candidates for human review. Nothing is
+uploaded and it does not use an API key or a speech model.
+
+```bash
+# Report candidates only
+sofit movie.mp4 --action-clips action-candidates.json
+
+# Also make one MP4 per candidate for reviewing/editing
+sofit movie.mp4 --action-clips action-candidates.json --action-render action-clips
+```
+
+Use `--action-threshold .40` to find more, noisier candidates or `.70` for a
+shorter, stricter list. The detector finds activity, not narrative quality, so
+the exported clips are intentionally review candidates rather than automatic
+final edits.
+
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
 machine.

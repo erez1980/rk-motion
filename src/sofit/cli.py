@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 
 from . import __version__
@@ -63,6 +64,16 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--quotes", action="store_true", help="also extract pull-quotes")
     p.add_argument("--clips-json", metavar="PATH",
                    help="write a clips.json (clip ranges + hooks + per-word timings) for a social-clip renderer")
+    p.add_argument("--action-clips", metavar="PATH",
+                   help="locally detect motion/loudness action candidates and write a reviewable JSON report; no transcription or AI")
+    p.add_argument("--action-threshold", type=float, default=.55,
+                   help="action score threshold from 0..1 (default: .55; lower finds more)")
+    p.add_argument("--action-min-duration", type=int, default=5,
+                   help="minimum candidate length in seconds (default: 5)")
+    p.add_argument("--action-padding", type=int, default=2,
+                   help="seconds retained before/after an action candidate (default: 2)")
+    p.add_argument("--action-render", metavar="DIR",
+                   help="with --action-clips, export each candidate as an MP4 to DIR")
     p.add_argument("--render-clips", metavar="DIR",
                    help="render each pull-quote to DIR as a vertical (9:16) clip with burned "
                    "Hebrew captions (needs the [render] extra + ffmpeg)")
@@ -257,6 +268,30 @@ def main(argv: list[str] | None = None) -> int:
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)
         return 1
+
+    # This independent path is deliberately before transcript generation: it is
+    # useful for editors who want visual/action highlights without any speech
+    # analysis, API key or model download.
+    if args.action_clips:
+        from .action import render_action_clips, write_action_report
+        try:
+            report = write_action_report(args.media, args.action_clips,
+                                         threshold=args.action_threshold,
+                                         min_duration=args.action_min_duration,
+                                         padding=args.action_padding)
+            if args.action_render:
+                outputs = render_action_clips(args.media, report["clips"], args.action_render)
+                report["rendered_clips"] = outputs
+                # Persist rendering results too, so a future UI knows its assets.
+                import json
+                from pathlib import Path
+                Path(args.action_clips).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                                                   encoding="utf-8")
+        except (RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
+            print(f"error: action detection failed: {exc}", file=sys.stderr)
+            return 1
+        print(f"wrote {args.action_clips} ({len(report['clips'])} action candidate(s))", file=sys.stderr)
+        return 0
 
     # List a feed's episodes and exit — no key or transcription needed.
     if args.list_episodes:
