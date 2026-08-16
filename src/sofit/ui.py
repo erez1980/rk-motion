@@ -167,7 +167,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not shutil.which("yt-dlp"):
                 raise RuntimeError("YouTube download needs yt-dlp. Install it with: brew install yt-dlp")
             output = str(Path(job["folder"]) / f"youtube-{video_id}.%(ext)s")
-            subprocess.run(["yt-dlp", "--no-playlist", "-x", "--audio-format", "mp3", "--audio-quality", "0",
+            subprocess.run(["yt-dlp", "--no-playlist", "--extractor-args", "youtube:player_client=tv",
+                            "-x", "--audio-format", "mp3", "--audio-quality", "0",
                             "-o", output, f"https://www.youtube.com/watch?v={video_id}"],
                            capture_output=True, text=True, check=True, timeout=600)
             tracks = list(Path(job["folder"]).glob(f"youtube-{video_id}.mp3"))
@@ -177,6 +178,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.OK, {"name": tracks[0].name})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
+            if "HTTP Error 403" in detail or "Forbidden" in detail:
+                detail = "YouTube blocked this download. Run: brew upgrade yt-dlp, then restart RK Motion."
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": detail})
         except Exception as exc:
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
