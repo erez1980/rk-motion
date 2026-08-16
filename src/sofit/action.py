@@ -264,25 +264,26 @@ def _strip_audio(target: Path) -> None:
 
 
 def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None:
-    """Mix one looping track or a sequential playlist from ``music_start``."""
+    """Mix music starting at ``music_start`` within the source track(s)."""
     music = [Path(item) for item in music_paths]
     if not music or any(not item.is_file() for item in music):
         raise ValueError("selected music file is unavailable")
     if music_start < 0:
         raise ValueError("music start must not be negative")
     movie_duration = duration(str(target))
-    delay_ms = round(music_start * 1000)
     mixed = target.with_name(target.stem + ".with-music.mp4")
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target)]
     if len(music) == 1:
-        cmd.extend(["-stream_loop", "-1", "-i", str(music[0])])
+        # Seek *inside* the MP3 before it is looped. The movie therefore gets
+        # music immediately at t=0, rather than silence until music_start.
+        cmd.extend(["-ss", str(music_start), "-stream_loop", "-1", "-i", str(music[0])])
         playlist = "[1:a]"
     else:
         for item in music:
             cmd.extend(["-i", str(item)])
         playlist = "".join(f"[{index}:a]" for index in range(1, len(music) + 1))
-        playlist += f"concat=n={len(music)}:v=0:a=1[playlist];[playlist]"
-    audio_filter = f"{playlist}adelay={delay_ms}:all=1,volume=0.65[music]"
+        playlist += f"concat=n={len(music)}:v=0:a=1[playlist];[playlist]atrim=start={music_start}"
+    audio_filter = f"{playlist}volume=0.65[music]"
     if _has_audio(str(target)):
         audio_filter += ";[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]"
         maps = ["-map", "0:v:0", "-map", "[mixed]"]

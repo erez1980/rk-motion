@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from .action import analyse_action, export_edited_movie
+from .action import analyse_action, duration, export_edited_movie
 
 LOGO = Path(__file__).with_name("assets") / "rk-logo.png"
 INDEX = Path(__file__).with_name("assets") / "index.html"
@@ -184,7 +184,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not tracks:
                 raise RuntimeError("MP3 conversion did not produce a file.")
             job["pending_music"] = tracks[0]
-            return self._json(HTTPStatus.OK, {"name": tracks[0].name})
+            return self._json(HTTPStatus.OK, {"name": tracks[0].name, "duration": duration(str(tracks[0]))})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
             if "HTTP Error 403" in detail or "Forbidden" in detail:
@@ -284,7 +284,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 handle.write(chunk)
                 remaining -= len(chunk)
         job.setdefault("music", []).append(target)
-        return self._json(HTTPStatus.OK, {"name": name})
+        return self._json(HTTPStatus.OK, {"name": name, "duration": duration(str(target))})
 
     def _analyse_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
