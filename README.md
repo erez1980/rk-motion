@@ -1,4 +1,10 @@
-# sofit
+# RK Motion
+
+**Action highlights for riders.** A private, local video editor that turns a
+long ride into reviewed action clips and one exported highlight movie.
+
+Built on the open-source Sofit codebase, RK Motion adds a visual workflow for
+mountain-bike footage and other action video.
 
 ## Local action-scene finder (MVP)
 
@@ -26,7 +32,11 @@ Requires Python 3.10+ and [FFmpeg](https://ffmpeg.org/).
 brew install ffmpeg
 
 # Get this repository, then install its CLI
-pip install .
+git clone https://github.com/erez1980/rk-motion.git
+cd rk-motion
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --no-deps -e .
 ```
 
 ### Use it
@@ -52,6 +62,20 @@ short cuts.
 
 > This is an activity detector, not an automatic editor: a loud concert or a
 > fast camera pan can score highly even when it is not the best story moment.
+
+### Visual editor (recommended)
+
+Open RK Motion's local interface:
+
+```bash
+rk-motion --ui
+```
+
+Then drag a video into the window. RK Motion will show scored action
+suggestions beside a video preview. You can select or deselect each suggestion,
+adjust its start/end time, change the order, and click **Export selected edit**
+to create one MP4 containing the approved clips. The interface runs at
+`127.0.0.1` on your Mac; the source video and the rendered result stay local.
 
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your

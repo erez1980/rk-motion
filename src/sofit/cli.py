@@ -74,6 +74,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="seconds retained before/after an action candidate (default: 2)")
     p.add_argument("--action-render", metavar="DIR",
                    help="with --action-clips, export each candidate as an MP4 to DIR")
+    p.add_argument("--ui", action="store_true",
+                   help="open RK Motion's local visual action-editor interface")
+    p.add_argument("--ui-port", type=int, default=8787,
+                   help="local port for --ui (default: 8787)")
     p.add_argument("--render-clips", metavar="DIR",
                    help="render each pull-quote to DIR as a vertical (9:16) clip with burned "
                    "Hebrew captions (needs the [render] extra + ffmpeg)")
@@ -264,6 +268,10 @@ def main(argv: list[str] | None = None) -> int:
               "clips.json, then: sofit --render-from clips.json --storyboard",
               file=sys.stderr)
         return 1
+
+    if args.ui:
+        from .ui import launch_ui
+        return launch_ui(args.ui_port)
 
     if not args.media:
         print("error: media argument is required (or use --render-from PATH)", file=sys.stderr)

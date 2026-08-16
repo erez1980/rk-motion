@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import subprocess
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -163,3 +165,33 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
         subprocess.run(cmd, check=True, capture_output=True)
         outputs.append(str(target))
     return outputs
+
+
+def export_edited_movie(path: str, clips: list[dict], output: str) -> str:
+    """Join editor-approved clips in their supplied order into one MP4."""
+    if not clips:
+        raise ValueError("select at least one clip before exporting")
+    _need_ffmpeg()
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
+        parts = []
+        for index, clip in enumerate(clips, 1):
+            start, end = float(clip["start"]), float(clip["end"])
+            if end <= start or start < 0:
+                raise ValueError("every clip needs a valid start and end time")
+            part = Path(tmp) / f"part-{index:03d}.mp4"
+            subprocess.run(
+                ["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", path,
+                 "-t", str(end - start), "-map", "0:v:0", "-map", "0:a?",
+                 "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac",
+                 "-movflags", "+faststart", str(part)], check=True, capture_output=True,
+            )
+            parts.append(part)
+        listing = Path(tmp) / "concat.txt"
+        # Paths generated above are trusted local temp files. ffconcat quotes apostrophes.
+        listing.write_text("".join("file '" + str(part).replace("'", "'\\\\''") + "'\n" for part in parts))
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
+                        "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(target)],
+                       check=True, capture_output=True)
+    return str(target)

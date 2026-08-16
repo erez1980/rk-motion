@@ -1,7 +1,7 @@
 [project]
-name = "sofit-cli"
+name = "rk-motion"
 version = "0.4.0"
-description = "Auto-generate chapters, show notes, and pull-quotes for Hebrew podcasts (mp3/mp4) from a local transcript."
+description = "Private, local action-scene finder and visual editor for rider videos."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ crop = ["opencv-python-headless>=4.9"]  # face-aware crop centering (optional)
 
 [project.scripts]
 sofit = "sofit.cli:main"
+rk-motion = "sofit.cli:main"
 sofit-mcp = "sofit.mcp_server:main"
 
 [build-system]
