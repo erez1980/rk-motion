@@ -192,7 +192,8 @@ def _has_audio(path: str) -> bool:
 
 def export_edited_movie(path: str, clips: list[dict], output: str,
                         transition: str = "cut", transition_duration: float = .5,
-                        music_path: str | None = None, music_start: float = 0) -> str:
+                        music_paths: list[str] | None = None, music_start: float = 0,
+                        speed: float = 1.0) -> str:
     """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
@@ -207,8 +208,12 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         _export_with_transitions(path, clips, target, transition, transition_duration)
     else:
         _export_hard_cuts(path, clips, target)
-    if music_path:
-        _mix_music(target, music_path, music_start)
+    if speed not in {1.0, 1.25, 1.5, 2.0}:
+        raise ValueError("speed must be 1, 1.25, 1.5 or 2")
+    if speed != 1:
+        _speed_up_movie(target, speed)
+    if music_paths:
+        _mix_music(target, music_paths, music_start)
     return str(target)
 
 
@@ -235,18 +240,38 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path) -> None:
                        check=True, capture_output=True)
 
 
-def _mix_music(target: Path, music_path: str, music_start: float) -> None:
-    """Loop and mix a local music file from ``music_start`` until movie end."""
-    music = Path(music_path)
-    if not music.is_file():
+def _speed_up_movie(target: Path, speed: float) -> None:
+    """Change video and its original sound together, before music is mixed."""
+    fast = target.with_name(target.stem + ".fast.mp4")
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target), "-filter:v", f"setpts=PTS/{speed}",
+           "-map", "0:v:0"]
+    if _has_audio(str(target)):
+        cmd.extend(["-filter:a", f"atempo={speed}", "-map", "0:a:0", "-c:a", "aac"])
+    cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", str(fast)])
+    subprocess.run(cmd, check=True, capture_output=True)
+    fast.replace(target)
+
+
+def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None:
+    """Mix one looping track or a sequential playlist from ``music_start``."""
+    music = [Path(item) for item in music_paths]
+    if not music or any(not item.is_file() for item in music):
         raise ValueError("selected music file is unavailable")
     if music_start < 0:
         raise ValueError("music start must not be negative")
     movie_duration = duration(str(target))
     delay_ms = round(music_start * 1000)
     mixed = target.with_name(target.stem + ".with-music.mp4")
-    audio_filter = f"[1:a]adelay={delay_ms}:all=1,volume=0.65[music]"
-    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target), "-stream_loop", "-1", "-i", str(music)]
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target)]
+    if len(music) == 1:
+        cmd.extend(["-stream_loop", "-1", "-i", str(music[0])])
+        playlist = "[1:a]"
+    else:
+        for item in music:
+            cmd.extend(["-i", str(item)])
+        playlist = "".join(f"[{index}:a]" for index in range(1, len(music) + 1))
+        playlist += f"concat=n={len(music)}:v=0:a=1[playlist];[playlist]"
+    audio_filter = f"{playlist}adelay={delay_ms}:all=1,volume=0.65[music]"
     if _has_audio(str(target)):
         audio_filter += ";[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]"
         maps = ["-map", "0:v:0", "-map", "[mixed]"]

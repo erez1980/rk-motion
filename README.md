@@ -87,11 +87,17 @@ list. “Random order” changes that order before exporting.
 
 ### Optional music track
 
-Before exporting, click **Add music** and choose an MP3 (M4A, AAC, WAV and OGG
-are also supported). Preview it with the built-in player, then move the
+Before exporting, click **Add music** and choose one or more MP3 files (M4A,
+AAC, WAV and OGG are also supported). Multiple tracks play sequentially in the
+order selected. Preview the first track with the built-in player, then move the
 **Music start** slider to choose where it begins in the edited movie. RK Motion
-loops a short track when needed, mixes it with the ride audio at a lower level,
-and automatically cuts it at the exported movie's end.
+loops a single short track when needed, mixes music with the ride audio at a
+lower level, and automatically cuts it at the exported movie's end.
+
+### Export speed
+
+Choose normal, 1.25×, 1.5× or 2× speed beside the transition selector. RK
+Motion speeds up the selected video and its original sound before adding music.
 
 Auto-generate **chapters**, **show notes**, and **pull-quotes** for Hebrew
 podcasts (mp3 or mp4) — locally transcribed, so your audio never leaves your
