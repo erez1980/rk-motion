@@ -3,6 +3,31 @@
 Scope: first-time local user selecting a long ride video, reviewing detected
 action suggestions, and exporting a short edit.
 
+## Round 3 — progress feedback anchored to the flow (2026-08)
+
+- **Status next to the action.** The single global status bar became three
+  anchored ones: below the upload area (upload + analysis), inside the music
+  studio (uploads, YouTube downloads), and below the export bar (export +
+  save). Feedback now appears where the user clicked, in reading order.
+- **Real progress with time-remaining everywhere.** Analysis is now an async
+  server job (like export) reporting stage messages ("normalising video 2/3",
+  "analysing motion and sound") with a size-based estimate; uploads compute
+  remaining time from measured throughput; music uploads gained real percent
+  (they previously had no progress events at all); YouTube downloads show a
+  running timer over an indeterminate bar.
+- **The screen follows the flow.** Picking files scrolls to the upload bar,
+  a finished analysis scrolls to the clips, adding/attaching music scrolls to
+  export, clicking export scrolls to its progress bar, and the finished movie
+  scrolls into view.
+- **Always-visible busy signal.** The sticky step rail shows a spinning ring
+  on the active step while anything runs, so scrolling away never hides that
+  work is in progress.
+- **Compact YouTube results.** One line per result — title (ellipsized),
+  channel · duration, a small listen button and an add button — no thumbnail.
+- Verified end-to-end with a synthetic ride video through the real server:
+  staged analysis messages with ETA, export with ETA, result playback; browser
+  run confirmed anchored bars, busy ring on/off, and no console errors.
+
 ## Round 2 — full design refresh (2026-08)
 
 ### Design system

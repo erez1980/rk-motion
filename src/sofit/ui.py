@@ -103,14 +103,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             return self._file(Path(path), "video/mp4", attachment=parts[1] == "export")
-        if len(parts) == 3 and parts[:2] == ["api", "export-status"]:
+        if len(parts) == 3 and parts[1] in {"export-status", "analyse-status"} and parts[0] == "api":
             job = JOBS.get(parts[2])
-            if not job or "export_status" not in job:
-                return self._json(HTTPStatus.NOT_FOUND, {"error": "Export job not found."})
-            state = dict(job["export_status"])
+            key = parts[1].replace("-", "_")
+            if not job or key not in job:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Job not found."})
+            state = dict(job[key])
             started = state.get("started")
             if started:
                 state["elapsed_seconds"] = round(time.monotonic() - started, 1)
+                del state["started"]  # monotonic time is meaningless to the client
             return self._json(HTTPStatus.OK, state)
         if parts == ["api", "capabilities"]:
             return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp"))})
@@ -234,26 +236,53 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         return self._json(HTTPStatus.OK, {"index": len(job["inputs"])})
 
     def _analyse_batch(self, job_id: str) -> None:
+        """Start analysis in the background; the client polls /api/analyse-status."""
         job = JOBS.get(job_id)
         if not job or not job.get("inputs"):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
+        raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
+        max_duration = float(raw_max) if raw_max else None
+        # A conservative size-based estimate, presented to the user as one.
+        total_mb = sum(item.stat().st_size for item in job["inputs"]) / 1e6
+        estimate = max(15, round(total_mb * 0.5 + len(job["inputs"]) * 6))
+        job["analyse_status"] = {"state": "running", "started": time.monotonic(),
+                                 "estimated_seconds": estimate,
+                                 "message": "מכינה את הסרטונים…"}
+        threading.Thread(target=self._run_analyse, args=(job, job_id, max_duration), daemon=True).start()
+        return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/analyse-status/{job_id}"})
+
+    @classmethod
+    def _run_analyse(cls, job: dict, job_id: str, max_duration: float | None) -> None:
+        status = job["analyse_status"]
         try:
-            source = self._combine_videos(job["inputs"], Path(job["folder"]))
+            def progress(index: int, count: int) -> None:
+                status["message"] = (f"מנרמלת סרטון {index + 1}/{count}…" if count > 1
+                                     else "מכינה את הסרטון…")
+
+            source = cls._combine_videos(job["inputs"], Path(job["folder"]), progress)
             job["source"] = source
-            raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
-            report = analyse_action(str(source), max_duration=float(raw_max) if raw_max else None)
-            job["report"] = report
+            status["message"] = "מנתחת תנועה וסאונד…"
+            report = analyse_action(str(source), max_duration=max_duration)
             report["job_id"] = job_id
-            return self._json(HTTPStatus.OK, report)
+            job["report"] = report
+            status.update({"state": "done", "message": "הניתוח הושלם.", "report": report})
         except Exception as exc:
-            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+            detail = str(exc)
+            stderr = getattr(exc, "stderr", None)
+            if stderr:
+                if isinstance(stderr, bytes):
+                    stderr = stderr.decode("utf-8", "replace")
+                detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
+            status.update({"state": "error", "message": detail or "הניתוח נכשל."})
 
     @staticmethod
-    def _combine_videos(inputs: list[Path], folder: Path) -> Path:
+    def _combine_videos(inputs: list[Path], folder: Path, progress=None) -> Path:
         """Normalise clips then concatenate, preserving their drag/drop order."""
         from .action import _has_audio
         normalised = []
         for index, source in enumerate(inputs):
+            if progress:
+                progress(index, len(inputs))
             target = folder / f"normalised-{index:03d}.mp4"
             cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(source), "-f", "lavfi", "-i",
                    "anullsrc=r=48000:cl=stereo", "-vf",

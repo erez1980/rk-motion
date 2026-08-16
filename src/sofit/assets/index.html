@@ -145,6 +145,13 @@ select{
 .bar i{display:block;width:0;height:100%;background:var(--accent);border-radius:9px;transition:width .25s}
 .status.working .bar i{animation:pulse 1.1s ease-in-out infinite alternate}
 @keyframes pulse{to{opacity:.35}}
+.status.indet .bar i{width:35%!important;animation:slide 1.2s ease-in-out infinite alternate}
+@keyframes slide{from{margin-inline-start:0}to{margin-inline-start:65%}}
+.status-grid{grid-column:1/-1;margin:0}
+
+/* Busy ring on the active step, so a running process stays visible from anywhere. */
+.steps li.busy::after{content:'';width:11px;height:11px;border:2px solid var(--accent);border-inline-start-color:transparent;border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---- Workspace ---- */
 .workspace{display:none;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:18px;margin-top:20px}
@@ -205,13 +212,15 @@ body.day .eyebrow{color:#4c7c12}
   background:var(--card-2);color:var(--ink);font:inherit;
 }
 .rights{font-size:12.5px;color:var(--soft);display:flex;align-items:center;gap:6px}
-.yt-results{display:grid;gap:6px}
+.yt-results{display:grid;gap:5px}
 .yt-result{
-  display:grid;grid-template-columns:64px 1fr auto auto;gap:10px;align-items:center;padding:8px;
+  display:flex;align-items:center;gap:9px;padding:6px 11px;font-size:13.5px;
   background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);
 }
-.yt-result img{width:64px;height:36px;object-fit:cover;border-radius:5px}
-.yt-result small{color:var(--soft)}
+.yt-result .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.yt-result small{color:var(--soft);white-space:nowrap}
+.yt-result .ghost{padding:3px 8px;font-size:12px}
+.yt-result .secondary{padding:5px 10px;font-size:12.5px;white-space:nowrap}
 .track-list{display:grid;gap:6px}
 .track{
   display:flex;align-items:center;gap:10px;padding:9px 12px;flex-wrap:wrap;
@@ -356,6 +365,7 @@ body.day .eyebrow{color:#4c7c12}
     </div>
     <label class="rights"><input id="ytRights" type="checkbox"> יש לי רשות להוריד ולהשתמש בתוכן מ־YouTube</label>
     <div id="ytResults" class="yt-results"></div>
+    <div id="statusMusic" class="status" role="status" aria-live="polite"><b>מכינים…</b><div class="bar"><i></i></div></div>
     <div id="trackList" class="track-list" hidden></div>
     <button id="attachYoutubeMusic" class="button primary" hidden>הוסף לסרטון מנקודה זו</button>
     <label id="musicStartWrap" class="start-control" hidden>
@@ -391,6 +401,8 @@ body.day .eyebrow{color:#4c7c12}
       <a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a>
     </div>
   </section>
+
+  <div id="statusExport" class="status status-grid" role="status" aria-live="polite"><b>מכינים…</b><div class="bar"><i></i></div></div>
 
   <section id="result" class="result card">
     <h2>🎬 הסרט מוכן!</h2>
@@ -433,10 +445,28 @@ fetch('/api/capabilities').then(r => r.json()).then(caps => {
 }).catch(() => {});
 
 /* ---- Shared helpers ---- */
-function setStatus(msg, p = 0, error = false, working = false) {
-  statusBox.className = 'status show' + (error ? ' error' : '') + (working ? ' working' : '');
-  text.textContent = msg;
-  bar.style.width = p + '%';
+/* One status widget per flow stage, so feedback appears next to the action. */
+function makeStatus(el) {
+  const label = el.querySelector('b'), fill = el.querySelector('.bar i');
+  return {
+    show(msg, p = 0, { error = false, working = false, indet = false } = {}) {
+      el.className = el.className.replace(/\bshow|error|working|indet\b/g, '').trim();
+      el.classList.add('show');
+      if (error) el.classList.add('error');
+      if (working) el.classList.add('working');
+      if (indet) el.classList.add('indet');
+      label.textContent = msg;
+      fill.style.width = p + '%';
+    },
+    hide() { el.classList.remove('show'); },
+    el,
+  };
+}
+const stMain = makeStatus(statusBox), stMusic = makeStatus($('#statusMusic')), stExport = makeStatus($('#statusExport'));
+function go(el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function setBusy(n) { for (let i = 1; i <= 3; i++) $('#step' + i).classList.toggle('busy', i === n); }
+function etaText(seconds) {
+  return Number.isFinite(seconds) && seconds >= 1 ? ` · נשאר בערך ${fmt(seconds)}` : '';
 }
 function invalidateDownload() { $('#download').classList.remove('show'); $('#result').classList.remove('show'); }
 function step(n) {
@@ -459,23 +489,50 @@ async function request(url, body, headers = {}) {
 function selected() { return report.clips.filter(c => c.selected !== false); }
 
 /* ---- Upload & analyse ---- */
+function pollAnalyse(statusUrl) {
+  return new Promise((resolve, reject) => {
+    const timer = setInterval(async () => {
+      try {
+        const r = await fetch(statusUrl), d = await r.json();
+        if (!d.state) throw Error(d.error || 'הניתוח נכשל.');
+        if (d.state === 'error') { clearInterval(timer); return reject(Error(d.message || 'הניתוח נכשל.')); }
+        if (d.state === 'done') { clearInterval(timer); return resolve(d.report); }
+        const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
+        const percent = Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100)));
+        stMain.show((d.message || 'מנתחת…') + etaText(estimate - elapsed), percent, { working: true });
+      } catch (error) {
+        clearInterval(timer);
+        reject(error);
+      }
+    }, 1000);
+  });
+}
+
 async function upload(files) {
   files = [...files].filter(f => f.type.startsWith('video/'));
   if (!files.length) return;
   invalidateDownload();
+  setBusy(1);
   try {
-    setStatus(`מכינה ${files.length} סרטונים…`, 0);
+    stMain.show(`מכינה ${files.length} סרטונים…`, 0);
+    go(stMain.el);
     const session = await request('/api/prepare', '');
     let sent = 0, total = files.reduce((sum, f) => sum + f.size, 0);
+    const started = performance.now();
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      setStatus(`מעלה סרטון ${i + 1}/${files.length}: ${f.name}`, Math.round(sent / total * 65));
+      const tag = files.length > 1 ? `מעלה סרטון ${i + 1}/${files.length}: ${f.name}` : `מעלה: ${f.name}`;
+      stMain.show(tag, Math.round(sent / total * 100));
       await new Promise((resolve, reject) => {
         const x = new XMLHttpRequest();
         x.open('POST', '/api/video/' + session.job_id);
         x.setRequestHeader('X-Filename', encodeURIComponent(f.name));
         x.upload.onprogress = e => {
-          if (e.lengthComputable) setStatus(`מעלה סרטון ${i + 1}/${files.length}: ${f.name}`, Math.round((sent + e.loaded) / total * 65));
+          if (!e.lengthComputable) return;
+          const done = sent + e.loaded;
+          const rate = done / ((performance.now() - started) / 1000);   // bytes/sec so far
+          const remaining = rate > 0 ? (total - done) / rate : NaN;
+          stMain.show(`${tag} · ${Math.round(done / total * 100)}%` + etaText(remaining), Math.round(done / total * 100));
         };
         x.onload = () => x.status === 200 ? resolve() : reject(new Error(x.responseText));
         x.onerror = reject;
@@ -483,13 +540,16 @@ async function upload(files) {
       });
       sent += f.size;
     }
-    setStatus(files.length > 1 ? 'מחברת ומנתחת את הסרטונים…' : 'מנתחת את רגעי האקשן…', 72, false, true);
+    stMain.show('מתחילה ניתוח…', 3, { working: true });
     const maxLen = $('#maxLength').value.trim();
-    report = await request('/api/analyse-batch/' + session.job_id, '', maxLen ? { 'X-Max-Scene-Length': maxLen } : {});
-    setStatus('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+    const start = await request('/api/analyse-batch/' + session.job_id, '', maxLen ? { 'X-Max-Scene-Length': maxLen } : {});
+    report = await pollAnalyse(start.status_url);
+    stMain.show('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+    setBusy(0);
     show();
   } catch (error) {
-    setStatus(error.message || 'לא ניתן לנתח את הסרטונים.', 0, true);
+    setBusy(0);
+    stMain.show(error.message || 'לא ניתן לנתח את הסרטונים.', 0, { error: true });
   }
 }
 file.onchange = () => upload(file.files);
@@ -609,7 +669,7 @@ function render() {
     const applyTimes = () => {
       const nextStart = +start.value, nextEnd = +end.value;
       if (nextStart < 0 || nextEnd <= nextStart) {
-        setStatus('זמן הסיום חייב להיות אחרי זמן ההתחלה.', 0, true);
+        stExport.show('זמן הסיום חייב להיות אחרי זמן ההתחלה.', 0, { error: true });
         return render();
       }
       c.start = nextStart; c.end = nextEnd; c.duration = c.end - c.start;
@@ -668,7 +728,6 @@ $('#random').onclick = () => {
   invalidateDownload();
   $('#undoRandom').hidden = false;
   render();
-  setStatus('סדר הקטעים עורבב. אפשר לבטל או להזיז ידנית.', 100);
 };
 $('#undoRandom').onclick = () => {
   if (!orderBeforeShuffle) return;
@@ -677,7 +736,6 @@ $('#undoRandom').onclick = () => {
   $('#undoRandom').hidden = true;
   invalidateDownload();
   render();
-  setStatus('סדר הקטעים שוחזר.', 100);
 };
 
 /* ---- Music ---- */
@@ -716,31 +774,45 @@ async function uploadMusic(files) {
   if (!files.length || !report) return;
   musicReady = false; musicUploading = true;
   invalidateDownload();
+  setBusy(2);
   try {
+    let sent = 0, total = files.reduce((sum, f) => sum + f.size, 0);
+    const started = performance.now();
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      setStatus(`מעלה מוזיקה ${i + 1}/${files.length}: ${f.name}`, Math.round(i / files.length * 90), false, true);
+      const tag = files.length > 1 ? `מעלה מוזיקה ${i + 1}/${files.length}: ${f.name}` : `מעלה: ${f.name}`;
+      stMusic.show(tag, Math.round(sent / total * 100));
       const x = new XMLHttpRequest();
       x.open('POST', '/api/music/' + report.job_id);
       x.setRequestHeader('X-Filename', encodeURIComponent(f.name));
+      x.upload.onprogress = e => {
+        if (!e.lengthComputable) return;
+        const done = sent + e.loaded;
+        const rate = done / ((performance.now() - started) / 1000);
+        const remaining = rate > 0 ? (total - done) / rate : NaN;
+        stMusic.show(`${tag} · ${Math.round(done / total * 100)}%` + etaText(remaining), Math.round(done / total * 100));
+      };
       const done = new Promise((resolve, reject) => {
         x.onload = () => x.status === 200 ? resolve(JSON.parse(x.responseText)) : reject(new Error(x.responseText));
         x.onerror = reject;
       });
       x.send(f);
       const uploaded = await done;
+      sent += f.size;
       tracks.push({ name: f.name, duration: uploaded.duration || 0, kind: 'file', previewUrl: URL.createObjectURL(f) });
       musicDuration = totalMusicDuration();
     }
     musicReady = true;
     renderTracks();
     updateSummary();
-    setStatus('המוזיקה נוספה. הרצועות יתנגנו לפי סדר ההוספה.', 100);
+    stMusic.show('המוזיקה נוספה. הרצועות יתנגנו לפי סדר ההוספה — ממשיכים לייצוא.', 100);
+    go($('#exportBox'));
   } catch {
     musicReady = tracks.some(t => !t.pending);
-    setStatus('לא ניתן להוסיף את קובצי המוזיקה.', 0, true);
+    stMusic.show('לא ניתן להוסיף את קובצי המוזיקה.', 0, { error: true });
   } finally {
     musicUploading = false;
+    setBusy(0);
   }
 }
 $('#musicFile').onchange = () => { uploadMusic([...$('#musicFile').files]); $('#musicFile').value = ''; };
@@ -767,14 +839,12 @@ $('#ytSearch').onclick = async () => {
     r.results.forEach(item => {
       const row = document.createElement('div');
       row.className = 'yt-result';
-      const img = document.createElement('img');
-      img.src = item.thumbnail; img.alt = '';
-      const info = document.createElement('span');
       const title = document.createElement('span');
+      title.className = 't';
       title.textContent = item.title;
+      title.title = item.title;
       const sub = document.createElement('small');
       sub.textContent = `${item.channel} · ${fmt(item.duration)}`;
-      info.append(title, document.createElement('br'), sub);
       const play = document.createElement('button');
       play.className = 'ghost';
       play.textContent = '▶';
@@ -785,9 +855,10 @@ $('#ytSearch').onclick = async () => {
       };
       const add = document.createElement('button');
       add.className = 'secondary';
-      add.textContent = 'הוספה כ-MP3';
+      add.textContent = 'הוספה';
+      add.setAttribute('aria-label', 'הוספה כ-MP3');
       add.onclick = () => downloadYoutube(item, add);
-      row.append(img, info, play, add);
+      row.append(title, sub, play, add);
       box.append(row);
     });
   } catch (e) {
@@ -796,10 +867,14 @@ $('#ytSearch').onclick = async () => {
 };
 
 async function downloadYoutube(item, btn) {
-  if (!$('#ytRights').checked) return setStatus('יש לאשר שיש לך רשות להשתמש בקטע.', 0, true);
+  if (!$('#ytRights').checked) return stMusic.show('יש לאשר שיש לך רשות להשתמש בקטע.', 0, { error: true });
   btn.disabled = true;
+  setBusy(2);
+  const started = Date.now();
+  const tick = setInterval(() =>
+    stMusic.show(`מורידה וממירה ל-MP3… ${fmt((Date.now() - started) / 1000)}`, 0, { indet: true }), 1000);
+  stMusic.show('מורידה וממירה ל-MP3…', 0, { indet: true });
   try {
-    setStatus('מורידה וממירה ל-MP3…', 60, false, true);
     const downloaded = await request('/api/youtube/download/' + report.job_id,
       JSON.stringify({ id: item.id, rights_confirmed: true }), { 'Content-Type': 'application/json' });
     tracks.push({ name: item.title, duration: downloaded.duration || 0, kind: 'youtube', pending: true, previewUrl: '/api/music-preview/' + report.job_id });
@@ -808,11 +883,13 @@ async function downloadYoutube(item, btn) {
     renderTracks();
     updateSummary();
     $('#attachYoutubeMusic').hidden = false;
-    setStatus('הקובץ מוכן. האזינו, בחרו נקודת התחלה ואז הוסיפו לסרטון.', 100);
+    stMusic.show('הקובץ מוכן. האזינו, בחרו נקודת התחלה ואז הוסיפו לסרטון.', 100);
   } catch (e) {
-    setStatus(e.message || 'ההורדה נכשלה.', 0, true);
+    stMusic.show(e.message || 'ההורדה נכשלה.', 0, { error: true });
   } finally {
+    clearInterval(tick);
     btn.disabled = false;
+    setBusy(0);
   }
 }
 
@@ -823,16 +900,17 @@ $('#attachYoutubeMusic').onclick = async () => {
     tracks.forEach(t => { if (t.kind === 'youtube') t.pending = false; });
     renderTracks();
     $('#attachYoutubeMusic').hidden = true;
-    setStatus('המוזיקה נוספה: הסרט יתחיל מהשנייה שבחרת בתוך הרצועה.', 100);
+    stMusic.show('המוזיקה נוספה: הסרט יתחיל מהשנייה שבחרת — ממשיכים לייצוא.', 100);
+    go($('#exportBox'));
   } catch (e) {
-    setStatus(e.message || 'לא ניתן להוסיף את המוזיקה.', 0, true);
+    stMusic.show(e.message || 'לא ניתן להוסיף את המוזיקה.', 0, { error: true });
   }
 };
 
 /* ---- Export ---- */
 async function saveFinishedMovie(url) {
   if (!saveHandle) return false;
-  setStatus('שומרת את הסרט במיקום שבחרת…', 99, false, true);
+  stExport.show('שומרת את הסרט במיקום שבחרת…', 99, { working: true });
   const response = await fetch(url), blob = await response.blob();
   const writer = await saveHandle.createWritable();
   await writer.write(blob);
@@ -854,43 +932,47 @@ function exportProgress(statusUrl, btn) {
       if (d.error) throw Error(d.error);
       const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
       const percent = d.state === 'done' ? 100 : Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100)));
-      const remaining = Math.max(0, Math.round(estimate - elapsed));
-      const suffix = d.state === 'done' ? '' : ` · נשאר בערך ${fmt(remaining)}`;
-      setStatus((d.message || 'מייצאת…') + suffix, percent, d.state === 'error', d.state === 'running');
+      const suffix = d.state === 'done' ? '' : etaText(Math.max(0, Math.round(estimate - elapsed)));
+      stExport.show((d.message || 'מייצאת…') + suffix, percent, { error: d.state === 'error', working: d.state === 'running' });
       if (d.state === 'done') {
         clearInterval(timer);
         try {
           const saved = await saveFinishedMovie(d.download);
-          setStatus(saved ? 'הסרט נשמר במיקום שבחרת.' : 'הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
+          stExport.show(saved ? 'הסרט נשמר במיקום שבחרת.' : 'הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
           if (!saved) { const a = $('#download'); a.href = d.download; a.classList.add('show'); }
         } catch {
           const a = $('#download');
           a.href = d.download;
           a.classList.add('show');
-          setStatus('הסרט מוכן. לחצו על הורדת MP4 כדי לשמור אותו.', 100);
+          stExport.show('הסרט מוכן. לחצו על הורדת MP4 כדי לשמור אותו.', 100);
         }
         showResult(d.download);
         btn.disabled = false;
+        setBusy(0);
         step(3);
       } else if (d.state === 'error') {
         clearInterval(timer);
         btn.disabled = false;
+        setBusy(0);
       }
     } catch {
       clearInterval(timer);
-      setStatus('לא ניתן לעקוב אחר הייצוא. נסו שוב.', 0, true);
+      stExport.show('לא ניתן לעקוב אחר הייצוא. נסו שוב.', 0, { error: true });
       btn.disabled = false;
+      setBusy(0);
     }
   }, 1000);
 }
 
 $('#export').onclick = async () => {
   const chosen = selected();
-  if (!chosen.length) return setStatus('בחרו לפחות קטע אחד.', 0, true);
-  if (musicUploading) return setStatus('ממתינים שהמוזיקה תעלה.', 0, true);
+  if (!chosen.length) return stExport.show('בחרו לפחות קטע אחד.', 0, { error: true });
+  if (musicUploading) return stExport.show('ממתינים שהמוזיקה תעלה.', 0, { error: true });
   const btn = $('#export');
   btn.disabled = true;
   saveHandle = null;
+  stExport.show('בחרו איפה לשמור את הסרט…', 0, { working: true });
+  go(stExport.el);
   try {
     if ('showSaveFilePicker' in window) {
       saveHandle = await window.showSaveFilePicker({
@@ -900,11 +982,13 @@ $('#export').onclick = async () => {
     }
   } catch (error) {
     if (error.name === 'AbortError') { btn.disabled = false; return; }
-    setStatus('לא ניתן לפתוח בחירת מיקום. הסרט יורד לאחר הייצוא.', 0, true);
+    stExport.show('לא ניתן לפתוח בחירת מיקום. הסרט יורד לאחר הייצוא.', 0, { error: true });
   }
   step(3);
+  setBusy(3);
   invalidateDownload();
-  setStatus('מתחילה ייצוא…', 3, false, true);
+  stExport.show('מתחילה ייצוא…', 3, { working: true });
+  go(stExport.el);
   try {
     const r = await fetch('/api/export', {
       method: 'POST',
@@ -921,11 +1005,12 @@ $('#export').onclick = async () => {
       }),
     });
     const d = await r.json();
-    if (d.error) { setStatus(d.error, 0, true); btn.disabled = false; return; }
+    if (d.error) { stExport.show(d.error, 0, { error: true }); btn.disabled = false; setBusy(0); return; }
     exportProgress(d.status_url, btn);
   } catch {
-    setStatus('הייצוא נכשל. נסו שוב.', 0, true);
+    stExport.show('הייצוא נכשל. נסו שוב.', 0, { error: true });
     btn.disabled = false;
+    setBusy(0);
   }
 };
 
