@@ -59,6 +59,7 @@ body{
     var(--bg);
   font:15px/1.55 Rubik,system-ui,"Segoe UI",Arial,sans-serif;
   min-height:100vh;
+  overflow-x:hidden; /* safety net: no single element should be able to widen the page */
 }
 .app{max-width:1240px;margin:auto;padding:0 22px 70px}
 
@@ -212,15 +213,20 @@ body.day .eyebrow{color:#4c7c12}
   background:var(--card-2);color:var(--ink);font:inherit;
 }
 .rights{font-size:12.5px;color:var(--soft);display:flex;align-items:center;gap:6px}
-.yt-results{display:grid;gap:5px}
+/* flex column, not grid: an implicit grid track sizes to its widest item's
+   min-content, and a long "channel · duration" string with no wrap point
+   was stretching the whole page sideways on mobile. */
+.yt-results{display:flex;flex-direction:column;gap:5px;min-width:0}
 .yt-result{
-  display:flex;align-items:center;gap:9px;padding:6px 11px;font-size:13.5px;
+  display:flex;align-items:center;gap:9px;padding:6px 11px;font-size:13.5px;min-width:0;
   background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);
 }
 .yt-result .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.yt-result small{color:var(--soft);white-space:nowrap}
-.yt-result .ghost{padding:3px 8px;font-size:12px}
-.yt-result .secondary{padding:5px 10px;font-size:12.5px;white-space:nowrap}
+.yt-result .meta{display:flex;align-items:baseline;gap:4px;min-width:0;max-width:38%;color:var(--soft)}
+.yt-result .meta .ch{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt-result .meta .dur{flex:none;white-space:nowrap}
+.yt-result .ghost{padding:3px 8px;font-size:12px;flex:none}
+.yt-result .secondary{padding:5px 10px;font-size:12.5px;white-space:nowrap;flex:none}
 .track-list{display:grid;gap:6px}
 .track{
   display:flex;align-items:center;gap:10px;padding:9px 12px;flex-wrap:wrap;
@@ -844,7 +850,14 @@ $('#ytSearch').onclick = async () => {
       title.textContent = item.title;
       title.title = item.title;
       const sub = document.createElement('small');
-      sub.textContent = `${item.channel} · ${fmt(item.duration)}`;
+      sub.className = 'meta';
+      const ch = document.createElement('span');
+      ch.className = 'ch';
+      ch.textContent = item.channel;
+      const dur = document.createElement('span');
+      dur.className = 'dur';
+      dur.textContent = '· ' + fmt(item.duration);
+      sub.append(ch, dur);
       const play = document.createElement('button');
       play.className = 'ghost';
       play.textContent = '▶';
