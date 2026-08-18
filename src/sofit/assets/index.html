@@ -434,6 +434,7 @@ const workspace = $('#workspace'), video = $('#video'), clipsEl = $('#clips'), t
 let report, activeIndex = -1, orderBeforeShuffle = null, saveHandle = null;
 let musicReady = false, musicUploading = false, musicDuration = 0, previewEnd = null, dragIndex = null;
 const tracks = []; // {name, duration, kind:'file'|'youtube', pending}
+const JOB_KEY = 'rk-motion-job';   // lets a reopened page find its running job
 const totalMusicDuration = () => tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
 
 /* ---- Theme ---- */
@@ -470,7 +471,32 @@ function makeStatus(el) {
 }
 const stMain = makeStatus(statusBox), stMusic = makeStatus($('#statusMusic')), stExport = makeStatus($('#statusExport'));
 function go(el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-function setBusy(n) { for (let i = 1; i <= 3; i++) $('#step' + i).classList.toggle('busy', i === n); }
+
+/* Phones background a tab when the screen locks, which kills an in-flight
+   upload. Hold a screen wake lock while any job runs, and re-take it when the
+   page comes back (the lock is dropped whenever the page is hidden). */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch { /* unsupported or denied — nothing else depends on it */ }
+}
+function setBusy(n) {
+  for (let i = 1; i <= 3; i++) $('#step' + i).classList.toggle('busy', i === n);
+  keepAwake(n > 0);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && document.querySelector('.steps li.busy')) keepAwake(true);
+});
+// Only the browser-side upload dies with the tab; server jobs are resumed on return.
+let uploading = false;
+addEventListener('beforeunload', e => { if (uploading) e.preventDefault(); });
 function etaText(seconds) {
   return Number.isFinite(seconds) && seconds >= 1 ? ` · נשאר בערך ${fmt(seconds)}` : '';
 }
@@ -516,9 +542,10 @@ function pollAnalyse(statusUrl) {
 
 async function upload(files) {
   files = [...files].filter(f => f.type.startsWith('video/'));
-  if (!files.length) return;
+  if (!files.length) { stMain.hide(); return; }
   invalidateDownload();
   setBusy(1);
+  uploading = true;
   try {
     stMain.show(`מכינה ${files.length} סרטונים…`, 0);
     go(stMain.el);
@@ -546,9 +573,12 @@ async function upload(files) {
       });
       sent += f.size;
     }
+    // From here on the work lives on the server, so the page may be closed.
+    uploading = false;
     stMain.show('מתחילה ניתוח…', 3, { working: true });
     const maxLen = $('#maxLength').value.trim();
     const start = await request('/api/analyse-batch/' + session.job_id, '', maxLen ? { 'X-Max-Scene-Length': maxLen } : {});
+    localStorage.setItem(JOB_KEY, session.job_id);
     report = await pollAnalyse(start.status_url);
     stMain.show('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
     setBusy(0);
@@ -556,12 +586,92 @@ async function upload(files) {
   } catch (error) {
     setBusy(0);
     stMain.show(error.message || 'לא ניתן לנתח את הסרטונים.', 0, { error: true });
+  } finally {
+    uploading = false;
   }
 }
+// iOS copies/transcodes the clip out of Photos before `change` fires, which can
+// take a while with nothing on screen — say so as soon as the picker opens.
+file.addEventListener('click', () => stMain.show('בוחרים סרטון… האייפון מכין את הקובץ, זה עשוי לקחת כמה רגעים.', 0, { indet: true }));
+file.addEventListener('cancel', () => stMain.hide());
 file.onchange = () => upload(file.files);
 ['dragenter', 'dragover'].forEach(name => drop.addEventListener(name, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(name => drop.addEventListener(name, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => upload(e.dataTransfer.files));
+
+/* ---- Resuming a session after the page was closed or backgrounded ---- */
+async function restoreMusic(jobId) {
+  try {
+    const r = await fetch('/api/session/' + jobId);
+    if (!r.ok) return;
+    const d = await r.json();
+    (d.music || []).forEach(t => tracks.push({ name: t.name, duration: t.duration, kind: t.kind }));
+    if (d.pending_music) {
+      tracks.push({ ...d.pending_music, pending: true, previewUrl: '/api/music-preview/' + jobId });
+      $('#attachYoutubeMusic').hidden = false;
+    }
+    musicReady = tracks.some(t => !t.pending);
+    musicDuration = totalMusicDuration();
+    renderTracks();
+    updateSummary();
+  } catch { /* the soundtrack list is a nicety; the editor still works */ }
+}
+
+async function resumeExport(jobId) {
+  try {
+    const r = await fetch('/api/export-status/' + jobId);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.state === 'running') {
+      step(3);
+      setBusy(3);
+      $('#export').disabled = true;
+      stExport.show(d.message || 'ממשיכה לייצא…', 3, { working: true });
+      exportProgress('/api/export-status/' + jobId, $('#export'));
+    } else if (d.state === 'done' && d.download) {
+      const a = $('#download');
+      a.href = d.download;
+      a.classList.add('show');
+      showResult(d.download);
+      step(3);
+      stExport.show('הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
+    }
+  } catch { /* nothing to resume */ }
+}
+
+async function resumeSession() {
+  const jobId = localStorage.getItem(JOB_KEY);
+  if (!jobId) return;
+  let d;
+  try {
+    const r = await fetch('/api/analyse-status/' + jobId);
+    if (!r.ok) { localStorage.removeItem(JOB_KEY); return; }
+    d = await r.json();
+  } catch { return; }   // server not reachable yet; keep the id for next time
+  try {
+    if (d.state === 'running') {
+      setBusy(1);
+      stMain.show(d.message || 'ממשיכה לנתח…', 3, { working: true });
+      report = await pollAnalyse('/api/analyse-status/' + jobId);
+      setBusy(0);
+      stMain.show('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+      show();
+      restoreMusic(jobId);
+    } else if (d.state === 'done' && d.report) {
+      report = d.report;
+      show();
+      stMain.show('חזרנו לעריכה שלך — הקטעים כבר מוכנים.', 100);
+      await restoreMusic(jobId);
+      resumeExport(jobId);
+    } else {
+      localStorage.removeItem(JOB_KEY);
+    }
+  } catch (error) {
+    setBusy(0);
+    localStorage.removeItem(JOB_KEY);
+    stMain.show(error.message || 'לא ניתן לשחזר את העריכה הקודמת.', 0, { error: true });
+  }
+}
 
 function show() {
   workspace.classList.add('show');
@@ -889,7 +999,7 @@ async function downloadYoutube(item, btn) {
   stMusic.show('מורידה וממירה ל-MP3…', 0, { indet: true });
   try {
     const downloaded = await request('/api/youtube/download/' + report.job_id,
-      JSON.stringify({ id: item.id, rights_confirmed: true }), { 'Content-Type': 'application/json' });
+      JSON.stringify({ id: item.id, title: item.title, rights_confirmed: true }), { 'Content-Type': 'application/json' });
     tracks.push({ name: item.title, duration: downloaded.duration || 0, kind: 'youtube', pending: true, previewUrl: '/api/music-preview/' + report.job_id });
     musicDuration = totalMusicDuration();
     musicReady = false;
@@ -1029,6 +1139,8 @@ $('#export').onclick = async () => {
 
 // Local debugging hook: loads a canned report without uploading a video.
 window.__rkDebugLoad = r => { report = r; show(); };
+
+resumeSession();
 </script>
 </body>
 </html>

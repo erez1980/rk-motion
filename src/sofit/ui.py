@@ -116,6 +116,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.OK, state)
         if parts == ["api", "capabilities"]:
             return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp"))})
+        if len(parts) == 3 and parts[:2] == ["api", "session"]:
+            # Lets a page that was closed mid-job rebuild its state on return.
+            job = JOBS.get(parts[2])
+            if not job:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Session not found."})
+            return self._json(HTTPStatus.OK, {
+                "music": job.get("music_meta", []),
+                "pending_music": job.get("pending_music_meta"),
+                "exporting": "export_status" in job,
+            })
         if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
             job = JOBS.get(parts[2])
             track = job.get("pending_music") if job else None
@@ -191,7 +201,11 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not tracks:
                 raise RuntimeError("MP3 conversion did not produce a file.")
             job["pending_music"] = tracks[0]
-            return self._json(HTTPStatus.OK, {"name": tracks[0].name, "duration": duration(str(tracks[0]))})
+            track_duration = duration(str(tracks[0]))
+            # Keep the display title so a reconnecting page can rebuild the list.
+            job["pending_music_meta"] = {"name": str(request.get("title") or tracks[0].name),
+                                         "duration": track_duration, "kind": "youtube"}
+            return self._json(HTTPStatus.OK, {"name": tracks[0].name, "duration": track_duration})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
             if "HTTP Error 403" in detail or "Forbidden" in detail:
@@ -207,6 +221,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if not job or not job.get("pending_music"):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "No downloaded music is waiting to be added."})
         job.setdefault("music", []).append(job.pop("pending_music"))
+        meta = job.pop("pending_music_meta", None)
+        if meta:
+            job.setdefault("music_meta", []).append(meta)
         return self._json(HTTPStatus.OK, {"ok": True})
 
     def _prepare_batch(self) -> None:
@@ -319,7 +336,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 handle.write(chunk)
                 remaining -= len(chunk)
         job.setdefault("music", []).append(target)
-        return self._json(HTTPStatus.OK, {"name": name, "duration": duration(str(target))})
+        track_duration = duration(str(target))
+        job.setdefault("music_meta", []).append({"name": name, "duration": track_duration, "kind": "file"})
+        return self._json(HTTPStatus.OK, {"name": name, "duration": track_duration})
 
     def _analyse_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))

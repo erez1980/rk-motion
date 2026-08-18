@@ -181,6 +181,7 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
 
 
 TRANSITIONS = {"cut", "fade", "wipeleft", "slideright", "dissolve"}
+MUSIC_FADE_OUT = 3.0  # seconds of fade at the end of the soundtrack
 
 
 def _has_audio(path: str) -> bool:
@@ -282,8 +283,15 @@ def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None
         for item in music:
             cmd.extend(["-i", str(item)])
         playlist = "".join(f"[{index}:a]" for index in range(1, len(music) + 1))
-        playlist += f"concat=n={len(music)}:v=0:a=1[playlist];[playlist]atrim=start={music_start}"
-    audio_filter = f"{playlist}volume=0.65[music]"
+        # asetpts rebases the trimmed playlist to t=0; without it the kept
+        # timestamps would delay the music by music_start seconds.
+        playlist += (f"concat=n={len(music)}:v=0:a=1[playlist];"
+                     f"[playlist]atrim=start={music_start},asetpts=PTS-STARTPTS,")
+    # The soundtrack is cut at the movie's end, so always fade it out instead
+    # of stopping mid-note.
+    fade = min(MUSIC_FADE_OUT, movie_duration / 2)
+    audio_filter = (f"{playlist}volume=0.65,"
+                    f"afade=t=out:st={max(0, movie_duration - fade):.3f}:d={fade:.3f}[music]")
     if _has_audio(str(target)):
         audio_filter += ";[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]"
         maps = ["-map", "0:v:0", "-map", "[mixed]"]
