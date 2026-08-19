@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>RK Motion — היילייטים של אקשן</title>
 <style>
 /* Rubik ships with the app (variable weight, Hebrew + Latin) so the UI needs no network. */
@@ -278,6 +278,13 @@ body.day .eyebrow{color:#4c7c12}
 .volume-pick{display:flex;align-items:center;gap:6px}
 .score.manual{background:var(--card-2);color:var(--soft);border:1px dashed var(--line)}
 
+/* Mobile-only shells: on desktop these wrappers are invisible pass-throughs. */
+.studio-body{display:contents}
+.music-toggle{display:none}
+.opts{display:contents}
+.opts-toggle{display:none}
+.action-bar{display:none}
+
 /* ---- YouTube preview modal ---- */
 .yt-modal{position:fixed;z-index:20;inset:0;background:rgba(2,8,4,.85);display:grid;place-items:center;padding:18px}
 .yt-modal[hidden]{display:none}
@@ -292,14 +299,60 @@ body.day .eyebrow{color:#4c7c12}
   .workspace.show{display:flex;flex-direction:column}
   .clip-list{max-height:none}
   .upload h2{letter-spacing:-1px}
-  .export{position:sticky;bottom:10px;z-index:6}
   .export-options{width:100%}
   .export-options .primary,.export-options .download{flex:1 1 100%;text-align:center}
   .track .name{max-width:100%}
   .clip{grid-template-columns:auto auto 1fr}
   .controls{grid-column:1/-1;flex-direction:row;justify-content:flex-end}
-  .thumb{width:92px;height:52px}
-  .timing input{width:64px}
+  .thumb{width:96px;height:54px}
+  .timing input{width:80px}
+
+  /* iOS zooms the whole page when a focused field's font is under 16px.
+     !important so component-level font rules cannot reintroduce the zoom. */
+  input,select{font-size:16px!important}
+
+  /* Finger-sized targets (44px-ish minimums). */
+  input[type=checkbox]{width:26px;height:26px}
+  .controls .ghost{min-width:44px;min-height:40px;font-size:15px}
+  .timing input{min-height:38px}
+  .timeline{height:44px}
+  .clip-tools input[type=range]{height:30px;width:130px}
+  .clip-tools select,.clip-tools .secondary{min-height:38px}
+  .preview-tools .primary,.preview-tools .secondary{min-height:44px}
+
+  /* One-row step rail. */
+  .steps{flex-wrap:nowrap;gap:6px}
+  .steps li{padding:6px 9px;font-size:11.5px;gap:5px;white-space:nowrap}
+  .steps b{width:18px;height:18px;font-size:10.5px;flex:none}
+
+  /* After a video is loaded the landing hero collapses to a thin strip. */
+  body.editing .upload{padding:14px!important;min-height:0;text-align:center}
+  body.editing .upload .kicker,body.editing .upload h2,body.editing .upload>p,
+  body.editing .upload .settings,body.editing .upload .drag-hint{display:none}
+
+  /* Music studio folds behind one button until it is wanted. */
+  .music-toggle{display:block;width:100%;min-height:46px}
+  .studio-body{display:none}
+  .music-studio.open .studio-body{display:contents}
+  .music-studio.open .music-toggle{display:none}
+  .music-studio>header{display:none}
+  .music-studio.open>header{display:block}
+
+  /* Export card: defaults up front, everything else behind one toggle. */
+  .opts{display:none;width:100%}
+  .opts.open{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .opts-toggle{display:block;width:100%;min-height:42px}
+
+  /* App-style fixed action bar while editing. */
+  body.editing .app{padding-bottom:96px}
+  .action-bar.show{
+    display:flex;position:fixed;inset-inline:0;bottom:0;z-index:9;gap:10px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  }
+  .action-bar .primary{flex:1;min-height:48px}
+  .action-bar .secondary{min-height:48px;padding:0 18px;flex:none}
 }
 @media(prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}
@@ -398,6 +451,8 @@ body.day .eyebrow{color:#4c7c12}
       <h2>המוזיקה של הסרט</h2>
       <p>מוסיפים קבצים מהמחשב או מחפשים ב־YouTube. הרצועות יתנגנו לפי סדר ההוספה.</p>
     </header>
+    <button id="musicToggle" class="button secondary music-toggle">🎵 הוספת מוזיקה לסרט ▾</button>
+    <div class="studio-body">
     <div class="music-sources">
       <label class="button secondary" for="musicFile">הוספת קובצי מוזיקה</label>
       <input id="musicFile" type="file" multiple accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg">
@@ -426,6 +481,7 @@ body.day .eyebrow{color:#4c7c12}
       </span>
       <small>לדוגמה 00:10 — הסרט מתחיל מהמוזיקה בשנייה 10</small>
     </label>
+    </div>
   </section>
 
   <section id="exportBox" class="export card">
@@ -434,28 +490,31 @@ body.day .eyebrow{color:#4c7c12}
       <p id="exportHint">בחרו קטעים ומעבר, ואז ייצאו לסרט אחד.</p>
     </div>
     <div class="export-options">
-      <label><input id="muteOriginal" type="checkbox"> השתק קול מקורי</label>
-      <label for="speed">מהירות</label>
-      <select id="speed">
-        <option value="1">רגילה</option><option value="1.25">1.25×</option>
-        <option value="1.5">1.5×</option><option value="2">2×</option>
-      </select>
-      <label for="transition">מעבר</label>
-      <select id="transition">
-        <option value="cut">חיתוך חד</option><option value="fade">Fade</option>
-        <option value="dissolve">Dissolve</option><option value="wipeleft">Wipe</option>
-        <option value="slideright">Slide</option>
-      </select>
-      <select id="transitionDuration" aria-label="אורך מעבר">
-        <option value=".3">0.3 שנ׳</option><option value=".5" selected>0.5 שנ׳</option><option value="1">1 שנ׳</option>
-      </select>
-      <label for="quality">איכות</label>
-      <select id="quality">
-        <option value="1080" selected>1080p</option>
-        <option value="720">720p</option>
-        <option value="original">איכות מקור</option>
-        <option value="whatsapp">WhatsApp (קטן)</option>
-      </select>
+      <button id="optsToggle" class="secondary opts-toggle">אפשרויות מתקדמות ▾</button>
+      <div class="opts">
+        <label><input id="muteOriginal" type="checkbox"> השתק קול מקורי</label>
+        <label for="speed">מהירות</label>
+        <select id="speed">
+          <option value="1">רגילה</option><option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option><option value="2">2×</option>
+        </select>
+        <label for="transition">מעבר</label>
+        <select id="transition">
+          <option value="cut">חיתוך חד</option><option value="fade">Fade</option>
+          <option value="dissolve">Dissolve</option><option value="wipeleft">Wipe</option>
+          <option value="slideright">Slide</option>
+        </select>
+        <select id="transitionDuration" aria-label="אורך מעבר">
+          <option value=".3">0.3 שנ׳</option><option value=".5" selected>0.5 שנ׳</option><option value="1">1 שנ׳</option>
+        </select>
+        <label for="quality">איכות</label>
+        <select id="quality">
+          <option value="1080" selected>1080p</option>
+          <option value="720">720p</option>
+          <option value="original">איכות מקור</option>
+          <option value="whatsapp">WhatsApp (קטן)</option>
+        </select>
+      </div>
       <button id="export" class="button primary">ייצוא הסרט</button>
       <a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a>
     </div>
@@ -475,6 +534,11 @@ body.day .eyebrow{color:#4c7c12}
 
 </section>
 </main>
+
+<div id="actionBar" class="action-bar">
+  <button id="barPlay" class="secondary">▶ נגן</button>
+  <button id="barExport" class="primary">ייצוא הסרט</button>
+</div>
 
 <div id="ytModal" class="yt-modal" hidden>
   <div class="yt-dialog">
@@ -734,6 +798,8 @@ async function resumeSession() {
 function show() {
   workspace.classList.add('show');
   $('#exportBox').classList.add('show');
+  document.body.classList.add('editing');
+  $('#actionBar').classList.add('show');
   video.src = '/api/video/' + report.job_id;
   $('#totalTime').textContent = fmt(report.duration || 0);
   report.clips.forEach((c, i) => c.uid = i + '-' + c.start);
@@ -811,6 +877,7 @@ function stopSequence(finished = false) {
   if (!playQueue) return;
   playQueue = null;
   $('#playMovie').textContent = '▶ נגן את הסרט';
+  $('#barPlay').textContent = '▶ נגן';
   $('#playState').textContent = finished ? 'זהו הסרט (בלי מעברים ומוזיקה) — מוכן לייצוא.' : '';
   if (finished) video.pause();
 }
@@ -823,11 +890,21 @@ $('#playMovie').onclick = () => {
   playIndex = 0;
   activeIndex = report.clips.indexOf(chosen[0]);
   $('#playMovie').textContent = '⏹ עצירה';
+  $('#barPlay').textContent = '⏹ עצירה';
   $('#playState').textContent = `מנגן קטע 1/${chosen.length}`;
   video.currentTime = chosen[0].start;
   video.play().catch(() => {});
   render();
 };
+
+/* ---- Mobile action bar + collapsible sections ---- */
+$('#barPlay').onclick = () => { go($('#video')); $('#playMovie').click(); };
+$('#barExport').onclick = () => $('#export').click();
+$('#optsToggle').onclick = () => {
+  const open = $('.opts').classList.toggle('open');
+  $('#optsToggle').textContent = open ? 'אפשרויות מתקדמות ▴' : 'אפשרויות מתקדמות ▾';
+};
+$('#musicToggle').onclick = () => $('.music-studio').classList.add('open');
 
 /* ---- Manual clip around the current player position ---- */
 $('#addClip').onclick = () => {
@@ -930,6 +1007,8 @@ function updateSummary() {
     : 'בחרו לפחות קטע אחד כדי לייצא.';
   $('#export').textContent = n ? `ייצוא ובחירת מיקום · ${n} קטעים` : 'ייצוא הסרט';
   $('#export').disabled = !n;
+  $('#barExport').textContent = n ? `ייצוא · ${n} קטעים · ${fmt(finalLength)}` : 'בחרו קטעים';
+  $('#barExport').disabled = !n;
 }
 
 function render() {
@@ -1041,6 +1120,7 @@ function renderTracks() {
   list.innerHTML = '';
   list.hidden = !tracks.length;
   $('#musicStartWrap').hidden = !tracks.length;
+  if (tracks.length) $('.music-studio').classList.add('open');
   tracks.forEach((t, i) => {
     const row = document.createElement('div');
     row.className = 'track' + (t.pending ? ' pending' : '');
