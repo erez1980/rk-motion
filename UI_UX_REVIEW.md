@@ -3,6 +3,37 @@
 Scope: first-time local user selecting a long ride video, reviewing detected
 action suggestions, and exporting a short edit.
 
+## Round 4 — native quality and a faster path to a finished movie (2026-08)
+
+- **No more forced 720p.** The pipeline used to downscale everything to
+  1280×720@30 before analysis — irreversible quality loss for 4K drone
+  footage. A single H.264 file is now used as-is (zero re-encode); other
+  codecs are converted once at native resolution; multiple files are
+  normalised to the first file's size. Analysis already samples at 160×90, so
+  it stays fast regardless of source size.
+- **Export quality profiles.** 1080p (default), 720p, source quality, and a
+  WhatsApp profile (720p + capped bitrate, ~6× smaller) applied at the
+  cut/transition stage. Small sources are never upscaled.
+- **Play the edit before exporting.** "נגן את הסרט" plays the selected clips
+  in sequence inside the player, skipping between them, with a clip i/n
+  indicator — no export needed to judge the edit.
+- **Auto-select to a target length.** Pick 30s/60s/2m and one click selects
+  the highest-scoring clips that fit, still editable by hand.
+- **Sensitivity slider without re-analysis.** The report now carries
+  per-second scores; the client rebuilds the clip list at any threshold
+  instantly, preserving edits/selection/thumbnails of unchanged clips and
+  never dropping manual clips.
+- **Manual clip at the playhead** ("קטע מנקודה זו", t−3..t+4) for quiet
+  moments the detector deliberately skips, marked ידני.
+- **Music volume** (רקע/מאוזן/חזק) replacing the hardcoded 65%.
+- **Export history.** Each export gets a versioned file; earlier versions
+  stay downloadable in the session, survive page reloads, and are listed
+  under the result player.
+- Verified: quality caps/no-upscale and the untouched fast path have
+  regression tests; sequence playback, slider, manual clips, auto-pick and
+  history verified in a browser run (test Chromium lacks H.264 decode, so
+  sequence advancing was driven via simulated timeupdate events).
+
 ## Round 3 — progress feedback anchored to the flow (2026-08)
 
 - **Status next to the action.** The single global status bar became three

@@ -93,6 +93,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._file(LOGO, "image/png")
         if parts == ["assets", "rubik.ttf"]:
             return self._file(FONT, "font/ttf")
+        if len(parts) == 4 and parts[:2] == ["api", "export"]:
+            job = JOBS.get(parts[2])
+            try:
+                entry = job["exports"][int(parts[3]) - 1] if job else None
+            except (KeyError, IndexError, ValueError):
+                entry = None
+            if not entry:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            return self._file(Path(entry["file"]), "video/mp4", attachment=True)
         if len(parts) == 3 and parts[0] == "api" and parts[1] in {"video", "export"}:
             job = JOBS.get(parts[2])
             if not job:
@@ -125,6 +135,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 "music": job.get("music_meta", []),
                 "pending_music": job.get("pending_music_meta"),
                 "exporting": "export_status" in job,
+                "exports": [{k: item[k] for k in ("version", "download", "clips", "duration", "quality")}
+                            for item in job.get("exports", [])],
             })
         if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
             job = JOBS.get(parts[2])
@@ -259,9 +271,18 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
         raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
         max_duration = float(raw_max) if raw_max else None
-        # A conservative size-based estimate, presented to the user as one.
+        # A conservative size-based estimate, presented to the user as one. A
+        # single H.264 file skips re-encoding entirely, so only analysis time
+        # counts for it.
         total_mb = sum(item.stat().st_size for item in job["inputs"]) / 1e6
-        estimate = max(15, round(total_mb * 0.5 + len(job["inputs"]) * 6))
+        try:
+            codec = self._video_meta(job["inputs"][0])[0]
+        except Exception:
+            codec = ""
+        if len(job["inputs"]) == 1 and codec == "h264":
+            estimate = max(10, round(total_mb * 0.06 + 8))
+        else:
+            estimate = max(15, round(total_mb * 0.5 + len(job["inputs"]) * 6))
         job["analyse_status"] = {"state": "running", "started": time.monotonic(),
                                  "estimated_seconds": estimate,
                                  "message": "מכינה את הסרטונים…"}
@@ -272,11 +293,10 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _run_analyse(cls, job: dict, job_id: str, max_duration: float | None) -> None:
         status = job["analyse_status"]
         try:
-            def progress(index: int, count: int) -> None:
-                status["message"] = (f"מנרמלת סרטון {index + 1}/{count}…" if count > 1
-                                     else "מכינה את הסרטון…")
+            def progress(message: str) -> None:
+                status["message"] = message
 
-            source = cls._combine_videos(job["inputs"], Path(job["folder"]), progress)
+            source = cls._prepare_source(job["inputs"], Path(job["folder"]), progress)
             job["source"] = source
             status["message"] = "מנתחת תנועה וסאונד…"
             report = analyse_action(str(source), max_duration=max_duration)
@@ -293,19 +313,49 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             status.update({"state": "error", "message": detail or "הניתוח נכשל."})
 
     @staticmethod
-    def _combine_videos(inputs: list[Path], folder: Path, progress=None) -> Path:
-        """Normalise clips then concatenate, preserving their drag/drop order."""
+    def _video_meta(path: Path) -> tuple[str, int, int]:
+        """(codec, width, height) of the first video stream."""
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_name,width,height", "-of", "json", str(path)],
+            capture_output=True, text=True, check=True)
+        stream = json.loads(result.stdout)["streams"][0]
+        return stream.get("codec_name", ""), int(stream.get("width", 0)), int(stream.get("height", 0))
+
+    @classmethod
+    def _prepare_source(cls, inputs: list[Path], folder: Path, progress=None) -> Path:
+        """Build the editing source at the footage's native resolution.
+
+        A single H.264 file is used as-is (no re-encode, no quality loss);
+        other codecs are converted once at source resolution for browser
+        preview; several files are normalised to the first file's size so they
+        can be concatenated in drop order.
+        """
         from .action import _has_audio
+        codec, width, height = cls._video_meta(inputs[0])
+        if len(inputs) == 1:
+            if codec == "h264":
+                return inputs[0]
+            if progress:
+                progress("ממירה את הסרטון לפורמט תואם, באיכות מלאה…")
+            target = folder / "source.mp4"
+            subprocess.run(
+                ["ffmpeg", "-y", "-v", "error", "-i", str(inputs[0]), "-map", "0:v:0", "-map", "0:a?",
+                 "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-c:a", "aac",
+                 "-movflags", "+faststart", str(target)], check=True, capture_output=True)
+            return target
+        width, height = max(2, width - width % 2), max(2, height - height % 2)
         normalised = []
         for index, source in enumerate(inputs):
             if progress:
-                progress(index, len(inputs))
+                progress(f"מנרמלת סרטון {index + 1}/{len(inputs)}…")
             target = folder / f"normalised-{index:03d}.mp4"
             cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(source), "-f", "lavfi", "-i",
                    "anullsrc=r=48000:cl=stereo", "-vf",
-                   "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih),setsar=1,fps=30",
+                   f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                   f"pad={width}:{height}:(ow-iw)/2:(oh-ih),setsar=1,fps=30",
                    "-map", "0:v:0", "-map", "0:a:0" if _has_audio(str(source)) else "1:a:0",
-                   "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac", "-shortest", str(target)]
+                   "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-c:a", "aac", "-shortest", str(target)]
             subprocess.run(cmd, check=True, capture_output=True)
             normalised.append(target)
         listing = folder / "videos.txt"
@@ -386,7 +436,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                              args=(job, clips, request.get("transition", "cut"),
                                    float(request.get("transition_duration", .5)),
                                    bool(request.get("use_music")), float(request.get("music_start", 0)),
-                                   float(request.get("speed", 1)), bool(request.get("remove_original_audio"))), daemon=True).start()
+                                   float(request.get("speed", 1)), bool(request.get("remove_original_audio")),
+                                   str(request.get("quality", "1080")),
+                                   float(request.get("music_volume", .65))), daemon=True).start()
             return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -403,18 +455,30 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float,
                     use_music: bool, music_start: float, speed: float,
-                    remove_original_audio: bool) -> None:
+                    remove_original_audio: bool, quality: str = "1080",
+                    music_volume: float = .65) -> None:
         try:
             job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
-            output = Path(job["folder"]) / "RK-Motion-edit.mp4"
+            version = len(job.get("exports", [])) + 1
+            output = Path(job["folder"]) / f"RK-Motion-edit-{version:02d}.mp4"
             export_edited_movie(str(job["source"]), clips, str(output),
                                 transition=transition, transition_duration=transition_duration,
                                 music_paths=[str(item) for item in job["music"]] if use_music and job.get("music") else None,
                                 music_start=music_start, speed=speed,
-                                remove_original_audio=remove_original_audio)
+                                remove_original_audio=remove_original_audio,
+                                quality=quality, music_volume=music_volume)
             job["export"] = output
+            job_id = job["report"]["job_id"]
+            entry = {"file": str(output), "version": version,
+                     "download": f"/api/export/{job_id}/{version}",
+                     "clips": len(clips), "duration": round(duration(str(output)), 1),
+                     "quality": quality}
+            job.setdefault("exports", []).append(entry)
+            history = [{k: item[k] for k in ("version", "download", "clips", "duration", "quality")}
+                       for item in job["exports"]]
             job["export_status"].update({"state": "done", "progress": 100,
-                                         "message": "הסרט מוכן.", "download": f"/api/export/{job['report']['job_id']}"})
+                                         "message": "הסרט מוכן.", "history": history,
+                                         "download": f"/api/export/{job_id}"})
         except Exception as exc:
             detail = str(exc)
             stderr = getattr(exc, "stderr", None)

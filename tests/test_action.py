@@ -56,3 +56,51 @@ def test_music_fades_out_at_the_end_without_touching_the_ride_audio(tmp_path):
     assert _mean_volume(output, 880, 0) - _mean_volume(output, 880, 9) > 8
     # ...while the 200Hz ride audio keeps playing at the same level throughout.
     assert abs(_mean_volume(output, 200, 0) - _mean_volume(output, 200, 9)) < 2
+
+
+def _frame_size(path: str) -> tuple[int, int]:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height", "-of", "csv=p=0", path],
+        capture_output=True, text=True, check=True)
+    width, height = result.stdout.strip().split(",")
+    return int(width), int(height)
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_export_quality_caps_tall_sources_and_never_upscales(tmp_path):
+    tall = tmp_path / "tall.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "testsrc2=size=320x1440:rate=30:duration=4",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(tall)], check=True)
+    clips = [{"start": 0, "end": 3, "duration": 3}]
+
+    capped = str(tmp_path / "capped.mp4")
+    export_edited_movie(str(tall), clips, capped, quality="1080")
+    assert _frame_size(capped)[1] == 1080
+
+    original = str(tmp_path / "original.mp4")
+    export_edited_movie(str(tall), clips, original, quality="original")
+    assert _frame_size(original)[1] == 1440
+
+    small = tmp_path / "small.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "testsrc2=size=320x180:rate=30:duration=4",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(small)], check=True)
+    kept = str(tmp_path / "kept.mp4")
+    export_edited_movie(str(small), clips, kept, quality="1080")
+    assert _frame_size(kept) == (320, 180)  # never upscale a small source
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_prepare_source_uses_a_single_h264_file_without_reencoding(tmp_path):
+    from sofit.ui import RKMotionHandler
+
+    ride = tmp_path / "ride.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "testsrc2=size=320x180:rate=30:duration=3",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(ride)], check=True)
+    before = ride.stat().st_mtime_ns
+    source = RKMotionHandler._prepare_source([ride], tmp_path)
+    assert source == ride
+    assert ride.stat().st_mtime_ns == before  # untouched, zero quality loss

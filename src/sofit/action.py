@@ -147,8 +147,11 @@ def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
         "source": str(Path(path).resolve()),
         "duration": round(total, 2),
         "detector": {"video_fps": 2, "score": "65% motion + 35% loudness",
-                     "threshold": threshold, "padding": padding,
-                     "max_duration": max_duration},
+                     "threshold": threshold, "min_duration": min_duration,
+                     "padding": padding, "max_duration": max_duration},
+        # Per-second combined scores let a client rebuild the clip list at any
+        # threshold instantly, without re-analysing the video.
+        "scores": [round(scores[sec], 3) for sec in all_seconds],
         "clips": _ranges(scores, threshold, min_duration, padding, total, max_duration),
     }
 
@@ -183,6 +186,25 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
 TRANSITIONS = {"cut", "fade", "wipeleft", "slideright", "dissolve"}
 MUSIC_FADE_OUT = 3.0  # seconds of fade at the end of the soundtrack
 
+# Export quality profiles: max output height (None keeps the source size) and
+# encoder settings. "whatsapp" trades quality for a small file that survives
+# WhatsApp's own re-compression better than a huge one.
+QUALITY_PROFILES = {
+    "720": {"max_height": 720, "encode": ["-crf", "18", "-preset", "medium"]},
+    "1080": {"max_height": 1080, "encode": ["-crf", "18", "-preset", "medium"]},
+    "original": {"max_height": None, "encode": ["-crf", "18", "-preset", "medium"]},
+    "whatsapp": {"max_height": 720,
+                 "encode": ["-crf", "26", "-preset", "medium",
+                            "-maxrate", "2500k", "-bufsize", "5000k"]},
+}
+
+
+def _scale_filter(max_height: int | None) -> str | None:
+    """Downscale-only filter: small sources are never blown up."""
+    if max_height is None:
+        return None
+    return f"scale=-2:'min({max_height},ih)'"
+
 
 def _has_audio(path: str) -> bool:
     result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
@@ -194,7 +216,8 @@ def _has_audio(path: str) -> bool:
 def export_edited_movie(path: str, clips: list[dict], output: str,
                         transition: str = "cut", transition_duration: float = .5,
                         music_paths: list[str] | None = None, music_start: float = 0,
-                        speed: float = 1.0, remove_original_audio: bool = False) -> str:
+                        speed: float = 1.0, remove_original_audio: bool = False,
+                        quality: str = "1080", music_volume: float = .65) -> str:
     """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
@@ -203,12 +226,17 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         raise ValueError(f"unsupported transition: {transition}")
     if not .1 <= transition_duration <= 3:
         raise ValueError("transition duration must be between 0.1 and 3 seconds")
+    profile = QUALITY_PROFILES.get(str(quality))
+    if not profile:
+        raise ValueError(f"unsupported quality: {quality}")
+    if not 0 < music_volume <= 2:
+        raise ValueError("music volume must be between 0 and 2")
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
     if transition != "cut" and len(clips) > 1:
-        _export_with_transitions(path, clips, target, transition, transition_duration)
+        _export_with_transitions(path, clips, target, transition, transition_duration, profile)
     else:
-        _export_hard_cuts(path, clips, target)
+        _export_hard_cuts(path, clips, target, profile)
     if speed not in {1.0, 1.25, 1.5, 2.0}:
         raise ValueError("speed must be 1, 1.25, 1.5 or 2")
     if speed != 1:
@@ -216,11 +244,12 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
     if remove_original_audio:
         _strip_audio(target)
     if music_paths:
-        _mix_music(target, music_paths, music_start)
+        _mix_music(target, music_paths, music_start, music_volume)
     return str(target)
 
 
-def _export_hard_cuts(path: str, clips: list[dict], target: Path) -> None:
+def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict) -> None:
+    scale = _scale_filter(profile["max_height"])
     with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
         parts = []
         for index, clip in enumerate(clips, 1):
@@ -228,12 +257,13 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path) -> None:
             if end <= start or start < 0:
                 raise ValueError("every clip needs a valid start and end time")
             part = Path(tmp) / f"part-{index:03d}.mp4"
-            subprocess.run(
-                ["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", path,
-                 "-t", str(end - start), "-map", "0:v:0", "-map", "0:a?",
-                 "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac",
-                 "-movflags", "+faststart", str(part)], check=True, capture_output=True,
-            )
+            cmd = ["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", path,
+                   "-t", str(end - start), "-map", "0:v:0", "-map", "0:a?"]
+            if scale:
+                cmd.extend(["-vf", scale])
+            cmd.extend(["-c:v", "libx264", *profile["encode"], "-c:a", "aac",
+                        "-movflags", "+faststart", str(part)])
+            subprocess.run(cmd, check=True, capture_output=True)
             parts.append(part)
         listing = Path(tmp) / "concat.txt"
         # Paths generated above are trusted local temp files. ffconcat quotes apostrophes.
@@ -264,7 +294,8 @@ def _strip_audio(target: Path) -> None:
     silent.replace(target)
 
 
-def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None:
+def _mix_music(target: Path, music_paths: list[str], music_start: float,
+               music_volume: float = .65) -> None:
     """Mix music starting at ``music_start`` within the source track(s)."""
     music = [Path(item) for item in music_paths]
     if not music or any(not item.is_file() for item in music):
@@ -290,7 +321,7 @@ def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None
     # The soundtrack is cut at the movie's end, so always fade it out instead
     # of stopping mid-note.
     fade = min(MUSIC_FADE_OUT, movie_duration / 2)
-    audio_filter = (f"{playlist}volume=0.65,"
+    audio_filter = (f"{playlist}volume={music_volume},"
                     f"afade=t=out:st={max(0, movie_duration - fade):.3f}:d={fade:.3f}[music]")
     if _has_audio(str(target)):
         audio_filter += ";[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[mixed]"
@@ -304,7 +335,8 @@ def _mix_music(target: Path, music_paths: list[str], music_start: float) -> None
 
 
 def _export_with_transitions(path: str, clips: list[dict], target: Path,
-                             transition: str, transition_duration: float) -> str:
+                             transition: str, transition_duration: float,
+                             profile: dict) -> str:
     """Use xfade/acrossfade directly from the source for smooth joined clips."""
     audio = _has_audio(path)
     durations: list[float] = []
@@ -333,10 +365,16 @@ def _export_with_transitions(path: str, clips: list[dict], target: Path,
             filters.append(f"[{current_audio}][a{index}]acrossfade=d={fade:.3f}[{next_audio}]")
             current_audio = next_audio
         timeline += durations[index] - fade
+    scale = _scale_filter(profile["max_height"])
+    if scale:
+        # Every input is a cut of the same source, so one scale on the joined
+        # stream is enough.
+        filters.append(f"[{current_video}]{scale}[vscaled]")
+        current_video = "vscaled"
     cmd.extend(["-filter_complex", ";".join(filters), "-map", f"[{current_video}]"])
     if audio:
         cmd.extend(["-map", f"[{current_audio}]"])
-    cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium"])
+    cmd.extend(["-c:v", "libx264", *profile["encode"]])
     if audio:
         cmd.extend(["-c:a", "aac"])
     cmd.extend(["-movflags", "+faststart", str(target)])

@@ -168,8 +168,18 @@ select{
 .timeline i:hover,.timeline i.active{opacity:1;box-shadow:0 0 0 2px var(--accent-soft)}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);pointer-events:none}
 
+.preview-tools{display:flex;align-items:center;gap:10px;margin:10px 2px 0;flex-wrap:wrap}
+.preview-tools .primary{padding:9px 16px}
+.preview-tools .secondary{padding:8px 12px;font-size:13px}
+#playState{margin-inline-start:auto;font-variant-numeric:tabular-nums}
+
 /* ---- Clips panel ---- */
 .panel{padding:16px 16px 8px;display:flex;flex-direction:column;min-height:0}
+.clip-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:10px;padding:9px 10px;background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);font-size:12.5px}
+.clip-tools .tool{display:flex;align-items:center;gap:7px;color:var(--soft)}
+.clip-tools input[type=range]{width:110px}
+.clip-tools select{padding:5px 8px;font-size:12.5px}
+.clip-tools .secondary{padding:6px 10px;font-size:12.5px}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
 .panel h2{font-size:16px;margin:0}
 .count{color:var(--soft);font-weight:400;font-size:12.5px}
@@ -260,6 +270,13 @@ body.day .eyebrow{color:#4c7c12}
 .result h2{margin:0 0 4px;font-size:17px}
 .result p{margin:0 0 12px;color:var(--soft);font-size:13px}
 .result video{display:block;width:100%;max-height:52vh;background:#000;border-radius:12px;margin-bottom:12px}
+.export-history h3{margin:12px 0 6px;font-size:13.5px;color:var(--soft)}
+.history-list{display:flex;flex-direction:column;gap:5px}
+.history-row{display:flex;align-items:center;gap:10px;padding:7px 11px;background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-s);font-size:13px}
+.history-row .meta{color:var(--soft);flex:1}
+.history-row a{color:var(--accent-soft-ink);font-weight:700;text-decoration:none}
+.volume-pick{display:flex;align-items:center;gap:6px}
+.score.manual{background:var(--card-2);color:var(--soft);border:1px dashed var(--line)}
 
 /* ---- YouTube preview modal ---- */
 .yt-modal{position:fixed;z-index:20;inset:0;background:rgba(2,8,4,.85);display:grid;place-items:center;padding:18px}
@@ -339,6 +356,11 @@ body.day .eyebrow{color:#4c7c12}
 
   <div class="preview card">
     <video id="video" controls playsinline></video>
+    <div class="preview-tools">
+      <button id="playMovie" class="button primary">▶ נגן את הסרט</button>
+      <span id="playState" class="hint"></span>
+      <button id="addClip" class="button secondary">➕ קטע מנקודה זו</button>
+    </div>
     <div class="time-readout"><span id="curTime">00:00</span><span id="totalTime">00:00</span></div>
     <div id="timeline" class="timeline" aria-label="ציר זמן של קטעי אקשן"><span id="playhead" class="playhead"></span></div>
   </div>
@@ -349,6 +371,22 @@ body.day .eyebrow{color:#4c7c12}
       <span>
         <button id="undoRandom" class="secondary" hidden>ביטול ערבוב</button>
         <button id="random" class="secondary">ערבוב סדר</button>
+      </span>
+    </div>
+    <div class="clip-tools">
+      <label id="sensitivityWrap" class="tool" hidden>
+        <span>רק שיאים</span>
+        <input id="sensitivity" type="range" min="35" max="75" step="5" value="55" dir="ltr">
+        <span>יותר רגעים</span>
+      </label>
+      <span class="tool">
+        <label for="targetLen">סרט של</label>
+        <select id="targetLen">
+          <option value="30">30 שניות</option>
+          <option value="60" selected>דקה</option>
+          <option value="120">2 דקות</option>
+        </select>
+        <button id="autoPick" class="secondary">בחירה אוטומטית</button>
       </span>
     </div>
     <div id="clips" class="clip-list"></div>
@@ -378,6 +416,14 @@ body.day .eyebrow{color:#4c7c12}
       <strong>התחלת הפסקול בשנייה:</strong>
       <input id="musicStart" type="range" min="0" value="0" step=".1">
       <b id="musicStartLabel">00:00</b>
+      <span class="volume-pick">
+        <label for="musicVolume">עוצמה</label>
+        <select id="musicVolume">
+          <option value=".35">רקע</option>
+          <option value=".65" selected>מאוזן</option>
+          <option value="1">חזק</option>
+        </select>
+      </span>
       <small>לדוגמה 00:10 — הסרט מתחיל מהמוזיקה בשנייה 10</small>
     </label>
   </section>
@@ -403,6 +449,13 @@ body.day .eyebrow{color:#4c7c12}
       <select id="transitionDuration" aria-label="אורך מעבר">
         <option value=".3">0.3 שנ׳</option><option value=".5" selected>0.5 שנ׳</option><option value="1">1 שנ׳</option>
       </select>
+      <label for="quality">איכות</label>
+      <select id="quality">
+        <option value="1080" selected>1080p</option>
+        <option value="720">720p</option>
+        <option value="original">איכות מקור</option>
+        <option value="whatsapp">WhatsApp (קטן)</option>
+      </select>
       <button id="export" class="button primary">ייצוא הסרט</button>
       <a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a>
     </div>
@@ -414,6 +467,10 @@ body.day .eyebrow{color:#4c7c12}
     <h2>🎬 הסרט מוכן!</h2>
     <p id="resultHint">אפשר לצפות בו כאן, להוריד אותו, או לחזור ולשנות קטעים ולייצא שוב.</p>
     <video id="resultVideo" controls playsinline></video>
+    <div id="exportHistory" class="export-history" hidden>
+      <h3>גרסאות קודמות מהסשן הזה</h3>
+      <div class="history-list"></div>
+    </div>
   </section>
 
 </section>
@@ -633,6 +690,7 @@ async function resumeExport(jobId) {
       a.href = d.download;
       a.classList.add('show');
       showResult(d.download);
+      renderHistory(d.history);
       step(3);
       stExport.show('הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
     }
@@ -679,6 +737,9 @@ function show() {
   video.src = '/api/video/' + report.job_id;
   $('#totalTime').textContent = fmt(report.duration || 0);
   report.clips.forEach((c, i) => c.uid = i + '-' + c.start);
+  const wrap = $('#sensitivityWrap');
+  wrap.hidden = !Array.isArray(report.scores) || !report.scores.length;
+  if (!wrap.hidden) $('#sensitivity').value = Math.round((report.detector?.threshold ?? .55) * 100);
   step(2);
   render();
   makeThumbs();
@@ -713,24 +774,144 @@ async function makeThumbs() {
 video.addEventListener('timeupdate', () => {
   $('#curTime').textContent = fmt(video.currentTime);
   if (report && report.duration) $('#playhead').style.right = (video.currentTime / report.duration * 100) + '%';
+  if (playQueue && video.currentTime >= playQueue[playIndex].end - .05) {
+    playIndex++;
+    if (playIndex >= playQueue.length) return stopSequence(true);
+    video.currentTime = playQueue[playIndex].start;
+    activeIndex = report.clips.indexOf(playQueue[playIndex]);
+    $('#playState').textContent = `מנגן קטע ${playIndex + 1}/${playQueue.length}`;
+    render();
+    return;
+  }
   if (previewEnd !== null && video.currentTime >= previewEnd) { video.pause(); previewEnd = null; }
 });
 video.addEventListener('seeking', () => { if (previewEnd !== null && video.currentTime < (report.clips[activeIndex]?.start ?? 0)) previewEnd = null; });
+video.addEventListener('ended', () => stopSequence(true));
 timeline.addEventListener('click', e => {
   if (!report || !report.duration) return;
   const rect = timeline.getBoundingClientRect();
   const frac = (rect.right - e.clientX) / rect.width; // RTL: time flows right-to-left
   previewEnd = null;
+  stopSequence();
   video.currentTime = Math.max(0, Math.min(report.duration, frac * report.duration));
 });
 function previewClip(i) {
   const c = report.clips[i];
+  stopSequence();
   activeIndex = i;
   previewEnd = c.end;
   video.currentTime = c.start;
-  video.play();
+  video.play().catch(() => {});
   render();
 }
+
+/* ---- Play the whole selected edit inside the player, no export needed ---- */
+let playQueue = null, playIndex = 0;
+function stopSequence(finished = false) {
+  if (!playQueue) return;
+  playQueue = null;
+  $('#playMovie').textContent = '▶ נגן את הסרט';
+  $('#playState').textContent = finished ? 'זהו הסרט (בלי מעברים ומוזיקה) — מוכן לייצוא.' : '';
+  if (finished) video.pause();
+}
+$('#playMovie').onclick = () => {
+  if (playQueue) { stopSequence(); video.pause(); return; }
+  const chosen = selected();
+  if (!chosen.length) return;
+  previewEnd = null;
+  playQueue = chosen;
+  playIndex = 0;
+  activeIndex = report.clips.indexOf(chosen[0]);
+  $('#playMovie').textContent = '⏹ עצירה';
+  $('#playState').textContent = `מנגן קטע 1/${chosen.length}`;
+  video.currentTime = chosen[0].start;
+  video.play().catch(() => {});
+  render();
+};
+
+/* ---- Manual clip around the current player position ---- */
+$('#addClip').onclick = () => {
+  if (!report) return;
+  const t = video.currentTime;
+  const start = Math.round(Math.max(0, t - 3) * 100) / 100;
+  const end = Math.round(Math.min(report.duration, t + 4) * 100) / 100;
+  if (end - start < 1) return;
+  const clip = { start, end, duration: Math.round((end - start) * 100) / 100, manual: true, selected: true, uid: 'm' + start + '-' + end };
+  const at = report.clips.findIndex(c => c.start > start);
+  if (at === -1) report.clips.push(clip); else report.clips.splice(at, 0, clip);
+  activeIndex = report.clips.indexOf(clip);
+  invalidateDownload();
+  render();
+  makeThumbs();
+};
+
+/* ---- Auto-select the strongest clips up to a target movie length ---- */
+$('#autoPick').onclick = () => {
+  if (!report) return;
+  const target = +$('#targetLen').value;
+  const byScore = [...report.clips].sort((a, b) => (b.score ?? 1) - (a.score ?? 1));
+  const chosen = new Set();
+  let total = 0;
+  for (const c of byScore) {
+    if (total >= target) break;
+    if (total + c.duration <= target * 1.2) { chosen.add(c); total += c.duration; }
+  }
+  if (!chosen.size && byScore.length) chosen.add(byScore[0]);
+  report.clips.forEach(c => { c.selected = chosen.has(c); });
+  invalidateDownload();
+  render();
+};
+
+/* ---- Rebuild the clip list at a different sensitivity, no re-analysis ---- */
+function rangesFromScores(scores, threshold, minDuration, padding, totalDuration, maxDuration) {
+  const r2 = v => Math.round(v * 100) / 100;
+  const groups = [];
+  scores.forEach((value, sec) => {
+    if (value < threshold) return;
+    const last = groups[groups.length - 1];
+    if (last && sec <= last[last.length - 1] + 2) last.push(sec);  // tolerate one quiet second
+    else groups.push([sec]);
+  });
+  const clips = [];
+  for (const group of groups) {
+    const start = Math.max(0, group[0] - padding);
+    const end = Math.min(totalDuration, group[group.length - 1] + 1 + padding);
+    if (end - start < minDuration) continue;
+    let sum = 0;
+    for (let sec = group[0]; sec <= group[group.length - 1]; sec++) sum += scores[sec] || 0;
+    const score = Math.round(sum / (group[group.length - 1] - group[0] + 1) * 1000) / 1000;
+    if (maxDuration && end - start > maxDuration) {
+      for (let cursor = start; cursor < end; cursor += maxDuration) {
+        const chunkEnd = Math.min(end, cursor + maxDuration);
+        clips.push({ start: r2(cursor), end: r2(chunkEnd), duration: r2(chunkEnd - cursor), score });
+      }
+    } else {
+      clips.push({ start: r2(start), end: r2(end), duration: r2(end - start), score });
+    }
+  }
+  return clips.sort((a, b) => b.score - a.score);
+}
+
+$('#sensitivity').oninput = () => {
+  if (!report || !Array.isArray(report.scores)) return;
+  const det = report.detector || {};
+  const fresh = rangesFromScores(report.scores, +$('#sensitivity').value / 100,
+    det.min_duration ?? 5, det.padding ?? 2, report.duration, det.max_duration ?? null);
+  // Keep edits (times, selection, thumbnail) of clips that still exist, and
+  // never drop manually added clips.
+  const clipKey = c => `${c.start}-${c.end}`;
+  const existing = new Map(report.clips.filter(c => !c.manual).map(c => [clipKey(c), c]));
+  const manual = report.clips.filter(c => c.manual);
+  report.clips = fresh.map(c => existing.get(clipKey(c)) || c).concat(manual);
+  report.clips.forEach((c, i) => { if (!c.uid) c.uid = i + '-' + c.start; });
+  activeIndex = -1;
+  orderBeforeShuffle = null;
+  $('#undoRandom').hidden = true;
+  stopSequence();
+  invalidateDownload();
+  render();
+  makeThumbs();
+};
 
 /* ---- Clip list ---- */
 function updateSummary() {
@@ -766,7 +947,7 @@ function render() {
       <input aria-label="בחירת קטע ${i + 1}" type="checkbox" ${c.selected === false ? '' : 'checked'}>
       <img class="thumb" data-uid="${c.uid}" alt="" draggable="true" title="גררו לשינוי סדר">
       <div>
-        <div class="clip-title"><strong>קטע ${i + 1}</strong><span class="score">${Math.round(c.score * 100)}% אקשן</span></div>
+        <div class="clip-title"><strong>קטע ${i + 1}</strong><span class="score${c.manual ? ' manual' : ''}">${c.manual ? 'ידני' : Math.round(c.score * 100) + '% אקשן'}</span></div>
         <div class="timing">
           <input aria-label="התחלה בשניות" type="number" min="0" step=".1" value="${c.start}">
           עד
@@ -936,6 +1117,8 @@ $('#musicStart').oninput = () => { $('#musicStartLabel').textContent = fmt($('#m
 $('#speed').onchange = updateSummary;
 $('#transition').onchange = updateSummary;
 $('#transitionDuration').onchange = updateSummary;
+$('#quality').onchange = invalidateDownload;
+$('#musicVolume').onchange = invalidateDownload;
 
 /* ---- YouTube search & download ---- */
 $('#closeYt').onclick = () => { $('#ytPreview').src = ''; $('#ytModal').hidden = true; };
@@ -1048,6 +1231,30 @@ function showResult(url) {
   box.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+const QUALITY_NAMES = { '1080': '1080p', '720': '720p', original: 'איכות מקור', whatsapp: 'WhatsApp' };
+function renderHistory(history) {
+  const box = $('#exportHistory');
+  // The newest version is the player above; list the earlier ones.
+  const previous = (history || []).slice(0, -1).reverse();
+  box.hidden = !previous.length;
+  if (!previous.length) return;
+  const rows = box.querySelector('.history-list');
+  rows.innerHTML = '';
+  previous.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'history-row';
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = `גרסה ${item.version} · ${item.clips} קטעים · ${fmt(item.duration)} · ${QUALITY_NAMES[item.quality] || item.quality}`;
+    const link = document.createElement('a');
+    link.href = item.download;
+    link.download = `RK-Motion-edit-${item.version}.mp4`;
+    link.textContent = 'הורדה';
+    row.append(meta, link);
+    rows.append(row);
+  });
+}
+
 function exportProgress(statusUrl, btn) {
   const timer = setInterval(async () => {
     try {
@@ -1070,6 +1277,7 @@ function exportProgress(statusUrl, btn) {
           stExport.show('הסרט מוכן. לחצו על הורדת MP4 כדי לשמור אותו.', 100);
         }
         showResult(d.download);
+        renderHistory(d.history);
         btn.disabled = false;
         setBusy(0);
         step(3);
@@ -1118,12 +1326,14 @@ $('#export').onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         job_id: report.job_id,
-        clips: chosen.map(({ thumb, uid, ...clip }) => clip),
+        clips: chosen.map(({ thumb, uid, manual, ...clip }) => clip),
         transition: $('#transition').value,
         transition_duration: +$('#transitionDuration').value,
         use_music: musicReady,
         music_start: +$('#musicStart').value,
+        music_volume: +$('#musicVolume').value,
         speed: +$('#speed').value,
+        quality: $('#quality').value,
         remove_original_audio: $('#muteOriginal').checked,
       }),
     });
