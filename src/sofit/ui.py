@@ -23,6 +23,7 @@ from . import __version__
 from .action import analyse_action, duration, export_edited_movie
 
 LOGO = Path(__file__).with_name("assets") / "rk-logo.png"
+APP_ICON = Path(__file__).with_name("assets") / "app-icon.png"
 INDEX = Path(__file__).with_name("assets") / "index.html"
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
@@ -120,6 +121,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._file(INDEX, "text/html; charset=utf-8")
         if parts == ["assets", "rk-logo.png"]:
             return self._file(LOGO, "image/png")
+        if parts == ["assets", "app-icon.png"]:
+            return self._file(APP_ICON, "image/png")
         if parts == ["assets", "rubik.ttf"]:
             return self._file(FONT, "font/ttf")
         if len(parts) == 4 and parts[:2] == ["api", "export"]:
@@ -165,7 +168,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 "music": job.get("music_meta", []),
                 "pending_music": job.get("pending_music_meta"),
                 "exporting": "export_status" in job,
-                "exports": [{k: item[k] for k in ("version", "download", "clips", "duration", "quality")}
+                "exports": [{k: item[k] for k in ("version", "download", "clips", "duration", "quality", "aspect")}
                             for item in job.get("exports", [])],
             })
         if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
@@ -222,6 +225,13 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
 
+    # Tried in order until one produces a file. YouTube's anti-bot rules shift
+    # often, and yt-dlp's own default client choice (no override) is kept
+    # current by its maintainers — so that goes first, not a client we pin
+    # ourselves. The rest are fallbacks other client combos that have worked
+    # historically when the default is blocked on a given network.
+    YOUTUBE_CLIENT_ATTEMPTS = [None, "tv,web_safari", "android_vr,web_safari", "web_creator,mweb"]
+
     def _youtube_download(self, job_id: str) -> None:
         try:
             job, request = JOBS.get(job_id), self._read_json()
@@ -235,10 +245,24 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not shutil.which("yt-dlp"):
                 raise RuntimeError("YouTube download needs yt-dlp installed on this computer (https://github.com/yt-dlp/yt-dlp).")
             output = str(Path(job["folder"]) / f"youtube-{video_id}.%(ext)s")
-            subprocess.run(["yt-dlp", "--no-playlist", "--extractor-args", "youtube:player_client=android_vr,web_safari",
-                            "-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "0",
-                            "-o", output, f"https://www.youtube.com/watch?v={video_id}"],
-                           capture_output=True, text=True, check=True, timeout=600)
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            last_error = None
+            for clients in self.YOUTUBE_CLIENT_ATTEMPTS:
+                cmd = ["yt-dlp", "--no-playlist", "-f", "bestaudio/best", "-x",
+                       "--audio-format", "mp3", "--audio-quality", "0", "-o", output]
+                if clients:
+                    cmd.extend(["--extractor-args", f"youtube:player_client={clients}"])
+                cmd.append(url)
+                try:
+                    subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=180)
+                    last_error = None
+                    break
+                except subprocess.CalledProcessError as exc:
+                    last_error = exc
+                except subprocess.TimeoutExpired as exc:
+                    last_error = exc
+            if last_error is not None:
+                raise last_error
             tracks = list(Path(job["folder"]).glob(f"youtube-{video_id}.mp3"))
             if not tracks:
                 raise RuntimeError("MP3 conversion did not produce a file.")
@@ -250,11 +274,14 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.OK, {"name": tracks[0].name, "duration": track_duration})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
-            if "HTTP Error 403" in detail or "Forbidden" in detail:
-                detail = "YouTube blocked this download. Update yt-dlp to its latest version, then restart RK Motion."
+            if "HTTP Error 403" in detail or "Forbidden" in detail or "Sign in to confirm" in detail:
+                detail = "YouTube חסמה כרגע את ההורדה מהשיר הזה. נסו שוב בעוד כמה דקות, או בחרו תוצאה אחרת."
             elif "Requested format is not available" in detail:
-                detail = "No downloadable audio format was exposed by YouTube for this result. Try another result or update yt-dlp."
+                detail = "לא נמצא פורמט אודיו להורדה מהתוצאה הזו. נסו תוצאה אחרת."
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": detail})
+        except subprocess.TimeoutExpired:
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY,
+                              {"error": "ההורדה ארכה יותר מדי זמן. נסו שוב או בחרו תוצאה אחרת."})
         except Exception as exc:
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
 
@@ -466,11 +493,14 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             # the output resolution cap bounds the real work.
             edit_seconds = sum(float(clip["end"]) - float(clip["start"]) for clip in clips)
             quality = str(request.get("quality", "1080"))
+            aspect = str(request.get("aspect", "16:9"))
             try:
                 _, width, height = self._video_meta(Path(job["source"]))
                 cap = {"720": 720, "1080": 1080, "whatsapp": 720}.get(quality)
                 if cap and height > cap:
                     width, height = round(width * cap / height), cap
+                if aspect == "9:16":
+                    width = (height * 9 // 16) // 2 * 2
                 work = edit_seconds * (width * height / 1e6)
             except Exception:
                 work = edit_seconds * 2
@@ -484,8 +514,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                                    float(request.get("transition_duration", .5)),
                                    bool(request.get("use_music")), float(request.get("music_start", 0)),
                                    float(request.get("speed", 1)), bool(request.get("remove_original_audio")),
-                                   str(request.get("quality", "1080")),
-                                   float(request.get("music_volume", .65))), daemon=True).start()
+                                   quality, float(request.get("music_volume", .65)), aspect), daemon=True).start()
             return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -503,7 +532,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _run_export(job: dict, clips: list[dict], transition: str, transition_duration: float,
                     use_music: bool, music_start: float, speed: float,
                     remove_original_audio: bool, quality: str = "1080",
-                    music_volume: float = .65) -> None:
+                    music_volume: float = .65, aspect: str = "16:9") -> None:
         try:
             job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
             version = len(job.get("exports", [])) + 1
@@ -513,15 +542,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                                 music_paths=[str(item) for item in job["music"]] if use_music and job.get("music") else None,
                                 music_start=music_start, speed=speed,
                                 remove_original_audio=remove_original_audio,
-                                quality=quality, music_volume=music_volume)
+                                quality=quality, music_volume=music_volume, aspect=aspect)
             job["export"] = output
             job_id = job["report"]["job_id"]
             entry = {"file": str(output), "version": version,
                      "download": f"/api/export/{job_id}/{version}",
                      "clips": len(clips), "duration": round(duration(str(output)), 1),
-                     "quality": quality}
+                     "quality": quality, "aspect": aspect}
             job.setdefault("exports", []).append(entry)
-            history = [{k: item[k] for k in ("version", "download", "clips", "duration", "quality")}
+            history = [{k: item[k] for k in ("version", "download", "clips", "duration", "quality", "aspect")}
                        for item in job["exports"]]
             _record_rate("export", job.get("export_perf", {}).get("work", 0),
                          time.monotonic() - job["export_status"]["started"])

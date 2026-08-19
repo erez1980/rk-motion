@@ -374,10 +374,10 @@ body.day .eyebrow{color:#4c7c12}
 
 <header class="top">
   <div class="brand">
-    <img src="/assets/rk-logo.png" alt="RK Motion">
+    <img src="/assets/app-icon.png" alt="RK Motion">
     <div>
       <h1>RK <em>Motion</em></h1>
-      <p>רוכבים קבוע · Edit your ride <span id="appVersion" class="ver"></span></p>
+      <p>רוכבים קבוע · הופכים רכיבה לסרט <span id="appVersion" class="ver"></span></p>
     </div>
   </div>
   <div class="header-actions">
@@ -528,6 +528,11 @@ body.day .eyebrow{color:#4c7c12}
           <option value="720">720p</option>
           <option value="original">איכות מקור</option>
           <option value="whatsapp">WhatsApp (קטן)</option>
+        </select>
+        <label for="aspect">פורמט</label>
+        <select id="aspect">
+          <option value="16:9" selected>רגיל · 16:9</option>
+          <option value="9:16">סטורי אינסטגרם · 9:16</option>
         </select>
       </div>
       <button id="export" class="button primary">ייצוא הסרט</button>
@@ -1347,7 +1352,8 @@ function renderHistory(history) {
     row.className = 'history-row';
     const meta = document.createElement('span');
     meta.className = 'meta';
-    meta.textContent = `גרסה ${item.version} · ${item.clips} קטעים · ${fmt(item.duration)} · ${QUALITY_NAMES[item.quality] || item.quality}`;
+    const format = item.aspect === '9:16' ? ' · סטורי 9:16' : '';
+    meta.textContent = `גרסה ${item.version} · ${item.clips} קטעים · ${fmt(item.duration)} · ${QUALITY_NAMES[item.quality] || item.quality}${format}`;
     const link = document.createElement('a');
     link.href = item.download;
     link.download = `RK-Motion-edit-${item.version}.mp4`;
@@ -1436,6 +1442,7 @@ $('#export').onclick = async () => {
         music_volume: +$('#musicVolume').value,
         speed: +$('#speed').value,
         quality: $('#quality').value,
+        aspect: $('#aspect').value,
         remove_original_audio: $('#muteOriginal').checked,
       }),
     });

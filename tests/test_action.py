@@ -39,7 +39,10 @@ def _mean_volume(path: str, band: int, start: float, length: float = 1) -> float
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 def test_music_fades_out_at_the_end_without_touching_the_ride_audio(tmp_path):
-    """The soundtrack is cut at the movie's end, so it must fade, not stop dead."""
+    """The soundtrack is cut at the movie's end, so it must fade, not stop
+    dead. The ride audio stays untouched by the music's own fade; it only
+    joins the fade in the movie's final second (see the dedicated
+    whole-movie fade-out test below)."""
     ride, music = tmp_path / "ride.mp4", tmp_path / "music.mp3"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
                     "-i", "testsrc2=size=320x180:rate=30:duration=12",
@@ -54,8 +57,9 @@ def test_music_fades_out_at_the_end_without_touching_the_ride_audio(tmp_path):
 
     # The 880Hz music is much quieter at the end than at the start...
     assert _mean_volume(output, 880, 0) - _mean_volume(output, 880, 9) > 8
-    # ...while the 200Hz ride audio keeps playing at the same level throughout.
-    assert abs(_mean_volume(output, 200, 0) - _mean_volume(output, 200, 9)) < 2
+    # ...while the 200Hz ride audio keeps playing at the same level while only
+    # the music is fading (movie-final-second-only fade covered separately).
+    assert abs(_mean_volume(output, 200, 0) - _mean_volume(output, 200, 7.2)) < 2
 
 
 def _frame_size(path: str) -> tuple[int, int]:
@@ -93,6 +97,55 @@ def test_export_quality_caps_tall_sources_and_never_upscales(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def _mean_luma_at(path: str, t: float) -> float:
+    """Average grayscale value (0=black..255=white) of the frame at time t."""
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-ss", str(t), "-i", path,
+         "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+        capture_output=True, check=True)
+    frame = result.stdout
+    return sum(frame) / len(frame) if frame else 0.0
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_export_ends_with_a_one_second_fade_to_black(tmp_path):
+    ride = tmp_path / "ride.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "testsrc2=size=320x180:rate=30:duration=6",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(ride)], check=True)
+
+    output = str(tmp_path / "edit.mp4")
+    export_edited_movie(str(ride), [{"start": 0, "end": 6, "duration": 6}], output)
+
+    start_luma = _mean_luma_at(output, 0.1)
+    end_luma = _mean_luma_at(output, 5.9)  # inside the final second
+    assert end_luma < 20, "last frame should be almost black"
+    assert start_luma - end_luma > 60, "clearly darker than the busy test pattern at the start"
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_export_9x16_crops_to_a_vertical_frame_for_stories(tmp_path):
+    ride = tmp_path / "ride.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "testsrc2=size=1280x720:rate=30:duration=4",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(ride)], check=True)
+
+    output = str(tmp_path / "story.mp4")
+    export_edited_movie(str(ride), [{"start": 0, "end": 3, "duration": 3}], output,
+                        quality="1080", aspect="9:16")
+
+    width, height = _frame_size(output)
+    assert height > width, "vertical frame"
+    assert abs(width / height - 9 / 16) < 0.01
+    assert height == 1080
+
+    # The default aspect stays untouched (existing horizontal behaviour).
+    landscape = str(tmp_path / "landscape.mp4")
+    export_edited_movie(str(ride), [{"start": 0, "end": 3, "duration": 3}], landscape, quality="1080")
+    w2, h2 = _frame_size(landscape)
+    assert w2 > h2
+
+
 def test_prepare_source_uses_a_single_h264_file_without_reencoding(tmp_path):
     from sofit.ui import RKMotionHandler
 

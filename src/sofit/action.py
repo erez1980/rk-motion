@@ -199,11 +199,26 @@ QUALITY_PROFILES = {
 }
 
 
+FADE_OUT_SECONDS = 1.0
+ASPECTS = {"16:9", "9:16"}
+
+
 def _scale_filter(max_height: int | None) -> str | None:
     """Downscale-only filter: small sources are never blown up."""
     if max_height is None:
         return None
     return f"scale=-2:'min({max_height},ih)'"
+
+
+def _crop_filter(max_height: int | None) -> str:
+    """Center-crop/scale to a 9:16 vertical frame for Stories/Reels."""
+    height = max_height or 1920
+    width = (height * 9 // 16) // 2 * 2  # even width, required by most encoders
+    return f"scale=w={width}:h={height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+
+
+def _frame_filter(aspect: str, max_height: int | None) -> str | None:
+    return _crop_filter(max_height) if aspect == "9:16" else _scale_filter(max_height)
 
 
 def _has_audio(path: str) -> bool:
@@ -217,7 +232,8 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
                         transition: str = "cut", transition_duration: float = .5,
                         music_paths: list[str] | None = None, music_start: float = 0,
                         speed: float = 1.0, remove_original_audio: bool = False,
-                        quality: str = "1080", music_volume: float = .65) -> str:
+                        quality: str = "1080", music_volume: float = .65,
+                        aspect: str = "16:9") -> str:
     """Join approved clips, optionally applying a video/audio transition."""
     if not clips:
         raise ValueError("select at least one clip before exporting")
@@ -231,12 +247,14 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         raise ValueError(f"unsupported quality: {quality}")
     if not 0 < music_volume <= 2:
         raise ValueError("music volume must be between 0 and 2")
+    if aspect not in ASPECTS:
+        raise ValueError(f"unsupported aspect: {aspect}")
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
     if transition != "cut" and len(clips) > 1:
-        _export_with_transitions(path, clips, target, transition, transition_duration, profile)
+        _export_with_transitions(path, clips, target, transition, transition_duration, profile, aspect)
     else:
-        _export_hard_cuts(path, clips, target, profile)
+        _export_hard_cuts(path, clips, target, profile, aspect)
     if speed not in {1.0, 1.25, 1.5, 2.0}:
         raise ValueError("speed must be 1, 1.25, 1.5 or 2")
     if speed != 1:
@@ -245,11 +263,28 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         _strip_audio(target)
     if music_paths:
         _mix_music(target, music_paths, music_start, music_volume)
+    # Every export ends on a fade to black instead of a hard cut, whether or
+    # not there is a soundtrack fading its own tail.
+    _fade_out_movie(target, profile)
     return str(target)
 
 
-def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict) -> None:
-    scale = _scale_filter(profile["max_height"])
+def _fade_out_movie(target: Path, profile: dict, fade: float = FADE_OUT_SECONDS) -> None:
+    movie_duration = duration(str(target))
+    fade = min(fade, movie_duration / 2)
+    start = max(0, movie_duration - fade)
+    faded = target.with_name(target.stem + ".faded.mp4")
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target),
+           "-vf", f"fade=t=out:st={start:.3f}:d={fade:.3f}", "-map", "0:v:0"]
+    if _has_audio(str(target)):
+        cmd.extend(["-af", f"afade=t=out:st={start:.3f}:d={fade:.3f}", "-map", "0:a:0", "-c:a", "aac"])
+    cmd.extend(["-c:v", "libx264", *profile["encode"], "-movflags", "+faststart", str(faded)])
+    subprocess.run(cmd, check=True, capture_output=True)
+    faded.replace(target)
+
+
+def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict, aspect: str = "16:9") -> None:
+    frame = _frame_filter(aspect, profile["max_height"])
     with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
         parts = []
         for index, clip in enumerate(clips, 1):
@@ -259,8 +294,8 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict)
             part = Path(tmp) / f"part-{index:03d}.mp4"
             cmd = ["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", path,
                    "-t", str(end - start), "-map", "0:v:0", "-map", "0:a?"]
-            if scale:
-                cmd.extend(["-vf", scale])
+            if frame:
+                cmd.extend(["-vf", frame])
             cmd.extend(["-c:v", "libx264", *profile["encode"], "-c:a", "aac",
                         "-movflags", "+faststart", str(part)])
             subprocess.run(cmd, check=True, capture_output=True)
@@ -336,7 +371,7 @@ def _mix_music(target: Path, music_paths: list[str], music_start: float,
 
 def _export_with_transitions(path: str, clips: list[dict], target: Path,
                              transition: str, transition_duration: float,
-                             profile: dict) -> str:
+                             profile: dict, aspect: str = "16:9") -> str:
     """Use xfade/acrossfade directly from the source for smooth joined clips."""
     audio = _has_audio(path)
     durations: list[float] = []
@@ -365,11 +400,11 @@ def _export_with_transitions(path: str, clips: list[dict], target: Path,
             filters.append(f"[{current_audio}][a{index}]acrossfade=d={fade:.3f}[{next_audio}]")
             current_audio = next_audio
         timeline += durations[index] - fade
-    scale = _scale_filter(profile["max_height"])
-    if scale:
-        # Every input is a cut of the same source, so one scale on the joined
-        # stream is enough.
-        filters.append(f"[{current_video}]{scale}[vscaled]")
+    frame = _frame_filter(aspect, profile["max_height"])
+    if frame:
+        # Every input is a cut of the same source, so one scale/crop on the
+        # joined stream is enough.
+        filters.append(f"[{current_video}]{frame}[vscaled]")
         current_video = "vscaled"
     cmd.extend(["-filter_complex", ";".join(filters), "-map", f"[{current_video}]"])
     if audio:

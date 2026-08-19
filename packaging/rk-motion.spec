@@ -22,6 +22,7 @@ binaries = [(str(item), "bin") for item in ffmpeg_bin.iterdir()] if ffmpeg_bin.i
 datas = [
     (str(SRC / "assets" / "index.html"), "sofit/assets"),
     (str(SRC / "assets" / "rk-logo.png"), "sofit/assets"),
+    (str(SRC / "assets" / "app-icon.png"), "sofit/assets"),
     (str(SRC / "data" / "fonts" / "Rubik.ttf"), "sofit/data/fonts"),
     (str(SRC / "data" / "fonts" / "OFL.txt"), "sofit/data/fonts"),
 ]
