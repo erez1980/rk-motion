@@ -104,3 +104,24 @@ def test_prepare_source_uses_a_single_h264_file_without_reencoding(tmp_path):
     source = RKMotionHandler._prepare_source([ride], tmp_path)
     assert source == ride
     assert ride.stat().st_mtime_ns == before  # untouched, zero quality loss
+
+
+def test_perf_rates_learn_from_measured_runs(tmp_path, monkeypatch):
+    """Estimates calibrate to the machine: each run averages the stored rate
+    with the measured one, and junk runs (tiny/instant) are ignored."""
+    from sofit import ui
+
+    monkeypatch.setattr(ui, "PERF_FILE", tmp_path / "perf.json")
+    assert ui._perf_rates() == ui.DEFAULT_RATES  # no file yet -> defaults
+
+    ui._record_rate("fast", work=400, elapsed=20)          # measured 20/s
+    expected = (ui.DEFAULT_RATES["fast"] + 20) / 2
+    assert ui._perf_rates()["fast"] == expected
+
+    ui._record_rate("fast", work=0, elapsed=10)            # no work: ignored
+    ui._record_rate("fast", work=100, elapsed=0.5)         # too quick: ignored
+    ui._record_rate("nope", work=100, elapsed=10)          # unknown kind: ignored
+    assert ui._perf_rates()["fast"] == expected
+
+    (tmp_path / "perf.json").write_text("not json")        # corrupt file
+    assert ui._perf_rates() == ui.DEFAULT_RATES

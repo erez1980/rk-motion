@@ -27,6 +27,34 @@ INDEX = Path(__file__).with_name("assets") / "index.html"
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
 
+# Time estimates learn this machine's real speed. Work is measured in
+# megapixel-seconds (video duration x frame megapixels — a decode/encode cost
+# proxy); rates are Mpx-s processed per wall second, refined after every run
+# and kept in a tiny stats file (numbers only, no media or names).
+PERF_FILE = Path.home() / ".rk-motion" / "perf.json"
+DEFAULT_RATES = {"fast": 40.0, "encode": 8.0, "export": 5.0}
+
+
+def _perf_rates() -> dict:
+    try:
+        saved = json.loads(PERF_FILE.read_text())
+        return {key: float(saved.get(key, value)) for key, value in DEFAULT_RATES.items()}
+    except Exception:
+        return dict(DEFAULT_RATES)
+
+
+def _record_rate(kind: str, work: float, elapsed: float) -> None:
+    """Blend the measured rate into the stored one (equal-weight EMA)."""
+    if kind not in DEFAULT_RATES or work <= 0 or elapsed <= 1:
+        return
+    rates = _perf_rates()
+    rates[kind] = round((rates[kind] + work / elapsed) / 2, 2)
+    try:
+        PERF_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PERF_FILE.write_text(json.dumps(rates))
+    except OSError:
+        pass  # estimates just stay at their previous accuracy
+
 
 class RKMotionHandler(BaseHTTPRequestHandler):
     server_version = "RKMotion/0.1"
@@ -273,18 +301,22 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
         raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
         max_duration = float(raw_max) if raw_max else None
-        # A conservative size-based estimate, presented to the user as one. A
-        # single H.264 file skips re-encoding entirely, so only analysis time
-        # counts for it.
-        total_mb = sum(item.stat().st_size for item in job["inputs"]) / 1e6
+        # Estimate from the actual work (duration x resolution) at this
+        # machine's learned speed, not from file size with a fixed constant.
         try:
             codec = self._video_meta(job["inputs"][0])[0]
         except Exception:
             codec = ""
-        if len(job["inputs"]) == 1 and codec == "h264":
-            estimate = max(10, round(total_mb * 0.06 + 8))
-        else:
-            estimate = max(15, round(total_mb * 0.5 + len(job["inputs"]) * 6))
+        kind = "fast" if len(job["inputs"]) == 1 and codec == "h264" else "encode"
+        work = 0.0
+        for item in job["inputs"]:
+            try:
+                _, width, height = self._video_meta(item)
+                work += duration(str(item)) * (width * height / 1e6)
+            except Exception:
+                work += item.stat().st_size / 3e6  # rough fallback when probing fails
+        estimate = max(8, round(work / _perf_rates()[kind] + 4))
+        job["analyse_perf"] = {"kind": kind, "work": work}
         job["analyse_status"] = {"state": "running", "started": time.monotonic(),
                                  "estimated_seconds": estimate,
                                  "message": "מכינה את הסרטונים…"}
@@ -304,6 +336,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             report = analyse_action(str(source), max_duration=max_duration)
             report["job_id"] = job_id
             job["report"] = report
+            perf = job.get("analyse_perf", {})
+            _record_rate(perf.get("kind", ""), perf.get("work", 0),
+                         time.monotonic() - status["started"])
             status.update({"state": "done", "message": "הניתוח הושלם.", "report": report})
         except Exception as exc:
             detail = str(exc)
@@ -427,10 +462,20 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             clips = request["clips"]
             if not clips:
                 raise ValueError("select at least one clip before exporting")
-            # A conservative local estimate. It is clearly presented as an
-            # estimate; actual FFmpeg speed changes with codec and Mac model.
+            # Work-based estimate at this machine's learned encode speed;
+            # the output resolution cap bounds the real work.
             edit_seconds = sum(float(clip["end"]) - float(clip["start"]) for clip in clips)
-            estimate = max(12, round(edit_seconds * 1.25 + 8))
+            quality = str(request.get("quality", "1080"))
+            try:
+                _, width, height = self._video_meta(Path(job["source"]))
+                cap = {"720": 720, "1080": 1080, "whatsapp": 720}.get(quality)
+                if cap and height > cap:
+                    width, height = round(width * cap / height), cap
+                work = edit_seconds * (width * height / 1e6)
+            except Exception:
+                work = edit_seconds * 2
+            estimate = max(10, round(work / _perf_rates()["export"] + 5))
+            job["export_perf"] = {"work": work}
             job["export_status"] = {"state": "running", "started": time.monotonic(),
                                     "estimated_seconds": estimate,
                                     "message": "מכינה את קטעי הווידאו…"}
@@ -478,6 +523,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             job.setdefault("exports", []).append(entry)
             history = [{k: item[k] for k in ("version", "download", "clips", "duration", "quality")}
                        for item in job["exports"]]
+            _record_rate("export", job.get("export_perf", {}).get("work", 0),
+                         time.monotonic() - job["export_status"]["started"])
             job["export_status"].update({"state": "done", "progress": 100,
                                          "message": "הסרט מוכן.", "history": history,
                                          "download": f"/api/export/{job_id}"})

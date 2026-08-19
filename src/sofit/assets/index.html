@@ -621,7 +621,9 @@ document.addEventListener('visibilitychange', () => {
 let uploading = false;
 addEventListener('beforeunload', e => { if (uploading) e.preventDefault(); });
 function etaText(seconds) {
-  return Number.isFinite(seconds) && seconds >= 1 ? ` · נשאר בערך ${fmt(seconds)}` : '';
+  if (!Number.isFinite(seconds)) return '';
+  if (seconds < 1) return ' · עוד רגע…';   // the estimate ran out but the work hasn't
+  return ` · נשאר בערך ${fmt(seconds)}`;
 }
 function invalidateDownload() { $('#download').classList.remove('show'); $('#result').classList.remove('show'); }
 function step(n) {
