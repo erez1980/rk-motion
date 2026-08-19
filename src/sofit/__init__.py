@@ -4,4 +4,4 @@ Pipeline: media file -> local faster-whisper transcript (cached) -> Claude
 generates chapters / show notes / quotes -> formatted output.
 """
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
