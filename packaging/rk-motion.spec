@@ -7,11 +7,14 @@
 # Windows) in packaging/ffmpeg-bin/ before building and they are bundled and
 # put on PATH by the launcher. Without them the app still builds but needs
 # FFmpeg installed on the user's machine.
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(SPECPATH).parent
 SRC = ROOT / "src" / "sofit"
+ICON = ROOT / "packaging" / "app-icon.png"
+VERSION = re.search(r'__version__ = "([^"]+)"', (SRC / "__init__.py").read_text()).group(1)
 
 ffmpeg_bin = ROOT / "packaging" / "ffmpeg-bin"
 binaries = [(str(item), "bin") for item in ffmpeg_bin.iterdir()] if ffmpeg_bin.is_dir() else []
@@ -44,7 +47,7 @@ exe = EXE(
     name="RK Motion",
     console=sys.platform not in ("darwin", "win32"),
     # PNG is converted to .icns/.ico at build time (needs Pillow in the build env).
-    icon=str(SRC / "assets" / "rk-logo.png") if sys.platform in ("darwin", "win32") else None,
+    icon=str(ICON) if sys.platform in ("darwin", "win32") else None,
 )
 
 if sys.platform == "darwin":
@@ -52,10 +55,12 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="RK Motion.app",
-        icon=str(SRC / "assets" / "rk-logo.png"),
+        icon=str(ICON),
         bundle_identifier="com.rkmotion.editor",
         info_plist={
             "CFBundleDisplayName": "RK Motion",
+            "CFBundleShortVersionString": VERSION,
+            "CFBundleVersion": VERSION,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
         },

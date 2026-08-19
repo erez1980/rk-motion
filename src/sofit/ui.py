@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from . import __version__
 from .action import analyse_action, duration, export_edited_movie
 
 LOGO = Path(__file__).with_name("assets") / "rk-logo.png"
@@ -125,7 +126,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 del state["started"]  # monotonic time is meaningless to the client
             return self._json(HTTPStatus.OK, state)
         if parts == ["api", "capabilities"]:
-            return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp"))})
+            return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp")),
+                                              "version": __version__})
         if len(parts) == 3 and parts[:2] == ["api", "session"]:
             # Lets a page that was closed mid-job rebuild its state on return.
             job = JOBS.get(parts[2])
@@ -534,7 +536,7 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
     host = "0.0.0.0" if lan else "127.0.0.1"
     server = ThreadingHTTPServer((host, port), RKMotionHandler)
     url = f"http://127.0.0.1:{port}"
-    print(f"RK Motion is running at {url} (Ctrl+C to stop)")
+    print(f"RK Motion v{__version__} is running at {url} (Ctrl+C to stop)")
     if lan:
         ip = _lan_ip()
         if ip:

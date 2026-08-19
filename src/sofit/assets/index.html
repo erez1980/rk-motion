@@ -75,6 +75,7 @@ body{
 .brand h1 em{font-style:normal;color:var(--accent)}
 body.day .brand h1 em{color:#4c7c12}
 .brand p{margin:0;color:var(--soft);font-size:12px;font-weight:600}
+.brand .ver{color:var(--accent-soft-ink);background:var(--accent-soft);padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:800;vertical-align:1px}
 .header-actions{display:flex;align-items:center;gap:10px}
 .privacy{font-size:11.5px;font-weight:700;color:var(--accent-soft-ink);background:var(--accent-soft);padding:7px 12px;border-radius:99px}
 
@@ -368,7 +369,7 @@ body.day .eyebrow{color:#4c7c12}
     <img src="/assets/rk-logo.png" alt="RK Motion">
     <div>
       <h1>RK <em>Motion</em></h1>
-      <p>רוכבים קבוע · Edit your ride</p>
+      <p>רוכבים קבוע · Edit your ride <span id="appVersion" class="ver"></span></p>
     </div>
   </div>
   <div class="header-actions">
@@ -567,9 +568,10 @@ const applyTheme = day => {
 applyTheme(localStorage.getItem('rk-motion-theme') === 'day');
 $('#themeToggle').onclick = () => applyTheme(!document.body.classList.contains('day'));
 
-/* YouTube search appears only when yt-dlp is installed on this computer. */
+/* YouTube search appears only when yt-dlp is installed; the header shows the running version. */
 fetch('/api/capabilities').then(r => r.json()).then(caps => {
   if (!caps.youtube) document.querySelectorAll('.youtube-search,.rights,.sep,#ytResults').forEach(el => el.hidden = true);
+  if (caps.version) $('#appVersion').textContent = 'v' + caps.version;
 }).catch(() => {});
 
 /* ---- Shared helpers ---- */
