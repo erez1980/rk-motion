@@ -17,6 +17,17 @@ def main() -> int:
         if os.path.isdir(bundled_bin):
             os.environ["PATH"] = bundled_bin + os.pathsep + os.environ.get("PATH", "")
 
+    # A double-clicked .app inherits launchd's minimal PATH, which misses
+    # Homebrew and pip locations — so a user-installed yt-dlp would go
+    # undetected. Append the common install dirs.
+    extras = ["/opt/homebrew/bin", "/usr/local/bin",
+              os.path.expanduser("~/.local/bin"),
+              os.path.expanduser("~/Library/Python/3.12/bin")]
+    current = os.environ.get("PATH", "").split(os.pathsep)
+    for path in extras:
+        if os.path.isdir(path) and path not in current:
+            os.environ["PATH"] += os.pathsep + path
+
     port = 8787
     for candidate in range(8787, 8817):
         with socket.socket() as probe:
