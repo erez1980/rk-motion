@@ -21,7 +21,7 @@ from urllib.parse import unquote, urlparse
 
 from . import __version__
 from .action import (analyse_action, duration, export_edited_movie, h264_args,
-                     h264_encoder, run_with_progress)
+                     h264_encoder, run_encode)
 
 ASSETS = Path(__file__).with_name("assets")
 INDEX = ASSETS / "index.html"
@@ -208,8 +208,10 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 del state["started"]  # monotonic time is meaningless to the client
             return self._json(HTTPStatus.OK, state)
         if parts == ["api", "capabilities"]:
+            encoder = h264_encoder()
             return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp")),
-                                              "version": __version__})
+                                              "version": __version__, "encoder": encoder,
+                                              "gpu": encoder != "libx264"})
         if len(parts) == 3 and parts[:2] == ["api", "session"]:
             # Lets a page that was closed mid-job rebuild its state on return.
             job = JOBS.get(parts[2])
@@ -494,8 +496,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                    "-map", "0:v:0", "-map", "0:a?",
                    *h264_args(width, height, cls._video_bitrate(inputs[0])),
                    "-c:a", "aac", "-movflags", "+faststart", str(target)]
-            run_with_progress(cmd, cls._safe_duration(inputs[0]),
-                              (lambda done: progress(label, done)) if progress else None)
+            run_encode(cmd, cls._safe_duration(inputs[0]),
+                       (lambda done: progress(label, done)) if progress else None)
             return target
         width, height = max(2, width - width % 2), max(2, height - height % 2)
         normalised = []
@@ -514,8 +516,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                    "-map", "0:v:0", "-map", "0:a:0" if _has_audio(str(source)) else "1:a:0",
                    *h264_args(width, height, cls._video_bitrate(source)),
                    "-c:a", "aac", "-shortest", str(target)]
-            run_with_progress(cmd, cls._safe_duration(source),
-                              (lambda done: progress(label, base + span * done)) if progress else None)
+            run_encode(cmd, cls._safe_duration(source),
+                       (lambda done: progress(label, base + span * done)) if progress else None)
             normalised.append(target)
         listing = folder / "videos.txt"
         listing.write_text("".join("file '" + str(item).replace("'", "'\\''") + "'\n" for item in normalised))
@@ -710,7 +712,10 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
     host = "0.0.0.0" if lan else "127.0.0.1"
     server = ThreadingHTTPServer((host, port), RKMotionHandler)
     url = f"http://127.0.0.1:{port}"
+    encoder = h264_encoder()
+    hardware = "GPU" if encoder != "libx264" else "CPU"
     print(f"RK Motion v{__version__} is running at {url} (Ctrl+C to stop)")
+    print(f"Video encoding: {encoder} ({hardware})")
     if lan:
         ip = _lan_ip()
         if ip:

@@ -202,3 +202,43 @@ expiring guess — so it now reports a real fraction across all of its passes
 - Multi-clip batches keep one climbing bar instead of restarting per file.
 - Checked the bar is monotonic in every path, and that a failed ffmpeg still
   surfaces its stderr for the status message.
+
+---
+
+## Round 7 — the stranded bar, and encoding on the GPU everywhere
+
+- **The bottom action bar was sitting mid-screen** on an iPhone. It could not
+  be reproduced in a desktop browser at any iPhone viewport or scroll
+  position, but the screenshot's scroll indicator showed a live viewport, not
+  a stitched full-page capture — so the bar really was stranded. The cause
+  that fits is the iOS keyboard: tapping a clip's time field shrinks the
+  *visual* viewport, which moves `position:fixed` elements, and iOS routinely
+  leaves them where the keyboard put them after it closes. The bar now pins
+  itself to the visual viewport, so it rides above the keyboard while typing
+  and snaps back after. `body`'s horizontal-overflow guard also moved from
+  `hidden` to `clip`, since `hidden` can turn the body into a scroll container
+  on iOS and that is another way a fixed child stops tracking the viewport.
+- **Encoding now uses the GPU on every platform**, not just macOS. The probe
+  walks a per-platform candidate list — VideoToolbox on Macs, NVENC / Quick
+  Sync / AMF on Windows, NVENC / Quick Sync on Linux — running a tiny real
+  encode on each, because being listed by ffmpeg says nothing about whether
+  the driver is there. It covers the export too, not only the source
+  conversion: the quality profiles now carry a bits-per-pixel target next to
+  their CRF, since GPU encoders have no CRF knob. If a GPU encode fails
+  anyway — a driver refusing a resolution the probe never tried — that one
+  command is retried on the CPU and the GPU is not used again this session,
+  because losing a ten-minute export to a driver hiccup is far worse than
+  spending the extra minutes in software. The chosen encoder is printed at
+  launch and shown on hover over the version chip.
+
+## Verification performed
+
+- Full test suite: 149 passed, 1 skipped.
+- Action bar measured through a simulated keyboard open/close cycle: rests at
+  the bottom, lifts by exactly the keyboard height, snaps back cleanly, no
+  leftover transform.
+- Real exports at 1080p 16:9, original 9:16 and WhatsApp: correct frame sizes
+  (including the 1080x1920 crop), correct duration, closing fade intact.
+- Encoder selection, the software retry and the command rewrite are covered by
+  unit tests with a mocked ffmpeg — this container has no GPU, so the hardware
+  branch itself is exercised there rather than on real silicon.

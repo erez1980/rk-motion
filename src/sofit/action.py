@@ -81,41 +81,93 @@ class _Stages:
         self._progress(done / self._total)
 
 
+# H.264 encoders that run on the GPU (or a dedicated media block), best first
+# per platform. Left out on purpose: h264_vaapi, which needs a device and an
+# hwupload filter chain this app does not build, so it could only ever fail.
+HARDWARE_ENCODERS = {
+    "darwin": ["h264_videotoolbox"],                   # Apple Silicon and Intel Macs
+    "win32": ["h264_nvenc", "h264_qsv", "h264_amf"],   # NVIDIA, Intel, AMD
+    "linux": ["h264_nvenc", "h264_qsv"],
+}
+SOFTWARE_ENCODE = ["-crf", "18", "-preset", "veryfast"]
 _H264_ENCODER: str | None = None
 
 
 def h264_encoder() -> str:
-    """The fastest H.264 encoder that actually runs on this machine.
+    """The fastest H.264 encoder that actually works on this machine.
 
-    Re-encoding a long 4K iPhone/GoPro clip with libx264 is by far the slowest
-    thing the app does — minutes of pegged CPU. Macs have a dedicated encoder
-    chip that does the same job several times faster, so use it when a probe
-    confirms it works here, and keep libx264 as the fallback everywhere else.
+    Re-encoding a long 4K ride with libx264 is by far the slowest thing the app
+    does — minutes of pegged CPU. Every modern machine has a video encoder in
+    its GPU, so probe the platform's candidates with a tiny real encode and
+    take the first that produces frames. Being listed by ffmpeg is not enough:
+    the driver can be missing, and ffmpeg only finds that out by trying.
     """
     global _H264_ENCODER
-    if _H264_ENCODER is None:
-        _H264_ENCODER = "libx264"
-        if sys.platform == "darwin":
-            probe = subprocess.run(
-                ["ffmpeg", "-v", "error", "-f", "lavfi",
-                 "-i", "testsrc2=size=128x72:rate=5:duration=0.4",
-                 "-c:v", "h264_videotoolbox", "-f", "null", "-"], capture_output=True)
-            if probe.returncode == 0:
-                _H264_ENCODER = "h264_videotoolbox"
+    if _H264_ENCODER is not None:
+        return _H264_ENCODER
+    _H264_ENCODER = "libx264"
+    try:
+        listed = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+                                capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return _H264_ENCODER
+    for name in HARDWARE_ENCODERS.get(sys.platform, []):
+        if name not in listed:
+            continue
+        probe = subprocess.run(
+            ["ffmpeg", "-v", "error", "-f", "lavfi",
+             "-i", "testsrc2=size=320x240:rate=10:duration=0.5",
+             "-c:v", name, "-pix_fmt", "yuv420p", "-f", "null", "-"], capture_output=True)
+        if probe.returncode == 0:
+            _H264_ENCODER = name
+            break
     return _H264_ENCODER
 
 
-def h264_args(width: int = 0, height: int = 0, source_bitrate: int = 0) -> list[str]:
-    """Encoder settings that keep the footage looking like the original.
+def h264_args(width: int = 0, height: int = 0, source_bitrate: int = 0,
+              bpp: float = .15, software: list[str] | None = None) -> list[str]:
+    """Encoder settings for this machine's best H.264 encoder.
 
-    The hardware encoder has no CRF, so quality is held by aiming above the
-    source's own bitrate (or a resolution-based floor when it is unknown).
+    GPU encoders have no CRF knob, so quality is held with a bitrate derived
+    from the frame size — and, when converting, never below what the source
+    already used, so the conversion is not the weak link.
     """
-    if h264_encoder() != "h264_videotoolbox":
-        return ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast"]
-    floor = int(width * height * 30 * 0.08) if width and height else 12_000_000
-    target = min(max(int(max(source_bitrate, floor) * 1.25), 6_000_000), 80_000_000)
-    return ["-c:v", "h264_videotoolbox", "-b:v", str(target)]
+    encoder = h264_encoder()
+    if encoder == "libx264":
+        return ["-c:v", "libx264", *(software or SOFTWARE_ENCODE)]
+    sized = int(width * height * 30 * bpp) if width and height else 12_000_000
+    target = min(max(int(max(sized, source_bitrate * 1.25)), 2_000_000), 80_000_000)
+    return ["-c:v", encoder, "-b:v", str(target),
+            "-maxrate", str(int(target * 1.5)), "-bufsize", str(target * 2)]
+
+
+def _software_encode(cmd: list[str]) -> list[str]:
+    """Rewrite a GPU-encoder command to use libx264 instead."""
+    out = list(cmd)
+    index = out.index("-c:v")
+    out[index + 1] = "libx264"
+    tail = index + 2
+    while tail < len(out) - 1 and out[tail] in {"-b:v", "-maxrate", "-bufsize"}:
+        del out[tail:tail + 2]
+    out[tail:tail] = SOFTWARE_ENCODE
+    return out
+
+
+def run_encode(cmd: list[str], total_seconds: float, progress=None) -> None:
+    """Run an encode, retrying on the CPU if the GPU encoder gives up.
+
+    GPU encoders are the flakiest part of ffmpeg — a driver can refuse a
+    resolution the probe never tried — and losing a long export to that would
+    be far worse than spending the extra minutes in software.
+    """
+    global _H264_ENCODER
+    try:
+        run_with_progress(cmd, total_seconds, progress)
+    except subprocess.CalledProcessError:
+        if not _H264_ENCODER or _H264_ENCODER == "libx264" or _H264_ENCODER not in cmd:
+            raise
+        _H264_ENCODER = "libx264"   # one failure is enough; stop trying this session
+        run_with_progress(_software_encode(cmd), total_seconds, progress)
 
 
 def _normalise(values: dict[int, float]) -> dict[int, float]:
@@ -288,14 +340,39 @@ MUSIC_FADE_OUT = 3.0  # seconds of fade at the end of the soundtrack
 # Export quality profiles: max output height (None keeps the source size) and
 # encoder settings. "whatsapp" trades quality for a small file that survives
 # WhatsApp's own re-compression better than a huge one.
+# `encode` is libx264's own quality knob; `bpp` (bits per pixel per second) is
+# the same intent expressed for GPU encoders, which have no CRF.
 QUALITY_PROFILES = {
-    "720": {"max_height": 720, "encode": ["-crf", "18", "-preset", "medium"]},
-    "1080": {"max_height": 1080, "encode": ["-crf", "18", "-preset", "medium"]},
-    "original": {"max_height": None, "encode": ["-crf", "18", "-preset", "medium"]},
-    "whatsapp": {"max_height": 720,
+    "720": {"max_height": 720, "bpp": .15, "encode": ["-crf", "18", "-preset", "medium"]},
+    "1080": {"max_height": 1080, "bpp": .15, "encode": ["-crf", "18", "-preset", "medium"]},
+    "original": {"max_height": None, "bpp": .15, "encode": ["-crf", "18", "-preset", "medium"]},
+    "whatsapp": {"max_height": 720, "bpp": .06,
                  "encode": ["-crf", "26", "-preset", "medium",
                             "-maxrate", "2500k", "-bufsize", "5000k"]},
 }
+
+
+def _output_size(path: str, max_height: int | None, aspect: str) -> tuple[int, int]:
+    """The frame this export will actually produce, for sizing the bitrate."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+             "stream=width,height", "-of", "csv=p=0", path],
+            capture_output=True, text=True, check=True)
+        width, height = (int(value) for value in result.stdout.strip().split(",")[:2])
+    except Exception:
+        return 1920, 1080          # a sane middle when the source will not say
+    if max_height and height > max_height:
+        width, height = round(width * max_height / height), max_height
+    if aspect == "9:16":
+        width = height * 9 // 16   # the frame is cropped, not letterboxed
+    return max(width, 2), max(height, 2)
+
+
+def _encode_args(path: str, profile: dict, aspect: str) -> list[str]:
+    """Encoder settings sized to what this export will actually produce."""
+    width, height = _output_size(path, profile["max_height"], aspect)
+    return h264_args(width, height, bpp=profile["bpp"], software=profile["encode"])
 
 
 FADE_OUT_SECONDS = 1.0
@@ -394,8 +471,9 @@ def _fade_out_movie(target: Path, profile: dict, fade: float = FADE_OUT_SECONDS,
            "-vf", f"fade=t=out:st={start:.3f}:d={fade:.3f}", "-map", "0:v:0"]
     if _has_audio(str(target)):
         cmd.extend(["-af", f"afade=t=out:st={start:.3f}:d={fade:.3f}", "-map", "0:a:0", "-c:a", "aac"])
-    cmd.extend(["-c:v", "libx264", *profile["encode"], "-movflags", "+faststart", str(faded)])
-    run_with_progress(cmd, movie_duration, progress)
+    cmd.extend([*_encode_args(str(target), profile, "16:9"),   # already the final frame
+                "-movflags", "+faststart", str(faded)])
+    run_encode(cmd, movie_duration, progress)
     faded.replace(target)
 
 
@@ -416,13 +494,13 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict,
                    "-t", str(end - start), "-map", "0:v:0", "-map", "0:a?"]
             if frame:
                 cmd.extend(["-vf", frame])
-            cmd.extend(["-c:v", "libx264", *profile["encode"], "-c:a", "aac",
+            cmd.extend([*_encode_args(path, profile, aspect), "-c:a", "aac",
                         "-movflags", "+faststart", str(part)])
             # Each clip advances the bar by its own share of the finished movie,
             # so a long clip does not look like a stall.
             done, length = cut, lengths[index - 1]
-            run_with_progress(cmd, length,
-                              (lambda f: progress((done + length * f) / movie)) if progress else None)
+            run_encode(cmd, length,
+                       (lambda f: progress((done + length * f) / movie)) if progress else None)
             cut += length
             parts.append(part)
         listing = Path(tmp) / "concat.txt"
@@ -440,8 +518,9 @@ def _speed_up_movie(target: Path, speed: float, progress=None) -> None:
            "-map", "0:v:0"]
     if _has_audio(str(target)):
         cmd.extend(["-filter:a", f"atempo={speed}", "-map", "0:a:0", "-c:a", "aac"])
-    cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", str(fast)])
-    run_with_progress(cmd, duration(str(target)) / speed, progress)
+    cmd.extend([*h264_args(*_output_size(str(target), None, "16:9")),
+                "-movflags", "+faststart", str(fast)])
+    run_encode(cmd, duration(str(target)) / speed, progress)
     fast.replace(target)
 
 
@@ -534,9 +613,9 @@ def _export_with_transitions(path: str, clips: list[dict], target: Path,
     cmd.extend(["-filter_complex", ";".join(filters), "-map", f"[{current_video}]"])
     if audio:
         cmd.extend(["-map", f"[{current_audio}]"])
-    cmd.extend(["-c:v", "libx264", *profile["encode"]])
+    cmd.extend(_encode_args(path, profile, aspect))
     if audio:
         cmd.extend(["-c:a", "aac"])
     cmd.extend(["-movflags", "+faststart", str(target)])
-    run_with_progress(cmd, timeline, progress)
+    run_encode(cmd, timeline, progress)
     return str(target)

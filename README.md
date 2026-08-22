@@ -117,10 +117,15 @@ once — iOS caches the old icon.)
 #### Speed and progress
 
 Every long step reports where ffmpeg actually is, not an elapsed-time guess,
-so the bar and the "time left" figure both mean something. On a Mac the
-source conversion uses the machine's hardware H.264 encoder when a probe
-confirms it works (iPhone footage is HEVC, so that conversion is otherwise
-the slowest thing the app does); elsewhere it falls back to libx264.
+so the bar and the "time left" figure both mean something.
+
+Encoding runs on the GPU wherever one is usable — VideoToolbox on Macs,
+NVENC / Quick Sync / AMF on Windows, NVENC / Quick Sync on Linux — chosen by
+a tiny real encode at startup, since being listed by ffmpeg says nothing
+about whether the driver is there. It covers both the source conversion
+(iPhone footage is HEVC, so that conversion is otherwise the slowest thing
+the app does) and the export. If a GPU encode fails anyway, that command is
+retried on the CPU. The encoder in use is printed when the app starts.
 
 #### Get told when it's done
 
