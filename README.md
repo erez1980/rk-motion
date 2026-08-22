@@ -110,6 +110,19 @@ link. LAN mode is off by default: without `--lan` the app stays on this
 machine only. Only turn it on at home — while it runs, anyone on the same
 Wi-Fi can reach it.
 
+On the phone, **Share → Add to Home Screen** turns it into a full-screen app
+with the RK Motion icon. (Already added it before v0.7.0? Remove and re-add it
+once — iOS caches the old icon.)
+
+#### Get told when it's done
+
+Analysing and exporting take minutes, so the page is built to be walked away
+from. The bell in the header controls what happens when a job ends: a chime, a
+buzz, a flashing tab title, and a system notification if the browser grants
+one. Notifications need a secure context — that means the app running on this
+machine, or added to the iPhone home screen; over plain `http` on the LAN you
+still get the chime and the flashing title.
+
 Before selecting a video, optionally set **Max scene length** in seconds. Leave
 it blank to keep each detected action range at its natural length. RK Motion
 will show scored action suggestions beside a video preview. You can select or

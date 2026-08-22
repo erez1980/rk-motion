@@ -124,3 +124,40 @@ action suggestions, and exporting a short edit.
 This is an implementation review, not a replacement for usability testing with
 real riders. The next validation should be a short session with 2–3 riders and
 their own GoPro footage.
+
+---
+
+## Round 5 — leave it alone, come back when it's done
+
+Three problems reported from real use on a Mac and an iPhone.
+
+- **Nothing told you the job had ended.** Analysing and exporting run for
+  minutes on the server, so people kept the tab open and checked back every
+  few minutes. The header now has a bell: when a job finishes (or fails) the
+  page chimes, buzzes, flashes the tab title and — where the browser allows
+  it — raises a system notification naming what finished. The chime and the
+  title flash need no permission, so something always lands; the audio
+  context and the permission prompt are armed from the tap that starts the
+  job, which is the only moment a browser accepts either.
+- **Saved to the iPhone home screen, the app had no icon.** There was no
+  `apple-touch-icon` and no manifest, so iOS invented one from a screenshot.
+  Added square, fully opaque 180/192/512px icons derived from the desktop
+  icon (`packaging/make_web_icons.py`) plus a web manifest — transparency and
+  rounded corners are left to the platform's own mask, otherwise the corners
+  come back white. Launched from the home screen the page now runs
+  full-screen, with the sticky header padded clear of the notch.
+- **A "?" box sat next to the logo.** The theme toggle drew a sun/moon with
+  `☀`/`☾`, symbol characters no bundled font covers, so they fell through to
+  a missing-glyph box. Both toggles are inline SVG now, and a test fails if
+  any symbol character reappears in the header.
+
+## Verification performed
+
+- Full test suite: 130 passed, 1 skipped.
+- Drove a real analyse-then-export in headless Chromium against a generated
+  ride video: both alerts fired with the right Hebrew text, the tab title
+  flashed while the page was hidden, no console or page errors.
+- Checked every `/assets/` path the page links resolves, and that anything
+  outside the whitelist 404s.
+- Header at 1280px, iPhone 13 and iPhone SE: SVG icons only, 46x44 tap
+  targets on mobile, no horizontal overflow.

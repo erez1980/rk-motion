@@ -22,9 +22,18 @@ from urllib.parse import unquote, urlparse
 from . import __version__
 from .action import analyse_action, duration, export_edited_movie
 
-LOGO = Path(__file__).with_name("assets") / "rk-logo.png"
-APP_ICON = Path(__file__).with_name("assets") / "app-icon.png"
-INDEX = Path(__file__).with_name("assets") / "index.html"
+ASSETS = Path(__file__).with_name("assets")
+INDEX = ASSETS / "index.html"
+# Everything the page may request from /assets/. The home-screen icons are
+# square and opaque on purpose: iOS and Android apply their own rounded mask.
+STATIC_ASSETS = {
+    "rk-logo.png": "image/png",
+    "app-icon.png": "image/png",
+    "icon-180.png": "image/png",
+    "icon-192.png": "image/png",
+    "icon-512.png": "image/png",
+    "manifest.webmanifest": "application/manifest+json",
+}
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
 
@@ -119,10 +128,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         parts = [p for p in urlparse(self.path).path.split("/") if p]
         if not parts:
             return self._file(INDEX, "text/html; charset=utf-8")
-        if parts == ["assets", "rk-logo.png"]:
-            return self._file(LOGO, "image/png")
-        if parts == ["assets", "app-icon.png"]:
-            return self._file(APP_ICON, "image/png")
+        if len(parts) == 2 and parts[0] == "assets" and parts[1] in STATIC_ASSETS:
+            return self._file(ASSETS / parts[1], STATIC_ASSETS[parts[1]])
         if parts == ["assets", "rubik.ttf"]:
             return self._file(FONT, "font/ttf")
         if len(parts) == 4 and parts[:2] == ["api", "export"]:

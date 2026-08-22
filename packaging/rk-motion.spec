@@ -20,9 +20,9 @@ ffmpeg_bin = ROOT / "packaging" / "ffmpeg-bin"
 binaries = [(str(item), "bin") for item in ffmpeg_bin.iterdir()] if ffmpeg_bin.is_dir() else []
 
 datas = [
-    (str(SRC / "assets" / "index.html"), "sofit/assets"),
-    (str(SRC / "assets" / "rk-logo.png"), "sofit/assets"),
-    (str(SRC / "assets" / "app-icon.png"), "sofit/assets"),
+    # The whole assets folder: page, icons and the web manifest. Globbing keeps
+    # newly added assets bundled without another edit here.
+    *((str(item), "sofit/assets") for item in sorted((SRC / "assets").iterdir()) if item.is_file()),
     (str(SRC / "data" / "fonts" / "Rubik.ttf"), "sofit/data/fonts"),
     (str(SRC / "data" / "fonts" / "OFL.txt"), "sofit/data/fonts"),
 ]
