@@ -718,6 +718,20 @@ function notifyDone(title, body) {
 applyNotify(notifyOn);
 $('#notifyToggle').onclick = () => { applyNotify(!notifyOn); armAlerts(); };
 
+/* Launched from the iPhone home screen the page has no browser chrome and no
+   download UI of its own, so a `download` link quietly does nothing. Hand the
+   finished movie to Safari instead, where the share sheet can save it. */
+const STANDALONE = matchMedia('(display-mode:standalone)').matches || navigator.standalone === true;
+function asDownload(anchor) {
+  if (STANDALONE) {
+    anchor.removeAttribute('download');
+    anchor.target = '_blank';
+    anchor.rel = 'noopener';
+  }
+  return anchor;
+}
+asDownload($('#download'));
+
 /* Without yt-dlp the YouTube search is replaced by a how-to-enable note;
    the header shows the running version. */
 fetch('/api/capabilities').then(r => r.json()).then(caps => {
@@ -1495,6 +1509,7 @@ function renderHistory(history) {
     link.href = item.download;
     link.download = `RK-Motion-edit-${item.version}.mp4`;
     link.textContent = 'הורדה';
+    asDownload(link);
     row.append(meta, link);
     rows.append(row);
   });
