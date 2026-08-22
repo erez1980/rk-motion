@@ -20,7 +20,8 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from . import __version__
-from .action import analyse_action, duration, export_edited_movie
+from .action import (analyse_action, duration, export_edited_movie, h264_args,
+                     h264_encoder, run_with_progress)
 
 ASSETS = Path(__file__).with_name("assets")
 INDEX = ASSETS / "index.html"
@@ -43,6 +44,48 @@ JOBS: dict[str, dict] = {}
 # and kept in a tiny stats file (numbers only, no media or names).
 PERF_FILE = Path.home() / ".rk-motion" / "perf.json"
 DEFAULT_RATES = {"fast": 40.0, "encode": 8.0, "export": 5.0}
+
+
+class _Phases:
+    """One honest progress bar across the steps of a job.
+
+    Every step reports its own 0..1 fraction. The bar weights the steps by how
+    long this machine is expected to spend on each, and the time left is
+    re-measured from the step's real speed — so a slow conversion no longer
+    parks on a full bar with nothing left to say.
+    """
+
+    def __init__(self, status: dict, weights: list[float]) -> None:
+        self._status = status
+        self._weights = [max(w, 1e-6) for w in weights] or [1.0]
+        self._total = sum(self._weights)
+        self._index = 0
+        self._started = time.monotonic()
+
+    def start(self, index: int, message: str) -> None:
+        """Move to the next step and restart the speed measurement."""
+        self._index = min(index, len(self._weights) - 1)
+        self._started = time.monotonic()
+        self.note(message)
+        self.update(0.0)
+
+    def note(self, message: str) -> None:
+        """Relabel the current step — several files can share one step, and
+        restarting the clock for each of them would skew the time left."""
+        self._status["message"] = message
+
+    def update(self, fraction: float) -> None:
+        fraction = min(1.0, max(0.0, fraction))
+        weight = self._weights[self._index]
+        done = sum(self._weights[:self._index]) + weight * fraction
+        self._status["percent"] = min(99, round(done / self._total * 100))
+        elapsed = time.monotonic() - self._started
+        # Wait for a real sample before quoting a time; the first seconds of an
+        # ffmpeg run are not representative.
+        if fraction > .03 and elapsed > 3:
+            per_unit = elapsed / fraction / weight
+            left = sum(self._weights[self._index:]) - weight * fraction
+            self._status["eta_seconds"] = round(left * per_unit)
 
 
 def _perf_rates() -> dict:
@@ -158,6 +201,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not job or key not in job:
                 return self._json(HTTPStatus.NOT_FOUND, {"error": "Job not found."})
             state = dict(job[key])
+            state.pop("phase_weights", None)   # internal pacing, not the client's business
             started = state.get("started")
             if started:
                 state["elapsed_seconds"] = round(time.monotonic() - started, 1)
@@ -349,10 +393,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 work += duration(str(item)) * (width * height / 1e6)
             except Exception:
                 work += item.stat().st_size / 3e6  # rough fallback when probing fails
-        estimate = max(8, round(work / _perf_rates()[kind] + 4))
+        rates = _perf_rates()
+        estimate = max(8, round(work / rates[kind] + 4))
+        # Two steps share the bar: preparing the source (a re-encode, unless a
+        # single H.264 file can be used as-is) and the motion/sound scan.
+        prepare = 0.0 if kind == "fast" else work / rates["encode"]
         job["analyse_perf"] = {"kind": kind, "work": work}
         job["analyse_status"] = {"state": "running", "started": time.monotonic(),
-                                 "estimated_seconds": estimate,
+                                 "estimated_seconds": estimate, "percent": 0,
+                                 "phase_weights": [prepare, work / rates["fast"]],
                                  "message": "מכינה את הסרטונים…"}
         threading.Thread(target=self._run_analyse, args=(job, job_id, max_duration), daemon=True).start()
         return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/analyse-status/{job_id}"})
@@ -361,19 +410,24 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _run_analyse(cls, job: dict, job_id: str, max_duration: float | None) -> None:
         status = job["analyse_status"]
         try:
-            def progress(message: str) -> None:
-                status["message"] = message
+            phases = _Phases(status, status.get("phase_weights") or [0.0, 1.0])
 
-            source = cls._prepare_source(job["inputs"], Path(job["folder"]), progress)
+            def prepared(message: str, fraction: float = 0.0) -> None:
+                phases.note(message)
+                phases.update(fraction)
+
+            source = cls._prepare_source(job["inputs"], Path(job["folder"]), prepared)
             job["source"] = source
-            status["message"] = "מנתחת תנועה וסאונד…"
-            report = analyse_action(str(source), max_duration=max_duration)
+            phases.start(1, "מנתחת תנועה וסאונד…")
+            report = analyse_action(str(source), max_duration=max_duration,
+                                    progress=phases.update)
             report["job_id"] = job_id
             job["report"] = report
             perf = job.get("analyse_perf", {})
             _record_rate(perf.get("kind", ""), perf.get("work", 0),
                          time.monotonic() - status["started"])
-            status.update({"state": "done", "message": "הניתוח הושלם.", "report": report})
+            status.update({"state": "done", "message": "הניתוח הושלם.", "report": report,
+                           "percent": 100, "eta_seconds": 0})
         except Exception as exc:
             detail = str(exc)
             stderr = getattr(exc, "stderr", None)
@@ -393,6 +447,28 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         stream = json.loads(result.stdout)["streams"][0]
         return stream.get("codec_name", ""), int(stream.get("width", 0)), int(stream.get("height", 0))
 
+    @staticmethod
+    def _video_bitrate(path: Path) -> int:
+        """Bits per second of the video stream, 0 when the container hides it."""
+        try:
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=bit_rate", "-of",
+                 "default=noprint_wrappers=1:nokey=1", str(path)],
+                capture_output=True, text=True, check=True)
+            return int(result.stdout.strip())
+        except (subprocess.CalledProcessError, ValueError):
+            return 0
+
+    @staticmethod
+    def _safe_duration(path: Path) -> float:
+        """Length in seconds, or 0 when it cannot be read (progress then just
+        falls back to a message with no percentage)."""
+        try:
+            return duration(str(path))
+        except Exception:
+            return 0.0
+
     @classmethod
     def _prepare_source(cls, inputs: list[Path], folder: Path, progress=None) -> Path:
         """Build the editing source at the footage's native resolution.
@@ -401,33 +477,45 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         other codecs are converted once at source resolution for browser
         preview; several files are normalised to the first file's size so they
         can be concatenated in drop order.
+
+        ``progress(message, fraction)`` is called as the work advances, with a
+        real 0..1 fraction taken from ffmpeg rather than a guess.
         """
         from .action import _has_audio
         codec, width, height = cls._video_meta(inputs[0])
         if len(inputs) == 1:
             if codec == "h264":
                 return inputs[0]
+            label = "ממירה את הסרטון לפורמט תואם, באיכות מלאה…"
             if progress:
-                progress("ממירה את הסרטון לפורמט תואם, באיכות מלאה…")
+                progress(label, 0.0)
             target = folder / "source.mp4"
-            subprocess.run(
-                ["ffmpeg", "-y", "-v", "error", "-i", str(inputs[0]), "-map", "0:v:0", "-map", "0:a?",
-                 "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-c:a", "aac",
-                 "-movflags", "+faststart", str(target)], check=True, capture_output=True)
+            cmd = ["ffmpeg", "-y", "-v", "error", "-hwaccel", "auto", "-i", str(inputs[0]),
+                   "-map", "0:v:0", "-map", "0:a?",
+                   *h264_args(width, height, cls._video_bitrate(inputs[0])),
+                   "-c:a", "aac", "-movflags", "+faststart", str(target)]
+            run_with_progress(cmd, cls._safe_duration(inputs[0]),
+                              (lambda done: progress(label, done)) if progress else None)
             return target
         width, height = max(2, width - width % 2), max(2, height - height % 2)
         normalised = []
         for index, source in enumerate(inputs):
+            label = f"מנרמלת סרטון {index + 1}/{len(inputs)}…"
+            # Each file owns its slice of the step, so the bar keeps climbing
+            # across a multi-clip batch instead of restarting per file.
+            span, base = 1 / len(inputs), index / len(inputs)
             if progress:
-                progress(f"מנרמלת סרטון {index + 1}/{len(inputs)}…")
+                progress(label, base)
             target = folder / f"normalised-{index:03d}.mp4"
             cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(source), "-f", "lavfi", "-i",
                    "anullsrc=r=48000:cl=stereo", "-vf",
                    f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih),setsar=1,fps=30",
                    "-map", "0:v:0", "-map", "0:a:0" if _has_audio(str(source)) else "1:a:0",
-                   "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-c:a", "aac", "-shortest", str(target)]
-            subprocess.run(cmd, check=True, capture_output=True)
+                   *h264_args(width, height, cls._video_bitrate(source)),
+                   "-c:a", "aac", "-shortest", str(target)]
+            run_with_progress(cmd, cls._safe_duration(source),
+                              (lambda done: progress(label, base + span * done)) if progress else None)
             normalised.append(target)
         listing = folder / "videos.txt"
         listing.write_text("".join("file '" + str(item).replace("'", "'\\''") + "'\n" for item in normalised))
@@ -514,7 +602,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             estimate = max(10, round(work / _perf_rates()["export"] + 5))
             job["export_perf"] = {"work": work}
             job["export_status"] = {"state": "running", "started": time.monotonic(),
-                                    "estimated_seconds": estimate,
+                                    "estimated_seconds": estimate, "percent": 0,
                                     "message": "מכינה את קטעי הווידאו…"}
             threading.Thread(target=self._run_export,
                              args=(job, clips, request.get("transition", "cut"),
@@ -540,8 +628,10 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                     use_music: bool, music_start: float, speed: float,
                     remove_original_audio: bool, quality: str = "1080",
                     music_volume: float = .65, aspect: str = "16:9") -> None:
+        status = job["export_status"]
         try:
-            job["export_status"]["message"] = "מייצאת את הסרט הערוך…"
+            status["message"] = "מייצאת את הסרט הערוך…"
+            phases = _Phases(status, [1.0])
             version = len(job.get("exports", [])) + 1
             output = Path(job["folder"]) / f"RK-Motion-edit-{version:02d}.mp4"
             export_edited_movie(str(job["source"]), clips, str(output),
@@ -549,7 +639,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                                 music_paths=[str(item) for item in job["music"]] if use_music and job.get("music") else None,
                                 music_start=music_start, speed=speed,
                                 remove_original_audio=remove_original_audio,
-                                quality=quality, music_volume=music_volume, aspect=aspect)
+                                quality=quality, music_volume=music_volume, aspect=aspect,
+                                progress=phases.update)
             job["export"] = output
             job_id = job["report"]["job_id"]
             entry = {"file": str(output), "version": version,
@@ -561,9 +652,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                        for item in job["exports"]]
             _record_rate("export", job.get("export_perf", {}).get("work", 0),
                          time.monotonic() - job["export_status"]["started"])
-            job["export_status"].update({"state": "done", "progress": 100,
-                                         "message": "הסרט מוכן.", "history": history,
-                                         "download": f"/api/export/{job_id}"})
+            status.update({"state": "done", "percent": 100, "eta_seconds": 0,
+                           "message": "הסרט מוכן.", "history": history,
+                           "download": f"/api/export/{job_id}"})
         except Exception as exc:
             detail = str(exc)
             stderr = getattr(exc, "stderr", None)
@@ -571,7 +662,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 if isinstance(stderr, bytes):
                     stderr = stderr.decode("utf-8", "replace")
                 detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
-            job["export_status"].update({"state": "error", "message": f"Export failed: {detail}"})
+            status.update({"state": "error", "message": f"Export failed: {detail}"})
 
 
 def _lan_ip() -> str | None:

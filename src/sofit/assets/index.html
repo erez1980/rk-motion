@@ -793,6 +793,18 @@ function etaText(seconds) {
   if (seconds < 1) return ' · עוד רגע…';   // the estimate ran out but the work hasn't
   return ` · נשאר בערך ${fmt(seconds)}`;
 }
+/* The server measures how far ffmpeg actually is and how fast it is going, so
+   prefer that over the up-front guess — which is what used to leave a long
+   conversion pinned at 97% saying "עוד רגע" for minutes. */
+function jobProgress(d) {
+  if (Number.isFinite(d.percent)) {
+    return { percent: Math.min(99, Math.max(1, Math.round(d.percent))),
+             eta: Number.isFinite(d.eta_seconds) ? d.eta_seconds : NaN };
+  }
+  const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
+  return { percent: Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100))),
+           eta: Math.max(0, Math.round(estimate - elapsed)) };
+}
 function invalidateDownload() { $('#download').classList.remove('show'); $('#result').classList.remove('show'); }
 function step(n) {
   for (let i = 1; i <= 3; i++) {
@@ -822,9 +834,8 @@ function pollAnalyse(statusUrl) {
         if (!d.state) throw Error(d.error || 'הניתוח נכשל.');
         if (d.state === 'error') { clearInterval(timer); return reject(Error(d.message || 'הניתוח נכשל.')); }
         if (d.state === 'done') { clearInterval(timer); return resolve(d.report); }
-        const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
-        const percent = Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100)));
-        stMain.show((d.message || 'מנתחת…') + etaText(estimate - elapsed), percent, { working: true });
+        const { percent, eta } = jobProgress(d);
+        stMain.show((d.message || 'מנתחת…') + etaText(eta), percent, { working: true });
       } catch (error) {
         clearInterval(timer);
         reject(error);
@@ -1520,9 +1531,9 @@ function exportProgress(statusUrl, btn) {
     try {
       const r = await fetch(statusUrl), d = await r.json();
       if (d.error) throw Error(d.error);
-      const elapsed = d.elapsed_seconds || 0, estimate = d.estimated_seconds || 1;
-      const percent = d.state === 'done' ? 100 : Math.min(97, Math.max(3, Math.round(elapsed / estimate * 100)));
-      const suffix = d.state === 'done' ? '' : etaText(Math.max(0, Math.round(estimate - elapsed)));
+      const live = jobProgress(d);
+      const percent = d.state === 'done' ? 100 : live.percent;
+      const suffix = d.state === 'done' ? '' : etaText(live.eta);
       stExport.show((d.message || 'מייצאת…') + suffix, percent, { error: d.state === 'error', working: d.state === 'running' });
       if (d.state === 'done') {
         clearInterval(timer);

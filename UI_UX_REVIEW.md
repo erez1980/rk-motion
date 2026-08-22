@@ -161,3 +161,44 @@ Three problems reported from real use on a Mac and an iPhone.
   outside the whitelist 404s.
 - Header at 1280px, iPhone 13 and iPhone SE: SVG icons only, 46x44 tap
   targets on mobile, no horizontal overflow.
+
+---
+
+## Round 6 — "is it doing anything?"
+
+Reported while converting an iPhone clip: *"is there a reason this step is
+really long and has no progress time? I can't tell if it's doing anything."*
+The message on screen was **"ממירה את הסרטון לפורמט תואם, באיכות מלאה… · עוד
+רגע…"** — for minutes.
+
+Both halves of that were real defects.
+
+- **The bar was guessing.** Every long step drew `elapsed ÷ up-front-estimate`,
+  clamped to 97%. Once the estimate ran out — which is exactly what happens on
+  the footage that takes longest — the bar froze near full and the ETA
+  degraded to "עוד רגע…" forever. It now asks ffmpeg where it actually is
+  (`-progress`), and the motion/sound scan reports the second it is reading.
+  Time left is re-measured from the step's own speed, so the number converges
+  instead of expiring. Steps are weighted by their expected cost, so one bar
+  covers preparing the source and scanning it without ever going backwards.
+- **The step really was slow, and avoidably so.** iPhones record HEVC, so
+  every iPhone upload hits a full libx264 re-encode of the whole ride — the
+  single most expensive thing the app does. Macs have a dedicated encoder
+  chip; a one-frame probe now picks `h264_videotoolbox` when it genuinely runs
+  on this machine, with decode acceleration on the way in and libx264 as the
+  fallback everywhere else. Quality is held by targeting above the source's
+  own bitrate, since the hardware encoder has no CRF knob.
+
+Exporting had the same defect one step later — a single message and the same
+expiring guess — so it now reports a real fraction across all of its passes
+(cut each clip, mix music, fade the tail), weighted by cost.
+
+## Verification performed
+
+- Full test suite: 137 passed, 1 skipped.
+- Real HEVC ride through the browser: the bar climbed 1% → 100% with a
+  countdown that converged (50s → 1s), across conversion and scan, no console
+  errors. Same for a real export.
+- Multi-clip batches keep one climbing bar instead of restarting per file.
+- Checked the bar is monotonic in every path, and that a failed ffmpeg still
+  surfaces its stderr for the status message.

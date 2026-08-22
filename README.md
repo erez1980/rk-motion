@@ -114,6 +114,14 @@ On the phone, **Share → Add to Home Screen** turns it into a full-screen app
 with the RK Motion icon. (Already added it before v0.7.0? Remove and re-add it
 once — iOS caches the old icon.)
 
+#### Speed and progress
+
+Every long step reports where ffmpeg actually is, not an elapsed-time guess,
+so the bar and the "time left" figure both mean something. On a Mac the
+source conversion uses the machine's hardware H.264 encoder when a probe
+confirms it works (iPhone footage is HEVC, so that conversion is otherwise
+the slowest thing the app does); elsewhere it falls back to libx264.
+
 #### Get told when it's done
 
 Analysing and exporting take minutes, so the page is built to be walked away

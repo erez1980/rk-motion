@@ -12,6 +12,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -32,6 +33,91 @@ def duration(path: str) -> float:
     return float(result.stdout.strip())
 
 
+def run_with_progress(cmd: list[str], total_seconds: float, progress=None) -> None:
+    """Run an ffmpeg command, reporting a real 0..1 fraction as it works.
+
+    ffmpeg knows exactly how far into the footage it is; asking it (via
+    ``-progress``) beats guessing from elapsed time, which is what left long
+    conversions sitting on a full bar with nothing to say.
+    """
+    if progress is None or total_seconds <= 0:
+        subprocess.run(cmd, check=True, capture_output=True)
+        return
+    watched = [cmd[0], "-progress", "pipe:1", "-nostats", *cmd[1:]]
+    proc = subprocess.Popen(watched, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert proc.stdout
+    for line in proc.stdout:
+        key, _, value = line.strip().partition("=")
+        if key == "out_time_us" and value.isdigit():
+            progress(min(1.0, int(value) / 1e6 / total_seconds))
+    stderr = proc.stderr.read() if proc.stderr else ""
+    if proc.wait() != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=stderr)
+    progress(1.0)
+
+
+class _Stages:
+    """Maps a sequence of ffmpeg passes onto one 0..1 bar.
+
+    An export is several passes over the movie (cut every clip, mix music,
+    fade the tail). Weighting them by relative cost keeps the bar moving at a
+    steady speed instead of leaping between stages.
+    """
+
+    def __init__(self, progress, weights: list[float]) -> None:
+        self._progress = progress
+        self._weights = [max(w, 1e-6) for w in weights] or [1.0]
+        self._total = sum(self._weights)
+        self._index = -1
+
+    def next(self):
+        """Advance to the next pass and return its progress callback."""
+        self._index = min(self._index + 1, len(self._weights) - 1)
+        return None if self._progress is None else self._report
+
+    def _report(self, fraction: float) -> None:
+        fraction = min(1.0, max(0.0, fraction))
+        done = sum(self._weights[:self._index]) + self._weights[self._index] * fraction
+        self._progress(done / self._total)
+
+
+_H264_ENCODER: str | None = None
+
+
+def h264_encoder() -> str:
+    """The fastest H.264 encoder that actually runs on this machine.
+
+    Re-encoding a long 4K iPhone/GoPro clip with libx264 is by far the slowest
+    thing the app does — minutes of pegged CPU. Macs have a dedicated encoder
+    chip that does the same job several times faster, so use it when a probe
+    confirms it works here, and keep libx264 as the fallback everywhere else.
+    """
+    global _H264_ENCODER
+    if _H264_ENCODER is None:
+        _H264_ENCODER = "libx264"
+        if sys.platform == "darwin":
+            probe = subprocess.run(
+                ["ffmpeg", "-v", "error", "-f", "lavfi",
+                 "-i", "testsrc2=size=128x72:rate=5:duration=0.4",
+                 "-c:v", "h264_videotoolbox", "-f", "null", "-"], capture_output=True)
+            if probe.returncode == 0:
+                _H264_ENCODER = "h264_videotoolbox"
+    return _H264_ENCODER
+
+
+def h264_args(width: int = 0, height: int = 0, source_bitrate: int = 0) -> list[str]:
+    """Encoder settings that keep the footage looking like the original.
+
+    The hardware encoder has no CRF, so quality is held by aiming above the
+    source's own bitrate (or a resolution-based floor when it is unknown).
+    """
+    if h264_encoder() != "h264_videotoolbox":
+        return ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast"]
+    floor = int(width * height * 30 * 0.08) if width and height else 12_000_000
+    target = min(max(int(max(source_bitrate, floor) * 1.25), 6_000_000), 80_000_000)
+    return ["-c:v", "h264_videotoolbox", "-b:v", str(target)]
+
+
 def _normalise(values: dict[int, float]) -> dict[int, float]:
     """Robust 0..1 normalisation; a single flash/explosion cannot dominate."""
     nonzero = sorted(v for v in values.values() if v > 0)
@@ -43,7 +129,8 @@ def _normalise(values: dict[int, float]) -> dict[int, float]:
     return {k: max(0.0, min(1.0, (v - floor) / span)) for k, v in values.items()}
 
 
-def _motion_per_second(path: str, fps: int = 2, width: int = 160, height: int = 90) -> dict[int, float]:
+def _motion_per_second(path: str, fps: int = 2, width: int = 160, height: int = 90,
+                       progress=None) -> dict[int, float]:
     """Average absolute luma-frame difference, sampled cheaply at low resolution."""
     cmd = ["ffmpeg", "-v", "error", "-i", path, "-an", "-vf",
            f"fps={fps},scale={width}:{height}:flags=fast_bilinear,format=gray",
@@ -64,13 +151,15 @@ def _motion_per_second(path: str, fps: int = 2, width: int = 160, height: int = 
             values[int(index / fps)].append(diff)
         previous = frame
         index += 1
+        if progress and index % (fps * 2) == 0:
+            progress(index / fps)
     stderr = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
     if proc.wait() not in (0, None):
         raise RuntimeError(f"ffmpeg video analysis failed: {stderr[-500:]}")
     return {second: sum(samples) / len(samples) for second, samples in values.items()}
 
 
-def _audio_per_second(path: str, sample_rate: int = 8000) -> dict[int, float]:
+def _audio_per_second(path: str, sample_rate: int = 8000, progress=None) -> dict[int, float]:
     """RMS loudness per second from a small mono PCM stream."""
     cmd = ["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar",
            str(sample_rate), "-f", "s16le", "-"]
@@ -87,6 +176,8 @@ def _audio_per_second(path: str, sample_rate: int = 8000) -> dict[int, float]:
         if samples:
             out[second] = math.sqrt(sum(x * x for x in samples) / len(samples)) / 32768
         second += 1
+        if progress and second % 5 == 0:
+            progress(second)
     # Some silent/no-audio videos make ffmpeg exit 1; visual scoring still works.
     proc.wait()
     return out
@@ -124,11 +215,16 @@ def _ranges(scores: dict[int, float], threshold: float, min_duration: int,
 
 
 def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
-                   padding: int = 2, max_duration: float | None = None) -> dict:
+                   padding: int = 2, max_duration: float | None = None,
+                   progress=None) -> dict:
     """Return ranked, reviewable action candidates for ``path``.
 
     Score weights deliberately favor motion (65%) over sound (35%), so music
     or a loud monologue alone is not reported as an action scene.
+
+    ``progress`` is called with a 0..1 fraction of the scan. The two passes
+    read the same footage but the visual one costs several times more, which
+    is why it owns most of the bar.
     """
     if not 0 < threshold <= 1:
         raise ValueError("threshold must be in the range 0..1")
@@ -137,8 +233,11 @@ def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
     if max_duration is not None and max_duration < 1:
         raise ValueError("max_duration must be at least 1 second")
     total = duration(path)
-    motion = _motion_per_second(path)
-    audio = _audio_per_second(path)
+    span = max(total, 1.0)
+    def at(base: float, weight: float):
+        return (lambda seconds: progress(base + weight * min(1.0, seconds / span))) if progress else None
+    motion = _motion_per_second(path, progress=at(0.0, .8))
+    audio = _audio_per_second(path, progress=at(.8, .2))
     motion_n, audio_n = _normalise(motion), _normalise(audio)
     all_seconds = range(max(1, math.ceil(total)))
     scores = {sec: .65 * motion_n.get(sec, 0.0) + .35 * audio_n.get(sec, 0.0)
@@ -233,8 +332,12 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
                         music_paths: list[str] | None = None, music_start: float = 0,
                         speed: float = 1.0, remove_original_audio: bool = False,
                         quality: str = "1080", music_volume: float = .65,
-                        aspect: str = "16:9") -> str:
-    """Join approved clips, optionally applying a video/audio transition."""
+                        aspect: str = "16:9", progress=None) -> str:
+    """Join approved clips, optionally applying a video/audio transition.
+
+    ``progress`` is called with a 0..1 fraction of the whole export, measured
+    from ffmpeg's own position in each pass rather than from elapsed time.
+    """
     if not clips:
         raise ValueError("select at least one clip before exporting")
     _need_ffmpeg()
@@ -249,27 +352,40 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
         raise ValueError("music volume must be between 0 and 2")
     if aspect not in ASPECTS:
         raise ValueError(f"unsupported aspect: {aspect}")
-    target = Path(output)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if transition != "cut" and len(clips) > 1:
-        _export_with_transitions(path, clips, target, transition, transition_duration, profile, aspect)
-    else:
-        _export_hard_cuts(path, clips, target, profile, aspect)
     if speed not in {1.0, 1.25, 1.5, 2.0}:
         raise ValueError("speed must be 1, 1.25, 1.5 or 2")
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # Relative cost of each remaining pass: re-encodes cost about one pass over
+    # the movie each, mixing music only touches the audio.
+    weights = [1.0]
     if speed != 1:
-        _speed_up_movie(target, speed)
+        weights.append(1.0)
+    if music_paths:
+        weights.append(.2)
+    weights.append(1.0)                       # the closing fade re-encodes too
+    stages = _Stages(progress, weights)
+    if transition != "cut" and len(clips) > 1:
+        _export_with_transitions(path, clips, target, transition, transition_duration,
+                                 profile, aspect, stages.next())
+    else:
+        _export_hard_cuts(path, clips, target, profile, aspect, stages.next())
+    if speed != 1:
+        _speed_up_movie(target, speed, stages.next())
     if remove_original_audio:
         _strip_audio(target)
     if music_paths:
-        _mix_music(target, music_paths, music_start, music_volume)
+        _mix_music(target, music_paths, music_start, music_volume, stages.next())
     # Every export ends on a fade to black instead of a hard cut, whether or
     # not there is a soundtrack fading its own tail.
-    _fade_out_movie(target, profile)
+    _fade_out_movie(target, profile, progress=stages.next())
+    if progress:
+        progress(1.0)
     return str(target)
 
 
-def _fade_out_movie(target: Path, profile: dict, fade: float = FADE_OUT_SECONDS) -> None:
+def _fade_out_movie(target: Path, profile: dict, fade: float = FADE_OUT_SECONDS,
+                    progress=None) -> None:
     movie_duration = duration(str(target))
     fade = min(fade, movie_duration / 2)
     start = max(0, movie_duration - fade)
@@ -279,14 +395,18 @@ def _fade_out_movie(target: Path, profile: dict, fade: float = FADE_OUT_SECONDS)
     if _has_audio(str(target)):
         cmd.extend(["-af", f"afade=t=out:st={start:.3f}:d={fade:.3f}", "-map", "0:a:0", "-c:a", "aac"])
     cmd.extend(["-c:v", "libx264", *profile["encode"], "-movflags", "+faststart", str(faded)])
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_with_progress(cmd, movie_duration, progress)
     faded.replace(target)
 
 
-def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict, aspect: str = "16:9") -> None:
+def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict,
+                      aspect: str = "16:9", progress=None) -> None:
     frame = _frame_filter(aspect, profile["max_height"])
+    lengths = [max(0.0, float(clip["end"]) - float(clip["start"])) for clip in clips]
+    movie = sum(lengths) or 1.0
     with tempfile.TemporaryDirectory(prefix="rk-motion-") as tmp:
         parts = []
+        cut = 0.0                      # movie seconds already written
         for index, clip in enumerate(clips, 1):
             start, end = float(clip["start"]), float(clip["end"])
             if end <= start or start < 0:
@@ -298,7 +418,12 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict,
                 cmd.extend(["-vf", frame])
             cmd.extend(["-c:v", "libx264", *profile["encode"], "-c:a", "aac",
                         "-movflags", "+faststart", str(part)])
-            subprocess.run(cmd, check=True, capture_output=True)
+            # Each clip advances the bar by its own share of the finished movie,
+            # so a long clip does not look like a stall.
+            done, length = cut, lengths[index - 1]
+            run_with_progress(cmd, length,
+                              (lambda f: progress((done + length * f) / movie)) if progress else None)
+            cut += length
             parts.append(part)
         listing = Path(tmp) / "concat.txt"
         # Paths generated above are trusted local temp files. ffconcat quotes apostrophes.
@@ -308,7 +433,7 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict,
                        check=True, capture_output=True)
 
 
-def _speed_up_movie(target: Path, speed: float) -> None:
+def _speed_up_movie(target: Path, speed: float, progress=None) -> None:
     """Change video and its original sound together, before music is mixed."""
     fast = target.with_name(target.stem + ".fast.mp4")
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(target), "-filter:v", f"setpts=PTS/{speed}",
@@ -316,7 +441,7 @@ def _speed_up_movie(target: Path, speed: float) -> None:
     if _has_audio(str(target)):
         cmd.extend(["-filter:a", f"atempo={speed}", "-map", "0:a:0", "-c:a", "aac"])
     cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", str(fast)])
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_with_progress(cmd, duration(str(target)) / speed, progress)
     fast.replace(target)
 
 
@@ -330,7 +455,7 @@ def _strip_audio(target: Path) -> None:
 
 
 def _mix_music(target: Path, music_paths: list[str], music_start: float,
-               music_volume: float = .65) -> None:
+               music_volume: float = .65, progress=None) -> None:
     """Mix music starting at ``music_start`` within the source track(s)."""
     music = [Path(item) for item in music_paths]
     if not music or any(not item.is_file() for item in music):
@@ -365,13 +490,13 @@ def _mix_music(target: Path, music_paths: list[str], music_start: float,
         maps = ["-map", "0:v:0", "-map", "[music]"]
     cmd.extend(["-filter_complex", audio_filter, *maps, "-t", str(movie_duration),
                 "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", str(mixed)])
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_with_progress(cmd, movie_duration, progress)
     mixed.replace(target)
 
 
 def _export_with_transitions(path: str, clips: list[dict], target: Path,
                              transition: str, transition_duration: float,
-                             profile: dict, aspect: str = "16:9") -> str:
+                             profile: dict, aspect: str = "16:9", progress=None) -> str:
     """Use xfade/acrossfade directly from the source for smooth joined clips."""
     audio = _has_audio(path)
     durations: list[float] = []
@@ -413,5 +538,5 @@ def _export_with_transitions(path: str, clips: list[dict], target: Path,
     if audio:
         cmd.extend(["-c:a", "aac"])
     cmd.extend(["-movflags", "+faststart", str(target)])
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_with_progress(cmd, timeline, progress)
     return str(target)
