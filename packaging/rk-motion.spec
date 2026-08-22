@@ -32,8 +32,9 @@ a = Analysis(
     pathex=[str(ROOT / "src")],
     binaries=binaries,
     datas=datas,
-    # Lazily imported inside ui.py for the --lan / phone-access QR code.
-    hiddenimports=["qrcode"],
+    # Lazily imported for --lan phone access: the QR code, and the certificate
+    # generator used where openssl is not on PATH (mainly Windows).
+    hiddenimports=["qrcode", "cryptography"],
     # The editor is stdlib-only; keep the podcast pipeline's heavy stacks out.
     excludes=["faster_whisper", "anthropic", "cv2", "numpy", "PIL", "bidi", "mcp", "pytest"],
 )

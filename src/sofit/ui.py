@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import shutil
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -22,6 +23,7 @@ from urllib.parse import unquote, urlparse
 from . import __version__
 from .action import (analyse_action, duration, export_edited_movie, h264_args,
                      h264_encoder, run_encode)
+from .lan_tls import certificate_for
 
 ASSETS = Path(__file__).with_name("assets")
 INDEX = ASSETS / "index.html"
@@ -160,7 +162,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                     break
                 try:
                     self.wfile.write(chunk)
-                except (BrokenPipeError, ConnectionResetError):
+                except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
                     # Browsers routinely cancel an old byte-range request when
                     # the user seeks or a new preview starts. That is expected,
                     # not an application/export failure.
@@ -713,25 +715,18 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
     the same Wi-Fi (e.g. an iPhone), so a phone can drive the editor while this
     machine does the processing. Off by default: the server stays on localhost.
     """
-    host = "0.0.0.0" if lan else "127.0.0.1"
-    server = ThreadingHTTPServer((host, port), RKMotionHandler)
+    # This machine always talks to itself over plain http on the loopback
+    # address, which browsers already treat as a secure origin. Phones get
+    # their own HTTPS listener on the network address — same port, different
+    # interface — because only a secure connection may open the share sheet
+    # that saves a finished movie to the camera roll.
+    server = ThreadingHTTPServer(("127.0.0.1", port), RKMotionHandler)
     url = f"http://127.0.0.1:{port}"
     encoder = h264_encoder()
     hardware = "GPU" if encoder != "libx264" else "CPU"
     print(f"RK Motion v{__version__} is running at {url} (Ctrl+C to stop)")
     print(f"Video encoding: {encoder} ({hardware})")
-    if lan:
-        ip = _lan_ip()
-        if ip:
-            lan_url = f"http://{ip}:{port}"
-            print(f"\nOn your phone (same Wi-Fi), open: {lan_url}")
-            print("Scan this QR code to open it directly:\n")
-            if not _print_qr(lan_url):
-                print("(Install 'qrcode' for a scannable code here — pip install qrcode)")
-            print("\nAnyone on this Wi-Fi can reach the app while it runs.\n")
-        else:
-            print("\nLAN mode is on, but no network address was found. "
-                  "Connect to Wi-Fi and restart to share with a phone.\n")
+    phone = _serve_to_phones(port) if lan else None
     threading.Timer(.3, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
@@ -739,5 +734,43 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
         return 0
     finally:
         server.server_close()
+        if phone:
+            phone.shutdown()
+            phone.server_close()
         for job in JOBS.values():
             shutil.rmtree(job["folder"], ignore_errors=True)
+
+
+def _serve_to_phones(port: int) -> ThreadingHTTPServer | None:
+    """Open a second listener on this machine's network address, over HTTPS."""
+    ip = _lan_ip()
+    if not ip:
+        print("\nLAN mode is on, but no network address was found. "
+              "Connect to Wi-Fi and restart to share with a phone.\n")
+        return None
+    pair = certificate_for(ip)
+    if not pair:
+        print("\nLAN mode needs a certificate and this machine has no way to make one "
+              "(install the 'cryptography' package, or openssl). Phone access is off.\n")
+        return None
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(*pair)
+    try:
+        phone = ThreadingHTTPServer((ip, port), RKMotionHandler)
+    except OSError as error:
+        print(f"\nCould not open {ip}:{port} for phone access ({error}).\n")
+        return None
+    phone.socket = context.wrap_socket(phone.socket, server_side=True)
+    threading.Thread(target=phone.serve_forever, daemon=True).start()
+
+    lan_url = f"https://{ip}:{port}"
+    print(f"\nOn your phone (same Wi-Fi), open: {lan_url}")
+    print("Scan this QR code to open it directly:\n")
+    if not _print_qr(lan_url):
+        print("(Install 'qrcode' for a scannable code here — pip install qrcode)")
+    print("\nThe first time on each phone the browser warns that the connection is not")
+    print("private: the certificate is this computer's own, not one a company signed.")
+    print("Tap Show Details, then Visit This Website. That warning is what buys you")
+    print("saving the finished movie straight to the phone's camera roll.")
+    print("\nAnyone on this Wi-Fi can reach the app while it runs.\n")
+    return phone

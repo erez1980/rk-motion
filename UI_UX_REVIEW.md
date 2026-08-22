@@ -281,3 +281,45 @@ window.
   right filename, no new tab, no navigation.
 - Checked the response carries `Content-Type: video/mp4` and no
   `Content-Disposition`.
+
+---
+
+## Round 9 — HTTPS for the phone
+
+Saving a movie into the phone's camera roll goes through the system share
+sheet, and browsers only offer that to a secure page. `http://127.0.0.1`
+already counts as secure, so the app on this computer was fine; a phone
+reaching the machine by its network address was not, and got a plain download
+into Files instead.
+
+LAN mode now serves HTTPS. The certificate is generated on this machine and
+kept in `~/.rk-motion`, reused across launches so a phone that accepted it
+once is not asked again, and regenerated when the network address changes or
+it ages out. It names `localhost`, `127.0.0.1` and the current network
+address, because Safari rejects a certificate that does not name the address
+that was dialled before the accept-once prompt is ever shown, and it lives 397
+days because Apple refuses server certificates valid for longer.
+
+Two listeners rather than one: plain http bound to the loopback address for
+this machine (no certificate warning where none is needed) and HTTPS bound to
+the network address for phones — same port, different interface. Certificates
+come from `openssl` where it exists, falling back to the `cryptography`
+package, which is now bundled so Windows gets HTTPS too. If neither is
+available the app still starts; only phone access is off, and it says so.
+
+## Verification performed
+
+- Full test suite: 158 passed, 1 skipped.
+- A real dual-listener run: index, capabilities, manifest, icons and a
+  **byte-range request** (206, which video playback needs) all served over TLS
+  from the network address, while the loopback http listener kept working.
+- **A page loaded over this certificate reports `isSecureContext: true`** —
+  the open question when this was proposed, and the whole point of the change.
+  Notifications and Wake Lock are exposed to it. The share sheet itself is
+  Safari-on-iOS behaviour that cannot be exercised in this container; what is
+  proven here is the secure context it is gated on.
+- Certificate contents checked with `openssl x509`: right subject alternative
+  names, right validity window, key written 0600.
+- A deliberately broken `cryptography` install falls through to `openssl`
+  instead of taking the app down — its Rust bindings raise something that does
+  not derive from `Exception`, so the guard had to go wider.
