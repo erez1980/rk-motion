@@ -776,26 +776,43 @@ const MIME = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
                 mp3: 'audio/mpeg', m4a: 'audio/mp4' };
 const mimeFor = name => MIME[String(name).split('.').pop().toLowerCase()] || 'application/octet-stream';
 
-async function saveMovie(url, filename, anchor) {
-  if (!CAN_SHARE_FILES) return false;        // let the plain download happen
+/* navigator.share only runs while the tap is still live. Awaiting the fetch
+   for the file spends that activation, and the browser then refuses the sheet
+   outright — so the file is pulled into memory as soon as it is ready and the
+   tap only has to hand over something already in hand. */
+let readyFile = null;             // {url, file}
+
+async function prepareToShare(url, filename) {
+  readyFile = null;
+  if (!CAN_SHARE_FILES) return;
   try {
     const blob = await (await fetch(url)).blob();
-    await navigator.share({ files: [new File([blob], filename, { type: mimeFor(filename) })] });
-    return true;
-  } catch (error) {
-    // The user closing the sheet is a decision, not a failure to work around.
-    return error?.name === 'AbortError';
-  }
+    readyFile = { url, file: new File([blob], filename, { type: mimeFor(filename) }) };
+  } catch { /* the plain browser download still works */ }
 }
 
 function asDownload(anchor) {
-  anchor.addEventListener('click', async event => {
-    if (!CAN_SHARE_FILES) return;            // the browser download is the right thing
+  anchor.addEventListener('click', event => {
+    const ready = readyFile;
+    // Not prepared (or a different file): the browser's own download is right.
+    if (!ready || ready.url !== anchor.getAttribute('href')) return;
     event.preventDefault();
-    const name = anchor.getAttribute('download') || 'RK-Motion-edit.mp4';
-    if (!await saveMovie(anchor.href, name, anchor)) window.location.href = anchor.href;
+    navigator.share({ files: [ready.file] }).catch(error => {
+      if (error?.name === 'AbortError') return;   // closing the sheet is a decision
+      // Never leave a dead button: say what happened and let the next tap
+      // fall through to a normal download.
+      readyFile = null;
+      shareFailed(anchor, error);
+    });
   });
   return anchor;
+}
+
+function shareFailed(anchor, error) {
+  const status = anchor.id === 'grabSave' ? stGrab : stExport;
+  status.show(`שיתוף הקובץ נחסם (${error?.name || 'שגיאה'}). לחצו שוב כדי להוריד אותו.`,
+              100, { error: true });
+  anchor.textContent = 'הורדה';
 }
 asDownload($('#download'));
 asDownload($('#grabSave'));
@@ -903,6 +920,7 @@ function followGrab(statusUrl, format) {
         save.href = d.download;
         save.setAttribute('download', d.name);
         save.textContent = CAN_SHARE_FILES ? 'שמירה במכשיר' : 'הורדה';
+        prepareToShare(d.download, d.name);
         $('#grabName').textContent = `${d.name} · ${fileSize(d.size)}`;
         $('#grabDone').hidden = false;
         stGrab.show('הקובץ מוכן.', 100);
@@ -1114,6 +1132,7 @@ async function resumeExport(jobId) {
       a.href = d.download;
       a.classList.add('show');
       showResult(d.download);
+      prepareToShare(d.download, 'RK-Motion-edit.mp4');
       renderHistory(d.history);
       step(3);
       stExport.show('הסרט מוכן. אפשר לצפות בו למטה או להוריד.', 100);
@@ -1745,6 +1764,7 @@ function exportProgress(statusUrl, btn) {
           stExport.show('הסרט מוכן. לחצו על הורדת MP4 כדי לשמור אותו.', 100);
         }
         showResult(d.download);
+        prepareToShare(d.download, 'RK-Motion-edit.mp4');
         renderHistory(d.history);
         btn.disabled = false;
         setBusy(0);

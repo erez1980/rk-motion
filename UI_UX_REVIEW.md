@@ -360,3 +360,37 @@ nothing else.
   Rights confirmation gates the request before anything is posted; a made-up
   video id never reaches the command line.
 - Titles fully readable at 320px and 390px, no horizontal overflow.
+
+---
+
+## Round 11 — the save button, again
+
+Still nothing on tap. The cause is a rule I got wrong: `navigator.share` only
+runs while the tap is still "live", and the click handler awaited a `fetch`
+for the file before calling it. That spends the activation, and WebKit then
+refuses the sheet with `NotAllowedError` — after which the code fell through
+to a navigation that looks, from the outside, like nothing happening.
+
+The file is now pulled into memory the moment an export or a download
+finishes, so the tap only has to hand over something already in hand and
+`share` is reached with no `await` in front of it. A refused share no longer
+disappears either: it names the error on screen and the next tap does a plain
+browser download.
+
+Chromium keeps activation alive across a short await, which is why the browser
+test passed the first time and why one cannot catch this. The guard is on the
+code's shape instead — nothing may be awaited between the tap and the sheet —
+and it fails on the version that shipped.
+
+## Verification performed
+
+- Full test suite: 168 passed, 1 skipped.
+- Share reached with `navigator.userActivation.isActive === true`, carrying the
+  right file and type.
+- A refused share shows its error name, relabels the button, and the next tap
+  downloads the file for real.
+- The shape guard fails when the awaited fetch is put back.
+
+**Not verified here:** whether iOS Safari now opens the sheet. This container
+has no WebKit, and Chromium does not enforce the rule that broke it. What is
+proven is that the pattern WebKit requires is the one now in the code.

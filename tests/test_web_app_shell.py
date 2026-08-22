@@ -113,6 +113,19 @@ def test_the_finished_movie_is_served_playable_not_as_an_attachment(base_url):
     assert not any("attachment=True" in line for line in export_lines)
 
 
+def test_the_share_sheet_opens_straight_off_the_tap():
+    """navigator.share only runs while the tap is still live. Awaiting the
+    fetch for the file first spends that activation and Safari refuses the
+    sheet outright, which is why the file is pulled in advance. Chromium is
+    lenient here, so a browser test cannot catch a regression — this can."""
+    click = INDEX.split("function asDownload(")[1].split("\nfunction ")[0]
+    before_share = click.split("navigator.share(")[0]
+    assert "await" not in before_share, "nothing may be awaited before the sheet opens"
+    assert "prepareToShare" in INDEX, "the file has to be in hand before the tap"
+    # And a refused share must not leave a dead button.
+    assert "shareFailed" in INDEX
+
+
 def test_saving_the_movie_prefers_the_share_sheet():
     """The system share sheet is the only route that reaches a phone's photo
     gallery; a plain download is the fallback, never a new blank tab."""
