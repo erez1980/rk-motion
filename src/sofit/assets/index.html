@@ -10,10 +10,7 @@
 <link rel="apple-touch-icon" href="/assets/icon-180.png">
 <link rel="manifest" href="/assets/manifest.webmanifest">
 <meta name="theme-color" content="#0a0d0b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="RK Motion">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <style>
 /* Rubik ships with the app (variable weight, Hebrew + Latin) so the UI needs no network. */
 @font-face{font-family:Rubik;src:url('/assets/rubik.ttf') format('truetype');font-weight:300 900;font-display:swap}
@@ -723,16 +720,50 @@ $('#notifyToggle').onclick = () => { applyNotify(!notifyOn); armAlerts(); };
 /* Launched from the iPhone home screen the page has no browser chrome and no
    download UI of its own, so a `download` link quietly does nothing. Hand the
    finished movie to Safari instead, where the share sheet can save it. */
-const STANDALONE = matchMedia('(display-mode:standalone)').matches || navigator.standalone === true;
-function asDownload(anchor) {
-  if (STANDALONE) {
-    anchor.removeAttribute('download');
-    anchor.target = '_blank';
-    anchor.rel = 'noopener';
+/* Getting the finished movie off the machine.
+
+   On a phone the only route that reaches the photo gallery is the system
+   share sheet ("Save Video"), so try that first. It needs a secure context —
+   the app on this computer, or any https address — which plain http over the
+   LAN is not; there the browser's own download lands the file in Files, and
+   iOS can move it to Photos from there. */
+const CAN_SHARE_FILES = (() => {
+  try {
+    return !!navigator.canShare?.({ files: [new File([new Blob(['x'])], 'a.mp4', { type: 'video/mp4' })] });
+  } catch { return false; }
+})();
+
+async function saveMovie(url, filename, anchor) {
+  if (!CAN_SHARE_FILES) return false;        // let the plain download happen
+  try {
+    const blob = await (await fetch(url)).blob();
+    await navigator.share({ files: [new File([blob], filename, { type: 'video/mp4' })] });
+    return true;
+  } catch (error) {
+    // The user closing the sheet is a decision, not a failure to work around.
+    return error?.name === 'AbortError';
   }
+}
+
+function asDownload(anchor) {
+  anchor.addEventListener('click', async event => {
+    if (!CAN_SHARE_FILES) return;            // the browser download is the right thing
+    event.preventDefault();
+    const name = anchor.getAttribute('download') || 'RK-Motion-edit.mp4';
+    if (!await saveMovie(anchor.href, name, anchor)) window.location.href = anchor.href;
+  });
   return anchor;
 }
 asDownload($('#download'));
+
+/* Say what the button will actually do on this device, and how the movie
+   reaches the camera roll from there. */
+if (CAN_SHARE_FILES) {
+  $('#download').textContent = 'שמירת הסרט';
+  $('#resultHint').textContent = 'אפשר לצפות בו כאן, לשמור אותו לגלריה או לשיתוף, או לחזור ולשנות קטעים ולייצא שוב.';
+} else if (matchMedia('(pointer:coarse)').matches) {
+  $('#resultHint').textContent = 'אפשר לצפות בו כאן או להוריד אותו. בטלפון ההורדה נשמרת ב״קבצים״, ומשם אפשר לשתף אותה אל ״תמונות״.';
+}
 
 /* Without yt-dlp the YouTube search is replaced by a how-to-enable note;
    the header shows the running version. */
@@ -1541,7 +1572,7 @@ function renderHistory(history) {
     const link = document.createElement('a');
     link.href = item.download;
     link.download = `RK-Motion-edit-${item.version}.mp4`;
-    link.textContent = 'הורדה';
+    link.textContent = 'שמירה';
     asDownload(link);
     row.append(meta, link);
     rows.append(row);

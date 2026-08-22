@@ -242,3 +242,42 @@ expiring guess — so it now reports a real fraction across all of its passes
 - Encoder selection, the software retry and the command rewrite are covered by
   unit tests with a mocked ffmpeg — this container has no GPU, so the hardware
   branch itself is exercised there rather than on real silicon.
+
+---
+
+## Round 8 — the movie could not get off the phone
+
+Reported: *"after the encode finishes I press Download MP4 and nothing
+happens, a browser opens with a white window."* Self-inflicted, in two steps.
+
+Round 5 added **Add to Home Screen** with `display: standalone`, so the page
+ran chrome-less on the phone. An installed iOS web app has no download
+manager, so `<a download>` does nothing there — and the guard added for that
+opened the file in a new tab instead. The export was served with
+`Content-Disposition: attachment`, which a tab cannot render. Hence the white
+window.
+
+- **The home-screen app runs in Safari again** (`display: browser`, no
+  `apple-mobile-web-app-capable`). The icon — which is what was actually
+  asked for — still works; the browser chrome that comes with it is what makes
+  saving the movie possible at all. Nothing is lost: notifications in an
+  installed iOS app need a secure context, which plain http over the LAN was
+  never going to be.
+- **The movie is served inline.** `<a download>` already names the file for a
+  real download; the attachment header only broke every other way of opening
+  it.
+- **Saving now tries the system share sheet first**, since its *Save Video* is
+  the only route that reaches the photo gallery. It needs a secure context —
+  present for the app on this computer, absent over plain http on the LAN —
+  so the button names what it will actually do on this device, and the result
+  card explains the Files → Photos step where that is the path.
+
+## Verification performed
+
+- Full test suite: 151 passed, 1 skipped.
+- Real export driven to completion twice in a mobile browser: with file
+  sharing available the finished 2.9MB MP4 reaches `navigator.share` as a
+  typed `File` and the page stays put; without it, a normal download with the
+  right filename, no new tab, no navigation.
+- Checked the response carries `Content-Type: video/mp4` and no
+  `Content-Disposition`.

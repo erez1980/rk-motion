@@ -184,7 +184,11 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not entry:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            return self._file(Path(entry["file"]), "video/mp4", attachment=True)
+            # Served inline, not as an attachment: the <a download> attribute
+            # already names the file for a real download, while an attachment
+            # header turns every other way of opening it (a phone's share sheet,
+            # a tab) into a blank page.
+            return self._file(Path(entry["file"]), "video/mp4")
         if len(parts) == 3 and parts[0] == "api" and parts[1] in {"video", "export"}:
             job = JOBS.get(parts[2])
             if not job:
@@ -194,7 +198,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             if not path:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            return self._file(Path(path), "video/mp4", attachment=parts[1] == "export")
+            return self._file(Path(path), "video/mp4")
         if len(parts) == 3 and parts[1] in {"export-status", "analyse-status"} and parts[0] == "api":
             job = JOBS.get(parts[2])
             key = parts[1].replace("-", "_")

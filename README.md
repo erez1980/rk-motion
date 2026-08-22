@@ -110,9 +110,18 @@ link. LAN mode is off by default: without `--lan` the app stays on this
 machine only. Only turn it on at home — while it runs, anyone on the same
 Wi-Fi can reach it.
 
-On the phone, **Share → Add to Home Screen** turns it into a full-screen app
-with the RK Motion icon. (Already added it before v0.7.0? Remove and re-add it
-once — iOS caches the old icon.)
+On the phone, **Share → Add to Home Screen** puts the RK Motion icon on the
+home screen. (Already added it before v0.7.0? Remove and re-add it once — iOS
+caches the old icon.) It deliberately opens in Safari rather than as a
+chrome-less app: an installed iOS web app has no download manager, so the
+finished movie could not be saved out of it.
+
+To get the movie onto the phone, use **שמירת הסרט** on the result card. Where
+the browser allows it that opens the system share sheet, whose **Save Video**
+puts the file straight in Photos; that needs a secure context, so it is there
+for the app on this computer but not over plain `http` on the LAN. Over the
+LAN the button downloads instead — the file lands in **Files**, and iOS can
+share it into **Photos** from there.
 
 #### Speed and progress
 

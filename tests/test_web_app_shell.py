@@ -52,7 +52,9 @@ def test_manifest_describes_an_installable_app(base_url):
     assert status == 200
     assert content_type == "application/manifest+json"
     manifest = json.loads(body)
-    assert manifest["display"] == "standalone"
+    # Deliberately not "standalone": an installed iOS web app has no download
+    # manager, so the finished movie could not be saved out of it.
+    assert manifest["display"] == "browser"
     assert manifest["dir"] == "rtl" and manifest["lang"] == "he"
     # Chrome only offers to install with an icon of 192px or more.
     assert any(int(icon["sizes"].split("x")[0]) >= 192 for icon in manifest["icons"])
@@ -96,3 +98,24 @@ def test_both_long_jobs_announce_themselves_when_they_finish():
     for gesture in ("$('#export').onclick = async () => {\n  armAlerts();",
                     "file.addEventListener('click', () => {\n  armAlerts();"):
         assert gesture in INDEX
+
+
+def test_the_finished_movie_is_served_playable_not_as_an_attachment(base_url):
+    """An attachment header turns every way of opening the movie other than a
+    download — a phone's share sheet, a tab — into a blank page."""
+    import inspect
+
+    from sofit import ui
+
+    source = inspect.getsource(ui.RKMotionHandler.do_GET)
+    export_lines = [line for line in source.splitlines() if 'video/mp4' in line]
+    assert export_lines, "the export routes should still be here"
+    assert not any("attachment=True" in line for line in export_lines)
+
+
+def test_saving_the_movie_prefers_the_share_sheet():
+    """The system share sheet is the only route that reaches a phone's photo
+    gallery; a plain download is the fallback, never a new blank tab."""
+    assert "navigator.share" in INDEX and "canShare" in INDEX
+    assert "video/mp4" in INDEX, "the shared file has to be typed for the share sheet"
+    assert "target = '_blank'" not in INDEX, "opening the file in a tab is what broke it"
