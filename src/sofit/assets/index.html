@@ -318,6 +318,23 @@ body.day .eyebrow{color:#4c7c12}
   .top{padding-top:calc(12px + env(safe-area-inset-top))}
 }
 
+/* ---- Standalone YouTube downloader ---- */
+.grabber{margin-bottom:16px}
+.grab-toggle{width:100%;text-align:center}
+.grab-hint{margin:12px 0 10px;color:var(--soft);font-size:13px}
+.grab-done{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.grab-done .meta{flex:1;min-width:0;color:var(--soft);font-size:13px;overflow-wrap:anywhere}
+.grab-formats{display:flex;gap:6px;flex:none}
+.grab-formats .secondary{padding:5px 12px;font-size:12.5px;white-space:nowrap}
+/* Two format buttons leave a phone almost no room for the title, and picking
+   the right video matters more here than it does for background music — so on
+   a narrow screen the title takes the whole first line. */
+@media (max-width:560px){
+  #grabResults .yt-result{flex-wrap:wrap}
+  #grabResults .yt-result .t{flex:1 0 100%;white-space:normal}
+  #grabResults .yt-result .meta{max-width:none;flex:1}
+}
+
 /* ---- YouTube preview modal ---- */
 .yt-modal{position:fixed;z-index:20;inset:0;background:rgba(2,8,4,.85);display:grid;place-items:center;padding:18px}
 .yt-modal[hidden]{display:none}
@@ -461,6 +478,28 @@ body.day .eyebrow{color:#4c7c12}
   <b id="statusText">מכינים…</b>
   <div class="bar"><i id="bar"></i></div>
 </div>
+
+<!-- A downloader on its own: no ride video, nothing to do with the edit.
+     Collapsed by default so it never gets in the way of the main flow. -->
+<section id="grabber" class="card grabber" hidden>
+  <button id="grabToggle" class="button secondary grab-toggle" aria-expanded="false" aria-controls="grabBody">
+    הורדה מיוטיוב · MP3 או MP4 ▾
+  </button>
+  <div id="grabBody" hidden>
+    <p class="grab-hint">מחפשים, בוחרים פורמט, והקובץ יורד למכשיר הזה. לא קשור לעריכה.</p>
+    <div class="youtube-search">
+      <input id="grabQuery" type="search" placeholder="חפשו סרטון או שיר ב־YouTube" aria-label="חיפוש להורדה">
+      <button id="grabSearch" class="button primary">חיפוש</button>
+    </div>
+    <label class="rights"><input id="grabRights" type="checkbox"> יש לי רשות להוריד את התוכן הזה</label>
+    <div id="grabResults" class="yt-results"></div>
+    <div id="statusGrab" class="status" role="status" aria-live="polite"><b>מכינים…</b><div class="bar"><i></i></div></div>
+    <div id="grabDone" class="grab-done" hidden>
+      <span id="grabName" class="meta"></span>
+      <a id="grabSave" class="button primary">שמירה</a>
+    </div>
+  </div>
+</section>
 
 <section id="workspace" class="workspace">
 
@@ -733,11 +772,15 @@ const CAN_SHARE_FILES = (() => {
   } catch { return false; }
 })();
 
+const MIME = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+                mp3: 'audio/mpeg', m4a: 'audio/mp4' };
+const mimeFor = name => MIME[String(name).split('.').pop().toLowerCase()] || 'application/octet-stream';
+
 async function saveMovie(url, filename, anchor) {
   if (!CAN_SHARE_FILES) return false;        // let the plain download happen
   try {
     const blob = await (await fetch(url)).blob();
-    await navigator.share({ files: [new File([blob], filename, { type: 'video/mp4' })] });
+    await navigator.share({ files: [new File([blob], filename, { type: mimeFor(filename) })] });
     return true;
   } catch (error) {
     // The user closing the sheet is a decision, not a failure to work around.
@@ -755,6 +798,7 @@ function asDownload(anchor) {
   return anchor;
 }
 asDownload($('#download'));
+asDownload($('#grabSave'));
 
 /* Say what the button will actually do on this device, and how the movie
    reaches the camera roll from there. */
@@ -772,12 +816,103 @@ fetch('/api/capabilities').then(r => r.json()).then(caps => {
     document.querySelectorAll('.youtube-search,.rights,.sep,#ytResults').forEach(el => el.hidden = true);
     $('#ytMissing').hidden = false;
   }
+  if (caps.youtube) $('#grabber').hidden = false;
   if (caps.version) $('#appVersion').textContent = 'v' + caps.version;
   // Handy when someone asks why an export was fast or slow on their machine.
   if (caps.encoder) $('#appVersion').title = caps.gpu
     ? `קידוד בכרטיס המסך (${caps.encoder})`
     : 'קידוד במעבד (libx264) — לא נמצא מאיץ חומרה זמין';
 }).catch(() => {});
+
+/* ---- Standalone YouTube downloader ----------------------------------
+   Nothing to do with the edit: search, pick MP3 or MP4, and the file comes
+   back to be saved on this device. Collapsed until asked for. */
+const stGrab = makeStatus($('#statusGrab'));
+const fileSize = bytes => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)}MB`
+                                           : `${Math.max(1, Math.round(bytes / 1024))}KB`;
+const GRAB_LABEL = 'הורדה מיוטיוב · MP3 או MP4 ';
+
+$('#grabToggle').onclick = () => {
+  const body = $('#grabBody'), opening = body.hidden;
+  body.hidden = !opening;
+  $('#grabToggle').setAttribute('aria-expanded', String(opening));
+  $('#grabToggle').textContent = GRAB_LABEL + (opening ? '▴' : '▾');
+  if (opening) $('#grabQuery').focus();
+};
+
+$('#grabSearch').onclick = () => {
+  const query = $('#grabQuery').value.trim();
+  if (query) searchYoutube($('#grabResults'), query, item => {
+    const formats = document.createElement('span');
+    formats.className = 'grab-formats';
+    ['mp3', 'mp4'].forEach(format => {
+      const button = document.createElement('button');
+      button.className = 'secondary';
+      button.textContent = format.toUpperCase();
+      button.setAttribute('aria-label', `הורדה כ-${format.toUpperCase()}`);
+      button.onclick = () => grabYoutube(item, format, formats);
+      formats.append(button);
+    });
+    return [formats];
+  });
+};
+$('#grabQuery').addEventListener('keydown', e => { if (e.key === 'Enter') $('#grabSearch').click(); });
+
+async function grabYoutube(item, format, formats) {
+  if (!$('#grabRights').checked) {
+    return stGrab.show('יש לאשר שיש לך רשות להוריד את התוכן.', 0, { error: true });
+  }
+  const buttons = [...formats.querySelectorAll('button')];
+  buttons.forEach(button => { button.disabled = true; });
+  $('#grabDone').hidden = true;
+  armAlerts();                       // a long video is worth a chime at the end
+  stGrab.show(`מורידה ${format.toUpperCase()}…`, 2, { working: true });
+  go(stGrab.el);
+  try {
+    const start = await request('/api/youtube/grab', JSON.stringify(
+      { id: item.id, title: item.title, format, rights_confirmed: true }),
+      { 'Content-Type': 'application/json' });
+    await followGrab(start.status_url, format);
+  } catch (error) {
+    stGrab.show(error.message || 'ההורדה נכשלה.', 0, { error: true });
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
+
+function followGrab(statusUrl, format) {
+  return new Promise(resolve => {
+    const timer = setInterval(async () => {
+      let d;
+      try {
+        d = await (await fetch(statusUrl)).json();
+      } catch {
+        clearInterval(timer);
+        stGrab.show('אבד הקשר להורדה.', 0, { error: true });
+        return resolve();
+      }
+      if (d.state === 'error') {
+        clearInterval(timer);
+        stGrab.show(d.message || 'ההורדה נכשלה.', 0, { error: true });
+        notifyDone('ההורדה נכשלה', d.message || '');
+        return resolve();
+      }
+      if (d.state === 'done') {
+        clearInterval(timer);
+        const save = $('#grabSave');
+        save.href = d.download;
+        save.setAttribute('download', d.name);
+        save.textContent = CAN_SHARE_FILES ? 'שמירה במכשיר' : 'הורדה';
+        $('#grabName').textContent = `${d.name} · ${fileSize(d.size)}`;
+        $('#grabDone').hidden = false;
+        stGrab.show('הקובץ מוכן.', 100);
+        notifyDone(`ה-${format.toUpperCase()} מוכן`, d.name);
+        return resolve();
+      }
+      stGrab.show(d.message || 'מורידה…', Math.max(2, d.percent || 0), { working: true });
+    }, 800);
+  });
+}
 
 /* ---- Shared helpers ---- */
 /* One status widget per flow stage, so feedback appears next to the action. */
@@ -1448,50 +1583,59 @@ $('#ytModal').onclick = e => { if (e.target === $('#ytModal')) $('#closeYt').cli
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ytModal').hidden) $('#closeYt').click(); });
 $('#ytQuery').addEventListener('keydown', e => { if (e.key === 'Enter') $('#ytSearch').click(); });
 
-$('#ytSearch').onclick = async () => {
-  const query = $('#ytQuery').value.trim();
-  if (!query) return;
-  const box = $('#ytResults');
+/* One search, two callers: the soundtrack picker and the standalone
+   downloader below differ only in what the buttons on the right of a row do. */
+async function searchYoutube(box, query, actions) {
   box.textContent = 'מחפשת…';
+  let results;
   try {
-    const r = await request('/api/youtube/search', JSON.stringify({ query }), { 'Content-Type': 'application/json' });
-    box.innerHTML = '';
-    if (!r.results.length) { box.textContent = 'לא נמצאו תוצאות.'; return; }
-    r.results.forEach(item => {
-      const row = document.createElement('div');
-      row.className = 'yt-result';
-      const title = document.createElement('span');
-      title.className = 't';
-      title.textContent = item.title;
-      title.title = item.title;
-      const sub = document.createElement('small');
-      sub.className = 'meta';
-      const ch = document.createElement('span');
-      ch.className = 'ch';
-      ch.textContent = item.channel;
-      const dur = document.createElement('span');
-      dur.className = 'dur';
-      dur.textContent = '· ' + fmt(item.duration);
-      sub.append(ch, dur);
-      const play = document.createElement('button');
-      play.className = 'ghost';
-      play.textContent = '▶';
-      play.setAttribute('aria-label', 'האזנה');
-      play.onclick = () => {
-        $('#ytPreview').src = 'https://www.youtube.com/embed/' + item.id + '?autoplay=1';
-        $('#ytModal').hidden = false;
-      };
-      const add = document.createElement('button');
-      add.className = 'secondary';
-      add.textContent = 'הוספה';
-      add.setAttribute('aria-label', 'הוספה כ-MP3');
-      add.onclick = () => downloadYoutube(item, add);
-      row.append(title, sub, play, add);
-      box.append(row);
-    });
-  } catch (e) {
-    box.textContent = e.message || 'החיפוש נכשל';
+    results = (await request('/api/youtube/search', JSON.stringify({ query }),
+                             { 'Content-Type': 'application/json' })).results;
+  } catch (error) {
+    box.textContent = error.message || 'החיפוש נכשל';
+    return;
   }
+  box.innerHTML = '';
+  if (!results.length) { box.textContent = 'לא נמצאו תוצאות.'; return; }
+  results.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'yt-result';
+    const title = document.createElement('span');
+    title.className = 't';
+    title.textContent = item.title;
+    title.title = item.title;
+    const sub = document.createElement('small');
+    sub.className = 'meta';
+    const ch = document.createElement('span');
+    ch.className = 'ch';
+    ch.textContent = item.channel;
+    const dur = document.createElement('span');
+    dur.className = 'dur';
+    dur.textContent = '· ' + fmt(item.duration);
+    sub.append(ch, dur);
+    const play = document.createElement('button');
+    play.className = 'ghost';
+    play.textContent = '▶';
+    play.setAttribute('aria-label', 'האזנה');
+    play.onclick = () => {
+      $('#ytPreview').src = 'https://www.youtube.com/embed/' + item.id + '?autoplay=1';
+      $('#ytModal').hidden = false;
+    };
+    row.append(title, sub, play, ...actions(item));
+    box.append(row);
+  });
+}
+
+$('#ytSearch').onclick = () => {
+  const query = $('#ytQuery').value.trim();
+  if (query) searchYoutube($('#ytResults'), query, item => {
+    const add = document.createElement('button');
+    add.className = 'secondary';
+    add.textContent = 'הוספה';
+    add.setAttribute('aria-label', 'הוספה כ-MP3');
+    add.onclick = () => downloadYoutube(item, add);
+    return [add];
+  });
 };
 
 async function downloadYoutube(item, btn) {

@@ -323,3 +323,40 @@ available the app still starts; only phone access is off, and it says so.
 - A deliberately broken `cryptography` install falls through to `openssl`
   instead of taking the app down — its Rust bindings raise something that does
   not derive from `Exception`, so the guard had to go wider.
+
+---
+
+## Round 10 — a downloader that is not part of the edit
+
+Asked for: search YouTube, take it as MP3 or MP4, save it on the phone.
+Deliberately separate from the soundtrack picker — that one attaches a track
+to an edit and is buried in the music studio; this one hands back a file and
+nothing else.
+
+- Its own card on the main page, **folded away by default** so the three-step
+  ride flow stays the first thing on screen, and hidden entirely without
+  `yt-dlp`.
+- Each result carries **MP3** and **MP4** buttons. The download runs as a
+  background job with the same progress contract as everything else: a real
+  percentage, read out of yt-dlp's own byte counts, and a chime at the end.
+- Files are served **inline**, so the finished download goes through the same
+  share-sheet save as an exported movie — a phone can put an MP4 straight in
+  Photos. The shared file is typed from its extension, so an MP3 arrives as
+  audio rather than pretending to be video.
+- The result row now wraps on a narrow screen: two format buttons left a phone
+  almost no room for the title, and picking the right video matters more here
+  than it does for background music.
+- The search itself is shared with the soundtrack picker rather than copied —
+  the two differ only in what the buttons on the right of a row do.
+
+## Verification performed
+
+- Full test suite: 167 passed, 1 skipped.
+- A stand-in `yt-dlp` on PATH exercises the real subprocess plumbing — the
+  progress template, the client fallback chain, the file that comes out —
+  since YouTube itself is not reachable from a test.
+- Whole flow driven in a mobile browser: search, MP4, save (arrives at the
+  share sheet as `video/mp4`), then MP3 of another result (`audio/mpeg`).
+  Rights confirmation gates the request before anything is posted; a made-up
+  video id never reaches the command line.
+- Titles fully readable at 320px and 390px, no horizontal overflow.

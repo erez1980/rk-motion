@@ -131,6 +131,15 @@ Photos. If the browser will not open a share sheet the button falls back to a
 plain download — the file lands in **Files**, and iOS can share it into
 **Photos** from there.
 
+#### Download from YouTube (MP3 or MP4)
+
+A separate tool on the main page, folded away until asked for: search, pick
+**MP3** or **MP4**, and the file comes back to be saved on whatever device
+you are using — on a phone through the same share sheet, so a video can go
+straight to Photos. It touches nothing in the edit. Needs `yt-dlp`; the panel
+does not appear without it. Downloads live in a temporary folder and are
+deleted when the app closes, like everything else.
+
 #### Speed and progress
 
 Every long step reports where ffmpeg actually is, not an elapsed-time guess,

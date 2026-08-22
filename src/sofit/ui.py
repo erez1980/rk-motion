@@ -39,6 +39,33 @@ STATIC_ASSETS = {
 }
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
+# Standalone YouTube downloads, keyed by a one-off token. Separate from JOBS:
+# grabbing a song or a clip needs no ride video and no edit.
+GRABS: dict[str, dict] = {}
+_GRAB_ROOT: Path | None = None
+
+
+def _grab_folder() -> Path:
+    """Where standalone downloads land, made on first use and wiped on exit."""
+    global _GRAB_ROOT
+    if _GRAB_ROOT is None:
+        _GRAB_ROOT = Path(tempfile.mkdtemp(prefix="rk-motion-grabs-"))
+    return _GRAB_ROOT
+
+
+def _youtube_error(error: Exception | None, kind: str) -> str:
+    """One Hebrew sentence a rider can act on, out of yt-dlp's stderr."""
+    stderr = getattr(error, "stderr", "") or ""
+    if isinstance(stderr, bytes):
+        stderr = stderr.decode("utf-8", "replace")
+    detail = stderr.strip().splitlines()[-1] if stderr.strip() else ""
+    if isinstance(error, subprocess.TimeoutExpired):
+        return "ההורדה ארכה יותר מדי. נסו סרטון קצר יותר."
+    if any(mark in detail for mark in ("HTTP Error 403", "Forbidden", "Sign in to confirm")):
+        return "YouTube חסמה כרגע את ההורדה הזו. נסו שוב בעוד כמה דקות, או בחרו תוצאה אחרת."
+    if "Requested format is not available" in detail:
+        return f"לא נמצא פורמט {kind.upper()} להורדה מהתוצאה הזו. נסו תוצאה אחרת."
+    return detail or "ההורדה נכשלה."
 
 # Time estimates learn this machine's real speed. Work is measured in
 # megapixel-seconds (video duration x frame megapixels — a decode/encode cost
@@ -213,6 +240,19 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 state["elapsed_seconds"] = round(time.monotonic() - started, 1)
                 del state["started"]  # monotonic time is meaningless to the client
             return self._json(HTTPStatus.OK, state)
+        if len(parts) == 3 and parts[:2] == ["api", "grab-status"]:
+            grab = GRABS.get(parts[2])
+            if not grab:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Download not found."})
+            return self._json(HTTPStatus.OK, grab["status"])
+        if len(parts) == 3 and parts[:2] == ["api", "grab"]:
+            grab = GRABS.get(parts[2])
+            if not grab or not grab.get("file"):
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            # Inline, like the exported movie: a phone's share sheet and an
+            # in-page player both need to open it, not just a download.
+            return self._file(grab["file"])
         if parts == ["api", "capabilities"]:
             encoder = h264_encoder()
             return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp")),
@@ -253,6 +293,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._youtube_search()
         if route == "/api/export":
             return self._export()
+        if route == "/api/youtube/grab":
+            return self._youtube_grab()
         if route.startswith("/api/youtube/download/"):
             return self._youtube_download(route.rsplit("/", 1)[-1])
         if route.startswith("/api/music/attach/"):
@@ -532,6 +574,89 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                         "-c", "copy", "-movflags", "+faststart", str(output)], check=True, capture_output=True)
         return output
 
+    # ---- Standalone YouTube grabber -------------------------------------
+    # Separate from the soundtrack flow above: that one attaches a track to an
+    # edit, this one just hands a file back so it can be saved on the phone.
+    GRAB_FORMATS = {
+        "mp3": ["-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "0"],
+        "mp4": ["-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+                "--merge-output-format", "mp4"],
+    }
+
+    def _youtube_grab(self) -> None:
+        try:
+            request = self._read_json()
+            if not request.get("rights_confirmed"):
+                raise ValueError("Confirm you have permission to download this video.")
+            kind = str(request.get("format", "mp3"))
+            if kind not in self.GRAB_FORMATS:
+                raise ValueError("Choose MP3 or MP4.")
+            video_id = str(request.get("id", ""))
+            if not video_id or not all(char.isalnum() or char in "-_" for char in video_id):
+                raise ValueError("Invalid YouTube video.")
+            if not shutil.which("yt-dlp"):
+                raise RuntimeError("Downloading needs yt-dlp installed on this computer "
+                                   "(https://github.com/yt-dlp/yt-dlp).")
+            token = uuid.uuid4().hex
+            GRABS[token] = {"status": {"state": "running", "percent": 0,
+                                       "message": "מורידה מיוטיוב…"},
+                            "title": str(request.get("title") or video_id)}
+            threading.Thread(target=self._run_grab, args=(token, video_id, kind),
+                             daemon=True).start()
+            return self._json(HTTPStatus.ACCEPTED,
+                              {"token": token, "status_url": f"/api/grab-status/{token}"})
+        except Exception as exc:
+            return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+
+    @classmethod
+    def _run_grab(cls, token: str, video_id: str, kind: str) -> None:
+        grab = GRABS[token]
+        status = grab["status"]
+        folder = _grab_folder() / token
+        folder.mkdir(parents=True, exist_ok=True)
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        last_error: Exception | None = None
+        for clients in cls.YOUTUBE_CLIENT_ATTEMPTS:
+            cmd = ["yt-dlp", "--no-playlist", *cls.GRAB_FORMATS[kind],
+                   "--newline", "--progress-template",
+                   "rk:%(progress.downloaded_bytes)s/%(progress.total_bytes_estimate)s",
+                   "-o", str(folder / f"%(title).80B.%(ext)s")]
+            if clients:
+                cmd.extend(["--extractor-args", f"youtube:player_client={clients}"])
+            cmd.append(url)
+            try:
+                cls._watch_grab(cmd, status)
+                last_error = None
+                break
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                last_error = exc
+        files = [item for item in folder.iterdir() if item.is_file()] if folder.is_dir() else []
+        if last_error is not None or not files:
+            status.update({"state": "error", "message": _youtube_error(last_error, kind)})
+            return
+        target = max(files, key=lambda item: item.stat().st_size)
+        grab["file"] = target
+        status.update({"state": "done", "percent": 100, "message": "מוכן לשמירה.",
+                       "name": target.name, "size": target.stat().st_size,
+                       "download": f"/api/grab/{token}"})
+
+    @staticmethod
+    def _watch_grab(cmd: list[str], status: dict) -> None:
+        """Run yt-dlp, turning its byte counts into the same bar as everything else."""
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert proc.stdout
+        for line in proc.stdout:
+            if not line.startswith("rk:"):
+                continue
+            done, _, total = line[3:].strip().partition("/")
+            if done.isdigit() and total.isdigit() and int(total) > 0:
+                # 97% at most: merging and converting happen after the bytes land.
+                status["percent"] = min(97, round(int(done) / int(total) * 100))
+        stderr = proc.stderr.read() if proc.stderr else ""
+        if proc.wait() != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=stderr)
+        status["message"] = "ממירה לקובץ…"
+
     def _upload_music(self, job_id: str) -> None:
         job = JOBS.get(job_id)
         size = int(self.headers.get("Content-Length", "0"))
@@ -739,6 +864,8 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
             phone.server_close()
         for job in JOBS.values():
             shutil.rmtree(job["folder"], ignore_errors=True)
+        if _GRAB_ROOT:
+            shutil.rmtree(_GRAB_ROOT, ignore_errors=True)
 
 
 def _serve_to_phones(port: int) -> ThreadingHTTPServer | None:
