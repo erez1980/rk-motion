@@ -324,6 +324,7 @@ body.day .eyebrow{color:#4c7c12}
 .grab-hint{margin:12px 0 10px;color:var(--soft);font-size:13px}
 .grab-done{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .grab-done .meta{flex:1;min-width:0;color:var(--soft);font-size:13px;overflow-wrap:anywhere}
+.save-mode{display:block;width:100%;margin-top:6px;color:var(--soft);font-size:12px}
 .grab-formats{display:flex;gap:6px;flex:none}
 .grab-formats .secondary{padding:5px 12px;font-size:12.5px;white-space:nowrap}
 /* Two format buttons leave a phone almost no room for the title, and picking
@@ -624,6 +625,7 @@ body.day .eyebrow{color:#4c7c12}
       </div>
       <button id="export" class="button primary">ייצוא הסרט</button>
       <a id="download" class="button primary download" download="RK-Motion-edit.mp4">הורדת MP4</a>
+      <span id="saveMode" class="save-mode"></span>
     </div>
   </section>
 
@@ -784,35 +786,55 @@ let readyFile = null;             // {url, file}
 
 async function prepareToShare(url, filename) {
   readyFile = null;
-  if (!CAN_SHARE_FILES) return;
+  if (!CAN_SHARE_FILES) return saveMode('הקובץ יירד למכשיר');
+  saveMode('מכינה לשיתוף…');
   try {
     const blob = await (await fetch(url)).blob();
     readyFile = { url, file: new File([blob], filename, { type: mimeFor(filename) }) };
-  } catch { /* the plain browser download still works */ }
+    saveMode(`מוכן לשיתוף · ${(blob.size / 1048576).toFixed(1)}MB`);
+  } catch (error) {
+    // Silence here is what made a tap look dead: the button promised a share
+    // and then quietly did something else.
+    saveMode(`ההכנה לשיתוף נכשלה (${error?.name || 'שגיאה'}) — הקובץ יירד במקום`);
+  }
+}
+
+/* A one-line readout of what the save button will actually do. It exists
+   because a tap that quietly falls through to a different path is impossible
+   to tell apart from a button that does nothing at all. */
+function saveMode(text) {
+  const line = $('#saveMode');
+  if (line) line.textContent = 'שמירה: ' + text;
 }
 
 function asDownload(anchor) {
   anchor.addEventListener('click', event => {
     const ready = readyFile;
-    // Not prepared (or a different file): the browser's own download is right.
-    if (!ready || ready.url !== anchor.getAttribute('href')) return;
     event.preventDefault();
+    const url = anchor.getAttribute('href');
+    const name = anchor.getAttribute('download') || 'RK-Motion.mp4';
+    if (!ready || ready.url !== url) return downloadFile(url, name);
     navigator.share({ files: [ready.file] }).catch(error => {
       if (error?.name === 'AbortError') return;   // closing the sheet is a decision
-      // Never leave a dead button: say what happened and let the next tap
-      // fall through to a normal download.
       readyFile = null;
-      shareFailed(anchor, error);
+      saveMode(`השיתוף נחסם (${error?.name || 'שגיאה'}) — מוריד את הקובץ`);
+      downloadFile(url, name);
     });
   });
   return anchor;
 }
 
-function shareFailed(anchor, error) {
-  const status = anchor.id === 'grabSave' ? stGrab : stExport;
-  status.show(`שיתוף הקובץ נחסם (${error?.name || 'שגיאה'}). לחצו שוב כדי להוריד אותו.`,
-              100, { error: true });
-  anchor.textContent = 'הורדה';
+/* Every path ends in something happening. A fresh link is used rather than
+   the button's own default action, which is what a failed share has already
+   consumed. */
+function downloadFile(url, name) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.rel = 'noopener';
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 asDownload($('#download'));
 asDownload($('#grabSave'));

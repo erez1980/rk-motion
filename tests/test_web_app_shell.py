@@ -122,8 +122,15 @@ def test_the_share_sheet_opens_straight_off_the_tap():
     before_share = click.split("navigator.share(")[0]
     assert "await" not in before_share, "nothing may be awaited before the sheet opens"
     assert "prepareToShare" in INDEX, "the file has to be in hand before the tap"
-    # And a refused share must not leave a dead button.
-    assert "shareFailed" in INDEX
+
+    # No branch of the tap may end in nothing. A share that never opens and a
+    # file that was never prepared both have to fall through to a download,
+    # and the button has to say which one it is about to do — a tap that
+    # quietly takes a different path is what made this look like a dead button.
+    assert click.count("downloadFile(") == 2, "not-ready and share-refused both download"
+    assert "saveMode(" in INDEX, "the button states what it will actually do"
+    for outcome in ("מוכן לשיתוף", "ההכנה לשיתוף נכשלה", "השיתוף נחסם", "הקובץ יירד למכשיר"):
+        assert outcome in INDEX, f"no wording for {outcome}"
 
 
 def test_saving_the_movie_prefers_the_share_sheet():

@@ -394,3 +394,42 @@ and it fails on the version that shipped.
 **Not verified here:** whether iOS Safari now opens the sheet. This container
 has no WebKit, and Chromium does not enforce the rule that broke it. What is
 proven is that the pattern WebKit requires is the one now in the code.
+
+---
+
+## Round 12 — no silent path
+
+The button read "שמירת הסרט", so the share branch ran and then nothing
+visible happened. Looking again at that code, the tap had a hole in it: if the
+file had not finished being fetched in the background — or the fetch had
+failed — the handler returned and left the anchor's own default action to do
+the work, with no message at all. From the outside that is identical to a
+button that does nothing, and the label had already promised a share.
+
+Every branch of the tap now ends in something. A share that will not open and
+a file that was never prepared both fall through to a real download, started
+from a fresh link rather than the default action the failed share already
+consumed. A line under the button says what it is about to do — preparing,
+ready with the file's size, or falling back and why — because a tap that
+quietly takes a different path cannot be told apart from one that does
+nothing.
+
+## Verification performed
+
+- Full test suite: 168 passed, 1 skipped.
+- All five outcomes driven in a mobile browser against a real download:
+
+  | scenario | result |
+  |---|---|
+  | share works | file handed to the sheet |
+  | share refused | downloads, and names the error |
+  | user closes the sheet | nothing, correctly |
+  | no share support | downloads, states the mode |
+  | preparation fails | downloads, names the error |
+
+- The guard now checks the invariant rather than a helper's name: both
+  fall-through branches must download, and every outcome must have wording.
+
+**Still not verified here:** whether iOS opens the sheet. What is now certain
+is that no outcome on that phone can be silent — whatever happens, the line
+under the button says so.
