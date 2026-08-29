@@ -140,6 +140,10 @@ def _record_rate(kind: str, work: float, elapsed: float) -> None:
 
 class RKMotionHandler(BaseHTTPRequestHandler):
     server_version = "RKMotion/0.1"
+    # HTTP/1.0 (the stdlib default) leaves a browser unable to keep a
+    # connection alive or resume a transfer, which a download manager fetching
+    # a multi-hundred-megabyte movie relies on.
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, _format: str, *_args: object) -> None:
         return  # a desktop app should not fill the user's Terminal with HTTP logs
@@ -149,22 +153,45 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
+        # Set by a handler that answered without reading the request body: the
+        # client has to be told, or it will keep using a connection with those
+        # bytes still queued on it.
+        if self.close_connection:
+            self.send_header("Connection", "close")
         self.end_headers()
+        if self.command == "HEAD":
+            return          # a body on a HEAD reply would desync the connection
         self.wfile.write(raw)
 
     def _file(self, path: Path, content_type: str | None = None, attachment: bool = False) -> None:
         if not path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        size = path.stat().st_size
+        stat = path.stat()
+        size = stat.st_size
+        # A download manager opens several connections and resumes broken ones.
+        # Without a validator it cannot tell whether the bytes it asks for
+        # still belong to the file it started on — and exporting again replaces
+        # that file underneath it, which reads as a network failure.
+        tag = f'"{size:x}-{stat.st_mtime_ns:x}"'
+        modified = self.date_time_string(int(stat.st_mtime))
         start, end = 0, size - 1
         range_header = self.headers.get("Range", "")
-        if range_header.startswith("bytes="):
+        fresh = self.headers.get("If-Range", "")
+        if fresh and fresh not in (tag, modified):
+            range_header = ""    # it is asking about a file we no longer have
+        # Several ranges at once would need a multipart reply; sending the
+        # whole file instead is always a valid answer and browsers cope.
+        if range_header.startswith("bytes=") and "," not in range_header:
+            first, _, last = range_header[6:].strip().partition("-")
             try:
-                first, last = range_header[6:].split("=", 1)[-1].split("-", 1)
-                start = int(first) if first else max(0, size - int(last))
-                end = int(last) if last else end
-                if start < 0 or end < start or start >= size:
+                if first:
+                    start, end = int(first), int(last) if last else size - 1
+                elif last:
+                    start, end = max(0, size - int(last)), size - 1   # the last N bytes
+                else:
+                    raise ValueError
+                if start < 0 or start >= size or end < start:
                     raise ValueError
                 end = min(end, size - 1)
             except ValueError:
@@ -179,7 +206,11 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
         self.send_header("Content-Length", str(end - start + 1))
         self.send_header("Accept-Ranges", "bytes")
+        self.send_header("ETag", tag)
+        self.send_header("Last-Modified", modified)
         self.end_headers()
+        if self.command == "HEAD":
+            return
         with path.open("rb") as handle:
             handle.seek(start)
             remaining = end - start + 1
@@ -192,9 +223,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
                     # Browsers routinely cancel an old byte-range request when
                     # the user seeks or a new preview starts. That is expected,
-                    # not an application/export failure.
+                    # not an application/export failure — but the reply is now
+                    # short of its Content-Length, so this connection is spent.
+                    self.close_connection = True
                     return
                 remaining -= len(chunk)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        """A download manager asks for the size and validator before fetching."""
+        self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
         parts = [p for p in urlparse(self.path).path.split("/") if p]
@@ -414,9 +451,14 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _upload_video(self, job_id: str) -> None:
         job = JOBS.get(job_id)
         size = int(self.headers.get("Content-Length", "0"))
+        # Bailing out leaves the upload's body unread. On a kept-alive
+        # connection those bytes would be read as the next request, so this
+        # one has to end here.
         if not job:
+            self.close_connection = True
             return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
         if not size or size > 30 * 1024 * 1024 * 1024:
+            self.close_connection = True
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose video files smaller than 30GB."})
         suffix = Path(unquote(self.headers.get("X-Filename", "ride.mp4"))).suffix or ".mp4"
         target = Path(job["folder"]) / f"input-{len(job['inputs']):03d}{suffix}"
@@ -425,6 +467,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             while remaining:
                 chunk = self.rfile.read(min(1024 * 1024, remaining))
                 if not chunk:
+                    self.close_connection = True
                     return self._json(HTTPStatus.BAD_REQUEST, {"error": "Video upload ended early."})
                 handle.write(chunk)
                 remaining -= len(chunk)
@@ -697,13 +740,18 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _upload_music(self, job_id: str) -> None:
         job = JOBS.get(job_id)
         size = int(self.headers.get("Content-Length", "0"))
+        # As in _upload_video: an unread body would be read as the next
+        # request on a kept-alive connection.
         if not job:
+            self.close_connection = True
             return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
         if not size or size > 2 * 1024 * 1024 * 1024:
+            self.close_connection = True
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an audio file smaller than 2GB."})
         name = Path(unquote(self.headers.get("X-Filename", "music.mp3"))).name
         suffix = Path(name).suffix.lower() or ".mp3"
         if suffix not in {".mp3", ".m4a", ".aac", ".wav", ".ogg"}:
+            self.close_connection = True
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an MP3, M4A, AAC, WAV or OGG file."})
         target = Path(job["folder"]) / f"music-{len(job.get('music', [])):02d}{suffix}"
         remaining = size
@@ -711,6 +759,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             while remaining:
                 chunk = self.rfile.read(min(1024 * 1024, remaining))
                 if not chunk:
+                    self.close_connection = True
                     return self._json(HTTPStatus.BAD_REQUEST, {"error": "Music upload ended early."})
                 handle.write(chunk)
                 remaining -= len(chunk)
@@ -824,7 +873,10 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                          time.monotonic() - job["export_status"]["started"])
             status.update({"state": "done", "percent": 100, "eta_seconds": 0,
                            "message": "הסרט מוכן.", "history": history,
-                           "download": f"/api/export/{job_id}"})
+                           # The version, not the bare job: exporting again
+                           # would otherwise swap the file out from under a
+                           # download that is still reading it.
+                           "download": f"/api/export/{job_id}/{version}"})
         except Exception as exc:
             detail = str(exc)
             stderr = getattr(exc, "stderr", None)

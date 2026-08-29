@@ -466,3 +466,48 @@ under the button says so.
 - Start over: workspace cleared, stored job id gone, and the server's copy of
   the old export answered 404 afterwards. Resetting twice is not an error.
 - Toggle and button at 320px and 390px, no overflow.
+
+---
+
+## Round 14 — "Failed - Network error" downloading the finished movie
+
+Reported on a MacBook in Chrome, with a guess that it was a certificate
+problem. It is not: on this machine the app is served over plain
+`http://127.0.0.1`, with no TLS anywhere in the path. The transport itself was
+the weak part, and it had four separate defects — two of which the tests
+caught as outright bugs.
+
+- **The server spoke HTTP/1.0.** That is the stdlib default, and it leaves a
+  download manager unable to keep a connection alive or resume a broken
+  transfer — exactly what a several-hundred-megabyte movie needs. Now HTTP/1.1.
+- **Suffix ranges were rejected.** `Range: bytes=-500`, which browsers use to
+  probe the end of a media file, parsed its length as an end offset, produced
+  an end below the start, and answered 416. Several ranges at once answered
+  416 too; the whole file is a valid answer there and is what is sent now.
+- **HEAD was unsupported.** A download manager asks for the size and validator
+  before fetching and got 501.
+- **The finished movie had no validator and a moving address.** Nothing to
+  match a resumed range against, and `/api/export/<job>` follows the newest
+  export — so exporting again swapped the file out from under a download still
+  reading it. There is an ETag and a Last-Modified now, `If-Range` is honoured
+  so a stale resume restarts cleanly rather than splicing two versions, and
+  the button points at a fixed version.
+
+Keeping connections alive brought its own hazard, handled with it: a rejected
+upload leaves its body unsent, and those bytes would have been read as the
+next request. Those replies now close the connection and say so. A HEAD reply
+carries no body for the same reason.
+
+## Verification performed
+
+- Full test suite: 180 passed, 1 skipped.
+- A real 1080p export driven end to end in desktop Chrome — analysed,
+  exported, the result `<video>` streaming the same file — then downloaded:
+  66MB complete, byte count equal to `Content-Length`, no console or server
+  errors.
+- Resume, suffix ranges, HEAD, connection reuse and the stale-`If-Range` case
+  each covered directly.
+
+**Not verified here:** the original failure could not be reproduced, so this
+is four defects found by inspecting the path it takes rather than a
+confirmed diagnosis of that one message.
