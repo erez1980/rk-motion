@@ -162,6 +162,14 @@ one. Notifications need a secure context — that means the app running on this
 machine, or added to the iPhone home screen; over plain `http` on the LAN you
 still get the chime and the flashing title.
 
+**Already edited it yourself?** Tick **הסרטון שלי כבר ערוך — לא לחתוך, רק
+להוסיף מוזיקה** before choosing the file. The footage is kept whole and the
+action scan is skipped (most of the wait), leaving the soundtrack, quality,
+aspect and closing fade to work as they do on a cut edit.
+
+Mid-edit, **התחלה מחדש** under the step list throws the whole thing away —
+including the uploaded footage on this machine — and starts again.
+
 Before selecting a video, optionally set **Max scene length** in seconds. Leave
 it blank to keep each detected action range at its natural length. RK Motion
 will show scored action suggestions beside a video preview. You can select or

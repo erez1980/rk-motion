@@ -318,6 +318,15 @@ body.day .eyebrow{color:#4c7c12}
   .top{padding-top:calc(12px + env(safe-area-inset-top))}
 }
 
+.whole-toggle{display:flex;align-items:center;gap:9px;margin-top:12px;color:var(--soft);font-size:13.5px;cursor:pointer}
+.whole-toggle input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+/* Only worth offering once there is an edit to abandon. */
+.restart-row{display:none;justify-content:flex-start;margin:-4px 0 12px}
+body.editing .restart-row{display:flex}
+.restart-row .secondary{padding:7px 14px;font-size:12.5px}
+/* Nothing to re-threshold or auto-pick when the footage is kept whole. */
+body.whole .clip-tools,body.whole #addClip{display:none}
+
 /* ---- Standalone YouTube downloader ---- */
 .grabber{margin-bottom:16px}
 .grab-toggle{width:100%;text-align:center}
@@ -457,6 +466,9 @@ body.day .eyebrow{color:#4c7c12}
   <li id="step2"><b>2</b>בוחרים קטעים</li>
   <li id="step3"><b>3</b>מייצאים סרט</li>
 </ol>
+<div class="restart-row">
+  <button id="restart" class="secondary">התחלה מחדש</button>
+</div>
 
 <section id="drop" class="upload">
   <span class="kicker">ROCHVIM KAVUA / MOTION LAB</span>
@@ -468,6 +480,10 @@ body.day .eyebrow{color:#4c7c12}
     <span>שניות</span>
     <span class="hint">השאירו ריק לאורך טבעי</span>
   </div>
+  <label class="whole-toggle">
+    <input id="wholeVideo" type="checkbox">
+    <span>הסרטון שלי כבר ערוך — לא לחתוך, רק להוסיף מוזיקה</span>
+  </label>
   <div class="upload-cta">
     <label class="button primary" for="file">בחירת סרטון</label>
     <span class="drag-hint">או גררו קבצים לכאן</span>
@@ -863,6 +879,29 @@ fetch('/api/capabilities').then(r => r.json()).then(caps => {
     : 'קידוד במעבד (libx264) — לא נמצא מאיץ חומרה זמין';
 }).catch(() => {});
 
+/* ---- Starting over -----------------------------------------------------
+   Halfway through an edit the only way back was to reload and hope the
+   session did not come back with it. This drops the job on the server too,
+   so its files go rather than sitting in a temp folder until the app closes. */
+/* A maximum scene length is a contradiction once nothing is being cut. */
+$('#wholeVideo').onchange = () => {
+  const whole = $('#wholeVideo').checked;
+  $('#maxLength').disabled = whole;
+  $('#drop').querySelector('.settings').style.opacity = whole ? '.45' : '';
+};
+$('#wholeVideo').onchange();
+
+$('#restart').onclick = async () => {
+  if (report?.clips?.length && !confirm('להתחיל מחדש? העריכה הנוכחית תימחק.')) return;
+  const jobId = report?.job_id || localStorage.getItem(JOB_KEY);
+  localStorage.removeItem(JOB_KEY);
+  if (jobId) {
+    try { await fetch('/api/reset/' + jobId, { method: 'POST' }); }
+    catch { /* the page is being reset either way */ }
+  }
+  location.reload();
+};
+
 /* ---- Standalone YouTube downloader ----------------------------------
    Nothing to do with the edit: search, pick MP3 or MP4, and the file comes
    back to be saved on this device. Collapsed until asked for. */
@@ -1091,15 +1130,21 @@ async function upload(files) {
     }
     // From here on the work lives on the server, so the page may be closed.
     uploading = false;
-    stMain.show('מתחילה ניתוח…', 3, { working: true });
+    stMain.show($('#wholeVideo').checked ? 'מכינה את הסרטון…' : 'מתחילה ניתוח…', 3, { working: true });
     const maxLen = $('#maxLength').value.trim();
-    const start = await request('/api/analyse-batch/' + session.job_id, '', maxLen ? { 'X-Max-Scene-Length': maxLen } : {});
+    const headers = {};
+    if (maxLen) headers['X-Max-Scene-Length'] = maxLen;
+    if ($('#wholeVideo').checked) headers['X-Whole-Video'] = '1';
+    const start = await request('/api/analyse-batch/' + session.job_id, '', headers);
     localStorage.setItem(JOB_KEY, session.job_id);
     report = await pollAnalyse(start.status_url);
-    stMain.show('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+    stMain.show(report.whole ? 'הסרטון מוכן — אפשר להוסיף מוזיקה ולייצא.'
+                             : 'הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
     setBusy(0);
     show();
-    notifyDone('הניתוח הושלם', `נמצאו ${report.clips.length} קטעי אקשן — אפשר לבחור ולייצא.`);
+    notifyDone(report.whole ? 'הסרטון מוכן' : 'הניתוח הושלם',
+               report.whole ? 'אפשר להוסיף מוזיקה ולייצא.'
+                            : `נמצאו ${report.clips.length} קטעי אקשן — אפשר לבחור ולייצא.`);
   } catch (error) {
     setBusy(0);
     stMain.show(error.message || 'לא ניתן לנתח את הסרטונים.', 0, { error: true });
@@ -1199,6 +1244,7 @@ async function resumeSession() {
 
 function show() {
   workspace.classList.add('show');
+  document.body.classList.toggle('whole', !!report.whole);
   $('#exportBox').classList.add('show');
   document.body.classList.add('editing');
   $('#actionBar').classList.add('show');
@@ -1419,13 +1465,19 @@ function updateSummary() {
   start.max = Math.max(0, musicDuration);
   if (+start.value > musicDuration) start.value = musicDuration;
   $('#musicStartLabel').textContent = fmt(start.value);
-  $('#count').textContent = `(${n} נבחרו מתוך ${report.clips.length})`;
+  // "1 קטעים" is not Hebrew, and counting clips says nothing when the footage
+  // was never cut in the first place.
+  const pieces = report.whole ? '' : (n === 1 ? 'קטע אחד' : `${n} קטעים`);
+  const withDot = pieces ? pieces + ' · ' : '';
+  $('#count').textContent = report.whole ? '(הסרטון המלא)' : `(${n} נבחרו מתוך ${report.clips.length})`;
   $('#exportHint').textContent = n
-    ? `${n} קטעים · ${fmt(finalLength)} אורך הסרט הסופי · לפי סדר הרשימה.`
+    ? (report.whole ? `הסרטון המלא · ${fmt(finalLength)}`
+                    : `${pieces} · ${fmt(finalLength)} אורך הסרט הסופי · לפי סדר הרשימה.`)
     : 'בחרו לפחות קטע אחד כדי לייצא.';
-  $('#export').textContent = n ? `ייצוא ובחירת מיקום · ${n} קטעים` : 'ייצוא הסרט';
+  $('#export').textContent = n ? (report.whole ? 'ייצוא ובחירת מיקום' : `ייצוא ובחירת מיקום · ${pieces}`)
+                               : 'ייצוא הסרט';
   $('#export').disabled = !n;
-  $('#barExport').textContent = n ? `ייצוא · ${n} קטעים · ${fmt(finalLength)}` : 'בחרו קטעים';
+  $('#barExport').textContent = n ? `ייצוא · ${withDot}${fmt(finalLength)}` : 'בחרו קטעים';
   $('#barExport').disabled = !n;
 }
 

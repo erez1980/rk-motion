@@ -433,3 +433,36 @@ nothing.
 **Still not verified here:** whether iOS opens the sheet. What is now certain
 is that no outcome on that phone can be silent — whatever happens, the line
 under the button says so.
+
+---
+
+## Round 13 — an edit that is already made, and a way out of one
+
+- **"My video is already edited, I just want music."** The whole app is built
+  around finding the action in a long ride, which is exactly wrong for footage
+  that has already been cut. A toggle on the upload card keeps the footage
+  whole: the motion/sound scan is skipped entirely — most of the wait — and
+  the rest of the pipeline is handed one clip covering everything, so the
+  soundtrack, quality, aspect and closing fade all behave as they always did.
+  The tools that make no sense without a cut (sensitivity, target length,
+  auto-pick, add-clip) hide themselves, and the maximum-scene-length field
+  dims, since it contradicts the choice.
+- **A way to start over.** Halfway through an edit the only way back was to
+  reload and hope the session did not come back with it. A button under the
+  steps, shown only while editing, confirms and then drops the job on the
+  server too, so its footage goes with it instead of sitting in a temp folder
+  until the app closes.
+- **"1 קטעים" is not Hebrew.** Counting clips also says nothing when the
+  footage was never cut, so the export labels now read "הסרטון המלא · 00:30"
+  in that mode and "קטע אחד" when there really is one.
+
+## Verification performed
+
+- Full test suite: 172 passed, 1 skipped.
+- A 30s already-edited clip reached the workspace in 1.9s with no scan, as one
+  full-length clip; music added and exported, and the finished movie kept its
+  full length rather than losing a second to a cut.
+- The normal path still scans and still cuts — the flag is opt-in.
+- Start over: workspace cleared, stored job id gone, and the server's copy of
+  the old export answered 404 afterwards. Resetting twice is not an error.
+- Toggle and button at 320px and 390px, no overflow.

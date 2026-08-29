@@ -293,6 +293,8 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._youtube_search()
         if route == "/api/export":
             return self._export()
+        if route.startswith("/api/reset/"):
+            return self._reset(route.rsplit("/", 1)[-1])
         if route == "/api/youtube/grab":
             return self._youtube_grab()
         if route.startswith("/api/youtube/download/"):
@@ -396,6 +398,13 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             job.setdefault("music_meta", []).append(meta)
         return self._json(HTTPStatus.OK, {"ok": True})
 
+    def _reset(self, job_id: str) -> None:
+        """Throw away an edit in progress, files and all."""
+        job = JOBS.pop(job_id, None)
+        if job:
+            shutil.rmtree(job.get("folder", ""), ignore_errors=True)
+        return self._json(HTTPStatus.OK, {"ok": True})
+
     def _prepare_batch(self) -> None:
         job_id = uuid.uuid4().hex
         folder = Path(tempfile.mkdtemp(prefix="rk-motion-"))
@@ -429,6 +438,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
         raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
         max_duration = float(raw_max) if raw_max else None
+        # "Already edited, just add music": keep the footage whole and skip the
+        # motion/sound scan entirely, which is most of the wait.
+        whole = self.headers.get("X-Whole-Video", "").strip() == "1"
         # Estimate from the actual work (duration x resolution) at this
         # machine's learned speed, not from file size with a fixed constant.
         try:
@@ -444,20 +456,24 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             except Exception:
                 work += item.stat().st_size / 3e6  # rough fallback when probing fails
         rates = _perf_rates()
-        estimate = max(8, round(work / rates[kind] + 4))
+        scan = 0.0 if whole else work / rates["fast"]
+        estimate = max(8, round(work / rates[kind] + 4)) if not whole else max(6, round(
+            (0.0 if kind == "fast" else work / rates["encode"]) + 4))
         # Two steps share the bar: preparing the source (a re-encode, unless a
         # single H.264 file can be used as-is) and the motion/sound scan.
         prepare = 0.0 if kind == "fast" else work / rates["encode"]
         job["analyse_perf"] = {"kind": kind, "work": work}
         job["analyse_status"] = {"state": "running", "started": time.monotonic(),
                                  "estimated_seconds": estimate, "percent": 0,
-                                 "phase_weights": [prepare, work / rates["fast"]],
+                                 "phase_weights": [prepare, scan],
                                  "message": "מכינה את הסרטונים…"}
-        threading.Thread(target=self._run_analyse, args=(job, job_id, max_duration), daemon=True).start()
+        threading.Thread(target=self._run_analyse,
+                         args=(job, job_id, max_duration, whole), daemon=True).start()
         return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/analyse-status/{job_id}"})
 
     @classmethod
-    def _run_analyse(cls, job: dict, job_id: str, max_duration: float | None) -> None:
+    def _run_analyse(cls, job: dict, job_id: str, max_duration: float | None,
+                     whole: bool = False) -> None:
         status = job["analyse_status"]
         try:
             phases = _Phases(status, status.get("phase_weights") or [0.0, 1.0])
@@ -468,16 +484,19 @@ class RKMotionHandler(BaseHTTPRequestHandler):
 
             source = cls._prepare_source(job["inputs"], Path(job["folder"]), prepared)
             job["source"] = source
-            phases.start(1, "מנתחת תנועה וסאונד…")
-            report = analyse_action(str(source), max_duration=max_duration,
-                                    progress=phases.update)
+            if whole:
+                report = cls._whole_video_report(source)
+            else:
+                phases.start(1, "מנתחת תנועה וסאונד…")
+                report = analyse_action(str(source), max_duration=max_duration,
+                                        progress=phases.update)
             report["job_id"] = job_id
             job["report"] = report
             perf = job.get("analyse_perf", {})
             _record_rate(perf.get("kind", ""), perf.get("work", 0),
                          time.monotonic() - status["started"])
-            status.update({"state": "done", "message": "הניתוח הושלם.", "report": report,
-                           "percent": 100, "eta_seconds": 0})
+            status.update({"state": "done", "report": report, "percent": 100, "eta_seconds": 0,
+                           "message": "הסרטון מוכן." if whole else "הניתוח הושלם."})
         except Exception as exc:
             detail = str(exc)
             stderr = getattr(exc, "stderr", None)
@@ -486,6 +505,24 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                     stderr = stderr.decode("utf-8", "replace")
                 detail = stderr.strip().splitlines()[-1] if stderr.strip() else detail
             status.update({"state": "error", "message": detail or "הניתוח נכשל."})
+
+    @staticmethod
+    def _whole_video_report(source: Path) -> dict:
+        """One clip covering everything, for footage that is already cut.
+
+        The rest of the pipeline — soundtrack, quality, aspect, closing fade —
+        works on clips, so handing it a single full-length one keeps every
+        later step exactly as it is.
+        """
+        total = round(duration(str(source)), 2)
+        return {
+            "source": str(source.resolve()),
+            "duration": total,
+            "whole": True,
+            "detector": {"score": "no cut: the footage is kept whole"},
+            "scores": [],          # nothing to re-threshold, so no sensitivity slider
+            "clips": [{"start": 0, "end": total, "duration": total, "score": 1.0}],
+        }
 
     @staticmethod
     def _video_meta(path: Path) -> tuple[str, int, int]:
