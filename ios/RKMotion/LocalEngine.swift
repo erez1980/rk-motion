@@ -274,8 +274,13 @@ actor LocalEngine {
         // the end of the export, after the wait. Its own validator names the
         // offending instruction, so ask it up front and say what is wrong.
         let check = CompositionCheck()
-        guard await videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check) else {
-            throw AppError(message: "הרכבת הסרט נכשלה: " + (check.problems.first ?? "סיבה לא ידועה"))
+        var valid = false
+        do {valid = try await videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check)}
+        catch is CancellationError {throw CancellationError()}
+        catch {check.problems.append(error.localizedDescription)}
+        guard valid else {
+            let detail = check.problems.isEmpty ? "סיבה לא ידועה" : check.problems.joined(separator: " · ")
+            throw AppError(message: "הרכבת הסרט נכשלה: " + detail)
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
@@ -310,24 +315,30 @@ actor LocalEngine {
 /// failure can name the instruction instead of a bare error code.
 final class CompositionCheck: NSObject, AVVideoCompositionValidationHandling {
     var problems: [String] = []
+    // Keep validating after the first complaint: the whole list of flaws is
+    // worth more than the first one, and the delegate is the only way to see it.
+    private func note(_ text: String) -> Bool {
+        if problems.count < 8 {problems.append(text)}
+        return problems.count < 8
+    }
     private func seconds(_ range: CMTimeRange) -> String {
-        String(format: "%.3f–%.3f", range.start.seconds, range.end.seconds)
+        String(format: "%.3f-%.3f", range.start.seconds, range.end.seconds)
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidValueForKey key: String) -> Bool {
-        problems.append("ערך לא תקין: \(key)"); return false
+        note("ערך לא תקין: \(key)")
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingEmptyTimeRange timeRange: CMTimeRange) -> Bool {
-        problems.append("פער ללא הוראה: \(seconds(timeRange))"); return false
+        note("פער ללא הוראה: \(seconds(timeRange))")
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTimeRangeIn instruction: any AVVideoCompositionInstructionProtocol) -> Bool {
-        problems.append("טווח זמן לא תקין: \(seconds(instruction.timeRange))"); return false
+        note("טווח זמן לא תקין: \(seconds(instruction.timeRange))")
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTrackIDIn instruction: any AVVideoCompositionInstructionProtocol,
                           layerInstruction: AVVideoCompositionLayerInstruction, asset: AVAsset) -> Bool {
-        problems.append("ערוץ לא תקין \(layerInstruction.trackID) בטווח \(seconds(instruction.timeRange))"); return false
+        note("ערוץ לא תקין \(layerInstruction.trackID) בטווח \(seconds(instruction.timeRange))")
     }
 }
