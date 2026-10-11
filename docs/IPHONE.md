@@ -1,92 +1,81 @@
-# RK Motion on iPhone
+# RK Motion: standalone iPhone editor
 
-The native companion requires iOS 17+. The Mac runs the video engine; this
-is not an independent on-phone editor. Both devices must be on the same
-reachable Wi-Fi network. Keep the Mac awake while processing.
+Version 0.14.0 requires iOS 17+. All video analysis, timeline editing, audio
+mixing, and movie export run on the iPhone using AVFoundation. No Mac server,
+Wi-Fi connection, pairing, Python, FFmpeg, cloud API, or model key is needed.
+The Mac is used only to sign/install the IPA. Photos stored only in iCloud
+may need to download through the system picker before they can be imported.
+Once the source is local, editing and exporting work offline.
 
-## Install the IPA with your Mac
+## Install using your Mac
 
-1. Download `RK-Motion-unsigned.ipa` from the successful **iPhone companion**
-   GitHub Actions run. Unzip the Actions artifact ZIP to obtain the IPA.
-2. Connect the iPhone by USB, unlock it, and accept **Trust This Computer**.
-3. Open [Sideloadly](https://sideloadly.io/) on the Mac, choose the iPhone,
-   drag the IPA into its app field, and enter your Apple Account yourself.
-4. Start signing/installing and complete account verification yourself.
-5. Follow iOS prompts to trust the developer under **Settings → General →
-   VPN & Device Management**. If requested, enable **Developer Mode** under
-   **Settings → Privacy & Security**, then restart and confirm.
-6. Open RK Motion. Allow local network access; camera access is needed only
-   for QR scanning. Photos add permission is requested when saving an export.
+1. Download the IPA artifact from a successful **iPhone standalone** Actions
+   run. Unzip the artifact ZIP to obtain `RK-Motion-unsigned.ipa`.
+2. Connect/unlock your iPhone by USB and accept **Trust This Computer**.
+3. Open [Sideloadly](https://sideloadly.io/), choose the iPhone, drag in the IPA,
+   and enter/verify your Apple Account yourself. Start signing/installing.
+4. Follow iOS prompts to trust the developer under Settings → General →
+   VPN & Device Management and enable Developer Mode if requested.
+5. Open RK Motion. There is no connection/pairing screen. Select a video and
+   allow Photos add access when saving a finished movie.
 
-The input IPA is unsigned. A standard iPhone requires signing before it can
-run. Free Personal Team profiles expire after seven days; renew/reinstall or
-configure Sideloadly refresh. Keep the same signing account/bundle identifier
-for updates to preserve the app's data. Do not delete the app to update it.
+The unsigned IPA must be signed before it can run on a standard iPhone.
+Free Personal Team profiles expire after seven days; renew/reinstall or
+configure installer refresh. Use the same signing account and bundle ID for
+updates, without deleting the app, to preserve your local projects.
 
-Sources: [Apple code signing](https://support.apple.com/guide/security/app-code-signing-process-sec7c917bf14/web),
-[Apple Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account),
-[Sideloadly signing/refresh FAQ](https://sideloadly.io/faq.html).
+Sources: [Apple signing](https://support.apple.com/guide/security/app-code-signing-process-sec7c917bf14/web),
+[Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account),
+[Sideloadly FAQ](https://sideloadly.io/faq.html).
 
-## Start the matching Mac backend
+## On-device workflow
 
-Use this branch's backend, not an older desktop release:
+- Import from Photos or Files. The original is retained in the app's local
+  storage for future edits. Leave enough space for the source and exports.
+- Analyze activity using two small preview samples per second and per-second
+  audio RMS. Scores use 65% motion / 35% loudness, with robust normalization.
+  These are activity suggestions for review, not semantic riding judgments.
+- Or choose **keep the whole video**, which skips activity detection.
+- Preview the original directly, trim/select/reorder clips, add manual clips,
+  change detection sensitivity, and undo/redo edits. Projects save locally.
+- Add local music files; the playlist loops to fill the movie and fades out.
+  Choose source framing or portrait crop, quality cap, playback speed, and
+  hard cuts or dissolves. Small sources are not enlarged.
+- Export one composition locally to MP4, including framing, speed,
+  transitions, music, and closing fade. Save to Photos or share the file.
 
-```sh
-git clone --branch codex/iphone-companion https://github.com/erez1980/rk-motion.git
-cd rk-motion
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[lan]'
-# FFmpeg and ffprobe must already be on PATH, e.g. brew install ffmpeg
-rk-motion --ui --lan
-```
+Keep the app in the foreground for long processing jobs. It prevents
+automatic screen locking while processing, and uses the system's limited
+background grace period if you switch apps. iOS can suspend/terminate long
+work. On background expiration the operation is canceled safely; reopen
+and retry from the saved source/edit. This version does not promise
+unlimited background processing or push notifications.
 
-The Mac browser has a pairing button. Scan its private QR with the native
-app, or paste the complete pairing link including the fragment. Codes expire
-in ten minutes; reopen pairing on the Mac to refresh an expired code.
-Do not share the private link. The app enrolls a device token in Keychain
-and validates the server certificate fingerprint plus host and validity.
-If the Mac address/certificate changes, pair again.
+Exports target SDR BT.709 at 30 fps for compatibility. Native decoders read
+MOV/MP4, supported HEVC, and orientation metadata. Actual Dolby Vision/HDR
+appearance, very long/large recordings, thermal behavior, and unsupported
+codec variants must be verified on the target iPhone. The source is retained.
 
-## Editing flow
+## Build
 
-Choose a movie from Photos or Files. Uploads use file-backed 8MB chunks; open
-the app and tap resume after a disconnection. The Mac confirms committed
-byte offsets. Uploads can continue using iOS background transfers, but iOS
-controls scheduling and may stop transfers after force-quitting the app.
-
-Analysis and exports run on the Mac. Reopen the app to reconnect to status.
-Download the smaller preview for playback, trim/select/reorder clips, add
-music, select aspect/quality/speed, and export. Download the export as a local
-file, then save to Photos or share it. Projects and edits survive Mac restarts.
-Concurrent edit saves are rejected instead of silently overwriting another
-client; reconnect before editing after a conflict.
-
-The app does not promise continuous analysis polling or completion alerts
-while suspended. Mac sleep, Wi-Fi client isolation, VPN/firewall rules, or
-low disk space can interrupt the flow. A failed transfer can be resumed;
-processing interrupted by restarting the Mac must be retried.
-
-## Build locally with Xcode
-
-Full Xcode and its iOS platform are required; Command Line Tools are insufficient.
+Full Xcode with the iOS SDK is required locally:
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash scripts/build-ios.sh unsigned
-# Output: build/ios/RK-Motion-unsigned.ipa
 ```
 
-For direct installation, open `ios/RKMotion.xcodeproj`, select the RKMotion
-target, choose a unique bundle identifier and your Personal Team under
-Signing & Capabilities, connect/select the iPhone, then Build and Run.
-`scripts/generate-ios-project.py` regenerates the committed Xcode project if
-Swift source files are added. Reapply personal signing settings afterward.
+Open `ios/RKMotion.xcodeproj` to install directly through Xcode: choose your
+Personal Team and a unique bundle ID, select the connected iPhone, Build/Run.
+The generator in `scripts/generate-ios-project.py` includes the app and
+XCTest target; regenerating may overwrite personal signing settings.
 
-## Verification limits
+CI builds simulator/device targets and runs native tests. The tests create a
+rotated movie and audio locally, analyze the source, export a trimmed/dissolved
+movie with speed and music, validate dimensions/duration/audio, and reject
+out-of-range edits. Separate tests check local persistence and timeline math.
+Physical installation, Photos saving, signing renewal, and device performance
+still require actual iPhone verification.
 
-CI compiles simulator and device targets, archives the device app, and
-packages the IPA. Backend integration tests cover upload, processing,
-persistence, ranges, authorization, export, and compatible codecs.
-Physical iPhone installation, background suspension, HEVC/HDR recordings,
-large transfers, Photos saving, and signing renewal require device testing.
-HDR tone mapping has not been implemented: use SDR recordings for now.
+The desktop Python editor remains available separately; it is not part of
+the iPhone runtime. Projects from the earlier Mac companion are not migrated
+or downloaded automatically into the standalone app.

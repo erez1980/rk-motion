@@ -13,7 +13,7 @@ rk_args=(-project "$rk_root/ios/RKMotion.xcodeproj" -scheme RKMotion -configurat
 case "$rk_mode" in
   simulator)
     xcodebuild "${rk_args[@]}" -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-    echo "Simulator app: $rk_output/DerivedData/Build/Products/Release-iphonesimulator/RKMotion.app"
+    echo "Standalone simulator app: $rk_output/DerivedData/Build/Products/Release-iphonesimulator/RKMotion.app"
     ;;
   unsigned)
     xcodebuild "${rk_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$rk_output/RKMotion.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive

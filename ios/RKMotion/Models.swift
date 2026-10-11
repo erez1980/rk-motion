@@ -51,6 +51,7 @@ struct LocalProject: Codable, Identifiable {
     var duration: Double = 0
     var scores: [Double] = []
     var analyzed = false
+    var wholeVideo = false
     var edit = Edit(clips: [])
     var music: [LocalMusic] = []
     var exports: [LocalExport] = []

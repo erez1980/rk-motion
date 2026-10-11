@@ -31,6 +31,7 @@ actor LocalEngine {
         }.sorted {($0.score ?? 0) > ($1.score ?? 0)}
     }
     func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> (Double, [Double], [Clip]) {
+        try Task.checkCancellation()
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0, duration <= 24 * 3600,
@@ -93,9 +94,10 @@ actor LocalEngine {
         var lastProgress = -1
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
+            let start = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            guard start.isFinite else {throw AppError(message: "השמע מכיל חותמות זמן לא תקינות.")}
             try autoreleasepool {
-                let start = CMSampleBufferGetPresentationTimeStamp(sample).seconds
-                guard start.isFinite, let block = CMSampleBufferGetDataBuffer(sample) else {return}
+                guard let block = CMSampleBufferGetDataBuffer(sample) else {return}
                 let size = CMBlockBufferGetDataLength(block)
                 var data = [UInt8](repeating: 0, count: size)
                 let status = data.withUnsafeMutableBytes {CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: size, destination: $0.baseAddress!)}
@@ -107,7 +109,7 @@ actor LocalEngine {
                     }
                 }
             }
-            let second = Int(CMSampleBufferGetPresentationTimeStamp(sample).seconds)
+            let second = Int(start)
             if second >= lastProgress + 5 {lastProgress = second; await progress(0.8 + 0.2 * min(1, Double(second) / duration), "מנתחת שמע באייפון…")}
         }
         guard reader.status == .completed else {throw reader.error ?? AppError(message: "פענוח השמע הופסק.")}

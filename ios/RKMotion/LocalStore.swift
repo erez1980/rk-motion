@@ -43,7 +43,9 @@ enum LocalStore {
         try checkSpace(required: bytes + 256 * 1024 * 1024)
     }
     static func checkSpace(required: Int64) throws {
-        let available = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage ?? 0
+        let values = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        let fallback = (try FileManager.default.attributesOfFileSystem(forPath: root.path)[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+        let available = values.volumeAvailableCapacityForImportantUsage ?? fallback
         guard available >= required else {throw AppError(message: "אין מספיק מקום פנוי באייפון. פנו מקום ונסו שוב.")}
     }
     static func importFile(_ source: URL, project: String, prefix: String) async throws -> String {

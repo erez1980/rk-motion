@@ -133,20 +133,21 @@ Photos. If the browser will not open a share sheet the button falls back to a
 plain download — the file lands in **Files**, and iOS can share it into
 **Photos** from there.
 
-#### Native iPhone app / IPA
+#### Standalone native iPhone app / IPA
 
-The SwiftUI companion in [`ios/`](ios/) supports iOS 17 and later. The Mac
-runs analysis and export; keep both devices on the same reachable Wi-Fi and
-keep the Mac awake. The app uses private QR pairing with a pinned certificate,
-file-backed resumable transfers, saved edits, undo/redo, preview, exports,
-Photos saving, and the native share sheet. It resumes job status on reopening;
-it does not promise continuous polling or completion alerts while suspended.
+The SwiftUI app in [`ios/`](ios/) (v0.14.0, iOS 17+) processes videos entirely
+on the iPhone. Native AVFoundation handles activity analysis, clip editing,
+framing, playback speed, dissolves, soundtrack mixing, and MP4 export.
+Projects and original files are saved on the device; no Mac server, pairing,
+network API, Python, or FFmpeg is used by the iPhone app. The Mac is needed
+only for signing/installing the IPA.
 
 See [iPhone build and installation guide](docs/IPHONE.md). GitHub Actions
-builds a real `iphoneos` archive and packages `RK-Motion-unsigned.ipa`.
-An unsigned IPA must be signed before it can run on a standard iPhone.
-Use Xcode's Personal Team or an IPA signing installer such as Sideloadly.
-The free signing profile expires after seven days and requires renewal.
+compiles, runs native simulator integration tests, and packages a real
+`iphoneos` app as `RK-Motion-unsigned.ipa`. It must be signed before running
+on a standard iPhone, using Xcode Personal Team or Sideloadly. Free profiles
+expire after seven days and require renewal. Keep the app open for long
+processing jobs; iOS background time is limited.
 
 #### Download from YouTube (MP3 or MP4)
 

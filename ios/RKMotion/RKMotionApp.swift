@@ -31,7 +31,7 @@ struct EditorView: View {
                     Section("עיבוד מקומי באייפון") {
                         ProgressView(value: model.percent, total: 100)
                         Text(model.message).font(.footnote)
-                        Button("ביטול הפעולה") {model.cancel()}
+                        Button("ביטול הפעולה") {model.cancel()}.disabled(!model.canCancel)
                     }
                 }
                 if let project = model.project {

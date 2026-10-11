@@ -78,6 +78,24 @@ final class LocalEngineTests: XCTestCase {
         XCTAssertEqual(size.height, 240)
         let resultAudios = try await result.loadTracks(withMediaType: .audio)
         XCTAssertFalse(resultAudios.isEmpty)
+        let generator = AVAssetImageGenerator(asset: result)
+        let (lastImage, _) = try await generator.image(at: CMTime(seconds: max(0, actual - 0.05), preferredTimescale: 600))
+        var gray = [UInt8](repeating: 0, count: 64)
+        gray.withUnsafeMutableBytes {bytes in
+            let context = CGContext(data: bytes.baseAddress, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 8,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+            context.draw(lastImage, in: CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        XCTAssertLessThan(gray.reduce(0.0) {$0 + Double($1)} / 64, 40, "Closing fade should darken the final frames")
+        var muted = Edit(clips: [Clip(start: 0, end: 1)])
+        muted.settings["muteOriginal"] = .flag(true); muted.settings["useMusic"] = .flag(false)
+        let silentOutput = folder.appendingPathComponent("muted.mp4")
+        _ = try await engine.export(project, edit: muted, output: silentOutput) {_, _ in}
+        let silentTracks = try await AVURLAsset(url: silentOutput).loadTracks(withMediaType: .audio)
+        XCTAssertTrue(silentTracks.isEmpty)
+        let canceled = Task {try await engine.analyze(source, whole: true) {_, _ in}}
+        canceled.cancel()
+        do {_ = try await canceled.value; XCTFail("Canceled analysis was accepted")} catch is CancellationError {} catch {XCTFail("Unexpected cancellation error: \(error)")}
         // Source is still retained for future edits; no intermediate source re-encode.
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
         edit.clips[0].end = 99
@@ -94,7 +112,10 @@ final class LocalEngineTests: XCTestCase {
         writer.add(input)
         XCTAssertTrue(writer.startWriting()); writer.startSession(atSourceTime: .zero)
         for frame in 0..<90 {
-            while !input.isReadyForMoreMediaData {try await Task.sleep(for: .milliseconds(2))}
+            while !input.isReadyForMoreMediaData {
+                guard writer.status == .writing else {throw writer.error ?? AppError(message: "Fixture writer stopped")}
+                try await Task.sleep(for: .milliseconds(2))
+            }
             var buffer: CVPixelBuffer?
             XCTAssertEqual(CVPixelBufferPoolCreatePixelBuffer(nil, adapter.pixelBufferPool!, &buffer), kCVReturnSuccess)
             let pixels = buffer!

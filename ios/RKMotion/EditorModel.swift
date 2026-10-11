@@ -21,6 +21,7 @@ import UIKit
     private var suppressedEdit: Edit?
     private var undoStack: [Edit] = [], redoStack: [Edit] = []
     private var backgroundID = UIBackgroundTaskIdentifier.invalid
+    var canCancel: Bool {operation != nil}
     var sourceURL: URL? {project.map {LocalStore.file($0.source, project: $0.id)}}
 
     func restore() {
@@ -28,8 +29,9 @@ import UIKit
         open(saved)
     }
     func open(_ value: LocalProject) {
-        guard !busy else {return}
-        save(); project = value; edit = value.edit; suppressedEdit = edit
+        guard !busy, project?.id != value.id else {return}
+        guard save() else {return}
+        project = value; wholeVideo = value.wholeVideo; edit = value.edit; suppressedEdit = edit
         undoStack = []; redoStack = []; updateUndo()
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
@@ -41,11 +43,11 @@ import UIKit
         undoStack.append(previous); if undoStack.count > 40 {undoStack.removeFirst()}
         redoStack = []; updateUndo(); save()
     }
-    func save() {
-        guard var p = project else {return}
+    @discardableResult func save() -> Bool {
+        guard var p = project else {return true}
         p.edit = edit
-        do {try LocalStore.save(p); project = p; refreshLibrary(p)}
-        catch {message = "שמירת הפרויקט נכשלה: " + error.localizedDescription}
+        do {try LocalStore.save(p); project = p; refreshLibrary(p); return true}
+        catch {message = "שמירת הפרויקט נכשלה: " + error.localizedDescription; return false}
     }
     private func refreshLibrary(_ p: LocalProject) {projects.removeAll {$0.id == p.id}; projects.insert(p, at: 0)}
     private func setBusy(_ value: Bool) {
@@ -55,7 +57,9 @@ import UIKit
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
         save(); setBusy(true); percent = 0; message = "מעתיקה את הסרטון לאחסון המקומי…"
-        var p = LocalProject(name: file.lastPathComponent, source: "")
+        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : "רכיבה " + Date().formatted(date: .abbreviated, time: .shortened)
+        var p = LocalProject(name: name, source: "")
+        p.wholeVideo = wholeVideo
         do {
             p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source")
             try LocalStore.save(p); project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
@@ -65,7 +69,9 @@ import UIKit
         } catch {setBusy(false); message = error.localizedDescription; try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
     }
     func analyze() {
-        guard !busy, let p = project else {return}
+        guard !busy, var p = project else {return}
+        p.wholeVideo = wholeVideo; project = p
+        guard save() else {return}
         setBusy(true); percent = 0; message = "מנתחת באייפון…"
         let whole = wholeVideo
         operation = Task {
@@ -76,8 +82,8 @@ import UIKit
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
                 current.duration = duration; current.scores = scores; current.analyzed = true
-                project = current; edit.clips = clips; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo(); save()
-                message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"
+                project = current; edit.clips = clips; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
+                if save() {message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
             setBusy(false)
@@ -104,13 +110,15 @@ import UIKit
             let duration = try await asset.load(.duration).seconds
             guard duration.isFinite, duration > 0, !(try await asset.loadTracks(withMediaType: .audio)).isEmpty else {throw AppError(message: "בחרו קובץ שמע תקין.")}
             p.music.append(LocalMusic(file: name, name: file.lastPathComponent, duration: duration))
-            project = p; save(); message = "המוזיקה נשמרה באייפון"
+            project = p; if save() {message = "המוזיקה נשמרה באייפון"}
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
     func removeMusic(_ id: String) {
         guard !busy, var p = project, let song = p.music.first(where: {$0.id == id}) else {return}
-        p.music.removeAll {$0.id == id}; project = p; save()
+        p.music.removeAll {$0.id == id}
+        do {try LocalStore.save(p); project = p; refreshLibrary(p)}
+        catch {message = error.localizedDescription; return}
         try? FileManager.default.removeItem(at: LocalStore.file(song.file, project: p.id))
     }
     func exportMovie() {
@@ -123,8 +131,8 @@ import UIKit
                 let duration = try await engine.export(p, edit: snapshot, output: output) {[weak self] fraction, text in await self?.progress(fraction, text)}
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
-                current.exports.append(LocalExport(file: file, duration: duration)); project = current; movieURL = output; save()
-                message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"
+                current.exports.append(LocalExport(file: file, duration: duration)); project = current; movieURL = output
+                if save() {message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"}
             } catch is CancellationError {try? FileManager.default.removeItem(at: output); message = "הייצוא בוטל. העריכה נשמרה."}
             catch {try? FileManager.default.removeItem(at: output); message = error.localizedDescription}
             setBusy(false)
