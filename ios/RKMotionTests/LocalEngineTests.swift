@@ -35,6 +35,7 @@ final class LocalEngineTests: XCTestCase {
         defer {try? FileManager.default.removeItem(at: folder)}
         let video = folder.appendingPathComponent("silent.mov")
         try await makeVideo(video)
+        print("NATIVE: fixture video created")
         let wave = folder.appendingPathComponent("music.wav")
         try makeAudio(wave)
         let composition = AVMutableComposition()
@@ -54,8 +55,9 @@ final class LocalEngineTests: XCTestCase {
         merger.outputURL = source; merger.outputFileType = .mov
         await withCheckedContinuation {c in merger.exportAsynchronously {c.resume()}}
         XCTAssertEqual(merger.status, .completed, merger.error?.localizedDescription ?? "")
+        print("NATIVE: source merge completed")
         let engine = LocalEngine()
-        let (duration, scores, _) = try await engine.analyze(source, whole: false) {_, _ in}
+        let (duration, scores, _) = try await engine.analyze(source, whole: false) {fraction, text in print("NATIVE ANALYSIS: \(fraction) \(text)")}
         XCTAssertEqual(duration, 3, accuracy: 0.05)
         XCTAssertEqual(scores.count, 3)
         XCTAssertTrue(scores.allSatisfy {$0.isFinite})
@@ -67,7 +69,7 @@ final class LocalEngineTests: XCTestCase {
         edit.settings["transitionDuration"] = .text("0.3")
         edit.settings["aspect"] = .text("9:16")
         let output = folder.appendingPathComponent("result.mp4")
-        let expected = try await engine.export(project, edit: edit, output: output) {_, _ in}
+        let expected = try await engine.export(project, edit: edit, output: output) {fraction, text in print("NATIVE EXPORT: \(fraction) \(text)")}
         let result = AVURLAsset(url: output)
         let actual = try await result.load(.duration).seconds
         XCTAssertEqual(actual, expected, accuracy: 0.1)

@@ -160,11 +160,15 @@ actor LocalEngine {
         let bounds = CGRect(origin: .zero, size: natural).applying(preferred)
         let displayed = CGSize(width: abs(bounds.width), height: abs(bounds.height))
         let quality = edit.settings["quality"]?.string ?? "1080"
+        guard displayed.width.isFinite, displayed.height.isFinite, displayed.width > 0, displayed.height > 0,
+              displayed.width <= 16384, displayed.height <= 16384,
+              ["720", "1080", "original", "whatsapp"].contains(quality) else {throw AppError(message: "ממדי הסרטון או איכות הייצוא אינם תקינים.")}
         let cap: Double? = ["720", "whatsapp"].contains(quality) ? 720 : quality == "original" ? nil : 1080
         let size = Self.frame(source: displayed, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
         let segments = Self.timeline(clips: clips, speed: speed, transition: transition == "cut" ? 0 : fade)
         let length = segments.last!.end
-        try LocalStore.checkSpace(required: Int64(length * Double(size.width * size.height) * 0.15 / 8) + 256 * 1024 * 1024)
+        guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
+        try LocalStore.checkSpace(required: Int64(length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
         let composition = AVMutableComposition()
         let videos = (0..<2).map {_ in composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!}
         let original = try await asset.loadTracks(withMediaType: .audio).first
