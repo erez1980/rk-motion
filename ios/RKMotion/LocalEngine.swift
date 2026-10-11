@@ -140,7 +140,7 @@ actor LocalEngine {
         let scale = min(1, (cap ?? h) / h)
         return CGSize(width: max(2, floor(w * scale / 2) * 2), height: max(2, floor(h * scale / 2) * 2))
     }
-    func export(_ project: LocalProject, edit: Edit, output: URL, progress: Progress) async throws -> Double {
+    func export(_ project: LocalProject, edit: Edit, output: URL, progress: @escaping Progress) async throws -> Double {
         let source = LocalStore.file(project.source, project: project.id)
         let asset = AVURLAsset(url: source)
         let total = try await asset.load(.duration).seconds
