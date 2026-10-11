@@ -263,6 +263,23 @@ actor LocalEngine {
             params.setVolumeRamp(fromStartVolume: volume, toEndVolume: 0, timeRange: CMTimeRange(start: time(max(0, length - 3)), duration: time(min(3, length))))
             parameters.append(params)
         }
+        // The composition's duration is the result of AVFoundation's own
+        // rounding of the scaled segments, not of the seconds computed above,
+        // so the two can disagree by a single tick. AVFoundation then refuses
+        // the whole composition over that sliver. Snap the instructions onto
+        // the real duration so they cover it edge to edge.
+        let span = try await composition.load(.duration)
+        var filled = CMTime.zero
+        var covering: [AVMutableVideoCompositionInstruction] = []
+        for instruction in instructions {
+            let end = min(instruction.timeRange.end, span)
+            guard filled < end else {continue}
+            instruction.timeRange = CMTimeRange(start: filled, end: end)
+            covering.append(instruction); filled = end
+        }
+        guard let tail = covering.last else {throw AppError(message: "לא נותרו קטעים לייצוא.")}
+        if filled < span {tail.timeRange = CMTimeRange(start: tail.timeRange.start, end: span)}
+        instructions = covering
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = size; videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.instructions = instructions
@@ -275,7 +292,7 @@ actor LocalEngine {
         // offending instruction, so ask it up front and say what is wrong.
         let check = CompositionCheck()
         var valid = false
-        do {valid = try await videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check)}
+        do {valid = try await videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: span), validationDelegate: check)}
         catch is CancellationError {throw CancellationError()}
         catch {check.problems.append(error.localizedDescription)}
         guard valid else {
