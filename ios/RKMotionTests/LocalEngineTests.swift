@@ -90,7 +90,14 @@ final class LocalEngineTests: XCTestCase {
         let resultAudios = try await result.loadTracks(withMediaType: .audio)
         XCTAssertFalse(resultAudios.isEmpty)
         let generator = AVAssetImageGenerator(asset: result)
-        let (lastImage, _) = try await generator.image(at: CMTime(seconds: max(0, actual - 0.05), preferredTimescale: 600))
+        // Both tolerances default to positive infinity, which lets the
+        // generator hand back any frame it likes - usually an early keyframe.
+        // The fade can only be measured on the frame that was asked for.
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let wanted = max(0, actual - 0.05)
+        let (lastImage, sampled) = try await generator.image(at: CMTime(seconds: wanted, preferredTimescale: 600))
+        XCTAssertEqual(sampled.seconds, wanted, accuracy: 0.05, "The fade check has to look at the closing frames")
         var gray = [UInt8](repeating: 0, count: 64)
         gray.withUnsafeMutableBytes {bytes in
             let context = CGContext(data: bytes.baseAddress, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 8,
