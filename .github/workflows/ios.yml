@@ -1,0 +1,24 @@
+name: iPhone companion
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths: ['ios/**', 'scripts/build-ios.sh', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', 'scripts/build-ios.sh', '.github/workflows/ios.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile simulator app
+        run: bash scripts/build-ios.sh simulator
+      - name: Build unsigned iPhone IPA
+        run: bash scripts/build-ios.sh unsigned
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RK-Motion-unsigned-IPA
+          path: build/ios/RK-Motion-unsigned.ipa
+          if-no-files-found: error
