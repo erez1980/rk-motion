@@ -274,7 +274,7 @@ actor LocalEngine {
         // the end of the export, after the wait. Its own validator names the
         // offending instruction, so ask it up front and say what is wrong.
         let check = CompositionCheck()
-        guard videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check) else {
+        guard await videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check) else {
             throw AppError(message: "הרכבת הסרט נכשלה: " + (check.problems.first ?? "סיבה לא ידועה"))
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
