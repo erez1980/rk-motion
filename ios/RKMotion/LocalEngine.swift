@@ -270,6 +270,13 @@ actor LocalEngine {
         videoComposition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         videoComposition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
         videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
+        // AVFoundation refuses a malformed composition with one opaque code at
+        // the end of the export, after the wait. Its own validator names the
+        // offending instruction, so ask it up front and say what is wrong.
+        let check = CompositionCheck()
+        guard videoComposition.isValid(for: composition, timeRange: CMTimeRange(start: .zero, duration: .positiveInfinity), validationDelegate: check) else {
+            throw AppError(message: "הרכבת הסרט נכשלה: " + (check.problems.first ?? "סיבה לא ידועה"))
+        }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
         guard let session = AVAssetExportSession(asset: composition, presetName: preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
@@ -296,5 +303,31 @@ actor LocalEngine {
         }
         await progress(1, "הסרט מוכן באייפון")
         return length
+    }
+}
+
+/// Collects why AVFoundation considers a video composition invalid, so the
+/// failure can name the instruction instead of a bare error code.
+final class CompositionCheck: NSObject, AVVideoCompositionValidationHandling {
+    var problems: [String] = []
+    private func seconds(_ range: CMTimeRange) -> String {
+        String(format: "%.3f–%.3f", range.start.seconds, range.end.seconds)
+    }
+    func videoComposition(_ videoComposition: AVVideoComposition,
+                          shouldContinueValidatingAfterFindingInvalidValueForKey key: String) -> Bool {
+        problems.append("ערך לא תקין: \(key)"); return false
+    }
+    func videoComposition(_ videoComposition: AVVideoComposition,
+                          shouldContinueValidatingAfterFindingEmptyTimeRange timeRange: CMTimeRange) -> Bool {
+        problems.append("פער ללא הוראה: \(seconds(timeRange))"); return false
+    }
+    func videoComposition(_ videoComposition: AVVideoComposition,
+                          shouldContinueValidatingAfterFindingInvalidTimeRangeIn instruction: any AVVideoCompositionInstructionProtocol) -> Bool {
+        problems.append("טווח זמן לא תקין: \(seconds(instruction.timeRange))"); return false
+    }
+    func videoComposition(_ videoComposition: AVVideoComposition,
+                          shouldContinueValidatingAfterFindingInvalidTrackIDIn instruction: any AVVideoCompositionInstructionProtocol,
+                          layerInstruction: AVVideoCompositionLayerInstruction, asset: AVAsset) -> Bool {
+        problems.append("ערוץ לא תקין \(layerInstruction.trackID) בטווח \(seconds(instruction.timeRange))"); return false
     }
 }
