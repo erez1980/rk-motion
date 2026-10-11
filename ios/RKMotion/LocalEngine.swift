@@ -279,12 +279,21 @@ actor LocalEngine {
             while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}
         }
         defer {observer.cancel()}
-        try await withTaskCancellationHandler {
-            try Task.checkCancellation()
+        try Task.checkCancellation()
+        await withTaskCancellationHandler {
             await withCheckedContinuation {continuation in session.exportAsynchronously {continuation.resume()}}
-            try Task.checkCancellation()
-            guard session.status == .completed else {throw session.error ?? AppError(message: "הייצוא הופסק.")}
         } onCancel: {session.cancelExport()}
+        // The session's own status is what decides the export, not the task's.
+        // Asking the task instead threw away a movie that had already finished
+        // writing: a short edit of a small frame exports in well under the time
+        // it takes anything else to touch the task, and the file on disk was
+        // complete before the check that discarded it. Each outcome also names
+        // itself now, so a failure here says which one happened.
+        switch session.status {
+        case .completed: break
+        case .cancelled: throw CancellationError()
+        default: throw session.error ?? AppError(message: "הייצוא נכשל באייפון.")
+        }
         await progress(1, "הסרט מוכן באייפון")
         return length
     }
