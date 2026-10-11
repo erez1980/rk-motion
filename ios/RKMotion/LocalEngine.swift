@@ -41,23 +41,37 @@ actor LocalEngine {
         if whole {return (duration, [], [Clip(start: 0, end: duration)])}
         let count = max(1, Int(ceil(duration)))
         var motion = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 160, height: 90)
-        generator.requestedTimeToleranceBefore = time(0.15)
-        generator.requestedTimeToleranceAfter = time(0.15)
         var previous: [UInt8]?
-        for index in 0..<Int(ceil(duration * 2)) {
+        let frameCount = Int(ceil(duration * 2))
+        // Bounded batches avoid overlapping one-shot generator lifetimes and
+        // keep decoded preview images out of memory after each small batch.
+        for first in stride(from: 0, to: frameCount, by: 16) {
             try Task.checkCancellation()
-            let second = Double(index) / 2
-            let (image, _) = try await generator.image(at: time(min(second, max(0, duration - 0.05))))
-            let pixels = try Self.gray(image)
-            if let previous {
-                let diff = zip(pixels, previous).reduce(0.0) {$0 + Double(abs(Int($1.0) - Int($1.1)))} / Double(255 * pixels.count)
-                let bucket = min(count - 1, Int(second)); motion[bucket] += diff; counts[bucket] += 1
+            let last = min(frameCount, first + 16)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 160, height: 90)
+            generator.requestedTimeToleranceBefore = time(0.15)
+            generator.requestedTimeToleranceAfter = time(0.15)
+            let times = (first..<last).map {time(min(Double($0) / 2, max(0, duration - 0.05)))}
+            var frames: [Int: [UInt8]] = [:]
+            for await result in generator.images(for: times) {
+                try Task.checkCancellation()
+                switch result {
+                case .success(let requested, let image, _):
+                    frames[Int((requested.seconds * 2).rounded())] = try Self.gray(image)
+                case .failure(_, let error): throw error
+                }
             }
-            previous = pixels
-            if index % 4 == 0 {await progress(0.8 * second / duration, "מנתחת תנועה באייפון…")}
+            for index in first..<last {
+                guard let pixels = frames[index] else {throw AppError(message: "לא ניתן לקרוא פריים מהסרטון.")}
+                if let previous {
+                    let diff = zip(pixels, previous).reduce(0.0) {$0 + Double(abs(Int($1.0) - Int($1.1)))} / Double(255 * pixels.count)
+                    let bucket = min(count - 1, index / 2); motion[bucket] += diff; counts[bucket] += 1
+                }
+                previous = pixels
+            }
+            await progress(0.8 * Double(last) / Double(frameCount), "מנתחת תנועה באייפון…")
         }
         for index in motion.indices where counts[index] > 0 {motion[index] /= Double(counts[index])}
         let audio = try await loudness(asset, duration: duration, progress: progress)
