@@ -17,6 +17,7 @@ Self-check (no network, needs ffmpeg + Pillow):
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import os
@@ -28,6 +29,7 @@ import urllib.request
 from pathlib import Path
 
 from .generate import GenerationError, call_claude_json
+from .storage import identifier, atomic_json
 
 # Default look tuned to the "animated storytime" genre: comic-book stills with
 # subtle motion. Overridable per run with --style.
@@ -122,6 +124,21 @@ def _save_cover(png_bytes: bytes, out_path: Path) -> Path:
 # Character sheet (generated once, cached) + scene planning
 # ---------------------------------------------------------------------------
 
+def _cache_key(*values) -> str:
+    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
+
+
+def _cached(path: Path, key: str) -> bool:
+    try:
+        return path.is_file() and path.stat().st_size > 0 and path.with_suffix(path.suffix + ".key").read_text() == key
+    except OSError:
+        return False
+
+
+def _stamp(path: Path, key: str):
+    path.with_suffix(path.suffix + ".key").write_text(key)
+
+
 def character_sheet(char_refs: dict[str, str], style: str, cache_path: Path) -> Path | None:
     """One reference sheet for all recurring characters, cached on disk.
 
@@ -131,7 +148,8 @@ def character_sheet(char_refs: dict[str, str], style: str, cache_path: Path) -> 
     """
     if not char_refs:
         return None
-    if cache_path.exists():
+    key = _cache_key(IMAGE_MODEL, style, {name: hashlib.sha256(Path(path).read_bytes()).hexdigest() for name, path in char_refs.items()})
+    if _cached(cache_path, key):
         return cache_path
     names = ", ".join(char_refs)
     parts: list[dict] = [{"text": (
@@ -151,6 +169,7 @@ def character_sheet(char_refs: dict[str, str], style: str, cache_path: Path) -> 
     parts += [_img_part(p) for p in char_refs.values()]
     print("storyboard: generating character sheet (cached for later runs)", file=sys.stderr)
     cache_path.write_bytes(_gemini_image(parts, aspect="16:9"))
+    _stamp(cache_path, key)
     return cache_path
 
 
@@ -207,6 +226,9 @@ def plan_scenes(words: list[dict], duration: float, characters: list[str],
 
 
 def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) -> Path:
+    key = _cache_key(IMAGE_MODEL, prompt, style, SCENE_W, SCENE_H, hashlib.sha256(sheet.read_bytes()).hexdigest() if sheet else None)
+    if _cached(out_path, key):
+        return out_path
     parts: list[dict] = [{"text": (
         f"{style}. {prompt}. Vertical 9:16 composition. "
         "Absolutely no letters, words, names, or numbers anywhere in the "
@@ -219,12 +241,18 @@ def _scene_image(prompt: str, style: str, sheet: Path | None, out_path: Path) ->
            if sheet else ""))}]
     if sheet:
         parts.append(_img_part(sheet))
-    return _save_cover(_gemini_image(parts, aspect="9:16"), out_path)
+    _save_cover(_gemini_image(parts, aspect="9:16"), out_path)
+    _stamp(out_path, key)
+    return out_path
 
 
 def _scene_video(prompt: str, still: Path, dur: float, out_path: Path) -> Path | None:
     """Animate a scene still via fal.ai image-to-video. Returns the mp4 path,
     or None on any failure so the caller falls back to Ken Burns."""
+    key = _cache_key(VIDEO_MODEL, prompt, dur, hashlib.sha256(still.read_bytes()).hexdigest())
+    if _cached(out_path, key):
+        return out_path
+    out_path.unlink(missing_ok=True)
     fal_key = os.environ.get("FAL_KEY")
     if not fal_key:
         return None
@@ -275,6 +303,7 @@ def _scene_video(prompt: str, still: Path, dur: float, out_path: Path) -> Path |
             try:
                 with urllib.request.urlopen(url, timeout=180) as r:
                     out_path.write_bytes(r.read())
+                _stamp(out_path, key)
                 return out_path
             except (TimeoutError, urllib.error.URLError):
                 if attempt == 2:
@@ -300,7 +329,7 @@ def add_cutaways(doc: dict, spec_path: str, only: str | None = None,
     spec_dir = Path(spec_path).resolve().parent
     added = 0
     for clip in doc["clips"]:
-        cid = str(clip.get("id"))
+        cid = identifier(clip.get("id"))
         if only and cid != only:
             continue
         spans = clip.get("segments") or [
@@ -360,23 +389,20 @@ def add_cutaways(doc: dict, spec_path: str, only: str | None = None,
         cw_dir.mkdir(parents=True, exist_ok=True)
         for n, c in enumerate(cws, 1):
             png = cw_dir / f"cw-{n}.png"
-            if not png.exists():
-                print(f"storyboard: {cid}: generating cutaway {n} "
-                      f"({c['prompt'][:60]}...)", file=sys.stderr)
-                _scene_image(c["prompt"], style, None, png)
+            print(f"storyboard: {cid}: generating cutaway {n} "
+                  f"({c['prompt'][:60]}...)", file=sys.stderr)
+            _scene_image(c["prompt"], style, None, png)
             c["image"] = str(png)
             if animate:
                 mp4 = cw_dir / f"cw-{n}.mp4"
-                if not mp4.exists():
-                    print(f"storyboard: {cid}: animating cutaway {n}...",
-                          file=sys.stderr)
-                    _scene_video(c["prompt"], png, c["end"] - c["start"], mp4)
+                print(f"storyboard: {cid}: animating cutaway {n}...",
+                      file=sys.stderr)
+                _scene_video(c["prompt"], png, c["end"] - c["start"], mp4)
                 if mp4.exists():
                     c["video"] = str(mp4)
         clip["cutaways"] = cws
         added += len(cws)
-    Path(spec_path).write_text(
-        json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_json(Path(spec_path), doc)
     return added
 
 
@@ -489,7 +515,7 @@ def render_storyboard_clips(video_path: str, clips: list[dict], out_dir: str,
 
     outputs: list[str] = []
     for clip in clips:
-        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+        clip_id = identifier(clip.get("id") or f"clip-{len(outputs) + 1}")
         hook_text = clip.get("hook")
         suffix = ""
         if hook_variant > 0:
@@ -518,16 +544,14 @@ def render_storyboard_clips(video_path: str, clips: list[dict], out_dir: str,
                 scene_no += 1
                 d = s["end"] - s["start"]
                 png = scene_dir / f"scene-{scene_no:02d}.png"
-                if not png.exists():  # re-runs reuse already-generated stills
-                    _scene_image(s["prompt"], style, sheet, png)
+                _scene_image(s["prompt"], style, sheet, png)
                 (scene_dir / f"scene-{scene_no:02d}.txt").write_text(
                     s["prompt"] + "\n", encoding="utf-8")
                 if animate:
                     mp4 = scene_dir / f"scene-{scene_no:02d}.mp4"
-                    if not mp4.exists():  # re-runs reuse animated shots too
-                        print(f"storyboard: animating scene {scene_no}...",
-                              file=sys.stderr)
-                        _scene_video(s["prompt"], png, d, mp4)
+                    print(f"storyboard: animating scene {scene_no}...",
+                          file=sys.stderr)
+                    _scene_video(s["prompt"], png, d, mp4)
                     if mp4.exists():
                         scene_files.append((mp4, d, True))
                         continue

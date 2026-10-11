@@ -104,7 +104,7 @@ def test_the_encoder_choice_matches_what_this_machine_can_run():
     encoder = h264_encoder()
     args = h264_args(3840, 2160, source_bitrate=45_000_000)
     if encoder == "libx264":
-        assert args == ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast"]
+        assert args == ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
     else:
         assert args[:2] == ["-c:v", "h264_videotoolbox"]
         # Aim above the source so the conversion is not the weak link.

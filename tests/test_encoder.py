@@ -68,7 +68,7 @@ def test_gpu_settings_carry_a_bitrate_because_there_is_no_crf(monkeypatch):
 
 def test_cpu_settings_keep_each_profile_s_own_quality_knob(monkeypatch):
     monkeypatch.setattr(action, "_H264_ENCODER", "libx264")
-    assert h264_args(1920, 1080, software=["-crf", "26"]) == ["-c:v", "libx264", "-crf", "26"]
+    assert h264_args(1920, 1080, software=["-crf", "26"]) == ["-c:v", "libx264", "-crf", "26", "-pix_fmt", "yuv420p"]
 
 
 def test_a_failed_gpu_encode_is_retried_on_the_cpu_and_not_tried_again(monkeypatch):
@@ -108,7 +108,7 @@ def test_software_rewrite_leaves_the_rest_of_the_command_alone():
         ["ffmpeg", "-i", "a.mp4", "-vf", "scale=-2:1080", "-c:v", "h264_videotoolbox",
          "-b:v", "9000000", "-maxrate", "1", "-bufsize", "2", "-c:a", "aac", "out.mp4"])
     assert rewritten[:5] == ["ffmpeg", "-i", "a.mp4", "-vf", "scale=-2:1080"]
-    assert rewritten[-3:] == ["-c:a", "aac", "out.mp4"]
+    assert rewritten[-5:] == ["-c:a", "aac", "-pix_fmt", "yuv420p", "out.mp4"]
     assert "h264_videotoolbox" not in rewritten
 
 
@@ -120,7 +120,7 @@ def test_the_bitrate_is_sized_to_the_frame_the_export_will_produce(tmp_path, mon
                     "-c:v", "libx264", "-preset", "ultrafast", str(tall)], check=True)
 
     assert _output_size(str(tall), 1080, "16:9") == (1920, 1080)
-    assert _output_size(str(tall), 1080, "9:16") == (607, 1080)
+    assert _output_size(str(tall), 1080, "9:16") == (606, 1080)
     assert _output_size(str(tall), None, "16:9") == (3840, 2160)
 
     monkeypatch.setattr(action, "_H264_ENCODER", "h264_nvenc")

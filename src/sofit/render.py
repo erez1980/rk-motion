@@ -27,6 +27,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from .storage import identifier
+from .process import StreamProcess
 
 try:  # optional; captions still render (in logical order) without it
     from bidi.algorithm import get_display as _bidi_display
@@ -745,14 +747,12 @@ def _overlay_pillow_frames(video_path: Path, output_path: Path, width: int,
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", "-crf", "23",
         "-c:a", "copy", "-movflags", "+faststart", "-shortest", "-y", str(output_path),
     ]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    for frame_idx in range(total_frames):
-        proc.stdin.write(make_frame(frame_idx / fps))
-    proc.stdin.close()
-    _, stderr = proc.communicate(timeout=FFMPEG_TIMEOUT)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Caption overlay failed: {stderr.decode()[-500:]}")
+    with StreamProcess(cmd, stdin=True, timeout=FFMPEG_TIMEOUT) as proc:
+        for frame_idx in range(total_frames):
+            proc.stdin.write(make_frame(frame_idx / fps))
+        proc.stdin.close()
+        if proc.wait() != 0:
+            raise RuntimeError(f"Caption overlay failed: {proc.stderr.read().decode()[-500:]}")
     return output_path
 
 
@@ -1274,7 +1274,7 @@ def _accent_from_art(image_path: str | None) -> tuple[int, int, int, int] | None
     except Exception:
         return None
     bins = [0.0] * 12  # 30° hue bins, votes weighted by saturation*brightness
-    for r, g, b in im.getdata():
+    for r, g, b in (im.get_flattened_data() if hasattr(im, "get_flattened_data") else im.getdata()):
         h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
         if s < 0.25 or v < 0.25:
             continue  # grays / blacks / near-whites don't vote
@@ -1669,7 +1669,7 @@ def _concat_parts(parts: list[Path], output_path: Path) -> None:
     """Losslessly join rendered segment files (identical codec settings) into
     `output_path` with the concat demuxer. Stream copy: no second encode."""
     lst = output_path.with_suffix(".concat.txt")
-    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts), encoding="utf-8")
+    lst.write_text("".join("file '" + str(p.resolve()).replace("'", "'\\''") + "'\n" for p in parts), encoding="utf-8")
     try:
         _run_ffmpeg(["ffmpeg", "-f", "concat", "-safe", "0", "-i", str(lst),
                      "-c", "copy", "-movflags", "+faststart", "-y", str(output_path)])
@@ -1737,7 +1737,7 @@ def render_clips(video_path: str, clips: list[dict], out_dir: str,
 
     outputs: list[str] = []
     for clip in clips:
-        clip_id = str(clip.get("id") or f"clip-{len(outputs) + 1}")
+        clip_id = identifier(clip.get("id") or f"clip-{len(outputs) + 1}")
 
         # Hook line for the card: primary, or an alternate for A/B testing. An
         # out-of-range variant falls back to the primary rather than rendering

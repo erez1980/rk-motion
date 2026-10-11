@@ -16,6 +16,7 @@ import json
 import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from .storage import atomic_json
 
 
 @dataclass
@@ -79,7 +80,7 @@ def _load_cache(key: str) -> list[Segment] | None:
 
 def _save_cache(key: str, segments: list[Segment]) -> None:
     p = _cache_dir() / f"{key}.json"
-    p.write_text(json.dumps([asdict(s) for s in segments], ensure_ascii=False))
+    atomic_json(p, [asdict(s) for s in segments])
 
 
 # ivrit-ai fine-tunes Whisper on Hebrew and ships CTranslate2 builds that

@@ -435,7 +435,7 @@ body.whole .clip-tools,body.whole #addClip{display:none}
     </div>
   </div>
   <div class="header-actions">
-    <button id="notifyToggle" class="secondary icon-btn off" aria-pressed="false" aria-label="התראה כשהעבודה מסתיימת">
+    <button id="notifyToggle" class="secondary icon-btn off" aria-pressed="false" aria-label="התראה כשהעבודה מסתיימת והדף פתוח">
       <svg class="bell-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M6 9a6 6 0 0 1 12 0c0 4 1.2 5.5 1.8 6.2.3.4 0 1-.5 1H4.7c-.5 0-.8-.6-.5-1C4.8 14.5 6 13 6 9Z"/>
         <path d="M10 20a2 2 0 0 0 4 0"/>
@@ -674,11 +674,58 @@ body.whole .clip-tools,body.whole #addClip{display:none}
 
 <script>
 'use strict';
+// Pairing credentials stay out of request URLs and media links. Safari uses
+// an HttpOnly cookie; the native client uses the same issued bearer token.
+const plainFetch = window.fetch.bind(window);
+const pairingReady = (async () => {
+  const code = new URLSearchParams(location.hash.slice(1)).get('pair');
+  if (!code) return;
+  history.replaceState(null, '', location.pathname);
+  const response = await plainFetch('/api/pair', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code})});
+  const data = await response.json();
+  if (!response.ok) throw Error(data.error || 'החיבור נכשל. פתחו קישור חדש במק.');
+})();
+window.fetch = async (url, options) => {
+  if (String(url).startsWith('/api/')) await pairingReady;
+  return plainFetch(url, options);
+};
+pairingReady.catch(error => alert(error.message));
 const $ = s => document.querySelector(s);
 const drop = $('#drop'), file = $('#file'), statusBox = $('#status'), bar = $('#bar'), text = $('#statusText');
 const workspace = $('#workspace'), video = $('#video'), clipsEl = $('#clips'), timeline = $('#timeline');
 let report, activeIndex = -1, orderBeforeShuffle = null, saveHandle = null;
 let musicReady = false, musicUploading = false, musicDuration = 0, previewEnd = null, dragIndex = null;
+let exportRunning = false, editRevision = 0, restoringEdit = false, saveTimer;
+let saveChain = Promise.resolve();
+const EDIT_CONTROLS = ['transition', 'transitionDuration', 'speed', 'quality', 'aspect', 'musicStart', 'musicVolume', 'muteOriginal', 'sensitivity'];
+function editDocument() {
+  return {clips: report.clips.map(({thumb, ...clip}) => clip),
+    settings: Object.fromEntries(EDIT_CONTROLS.map(id => [id, $('#' + id).type === 'checkbox' ? $('#' + id).checked : $('#' + id).value]))};
+}
+function queueEditSave() {
+  if (!report || restoringEdit) return;
+  const key = 'rk-edit-' + report.job_id, edit = editDocument();
+  localStorage.setItem(key, JSON.stringify({edit, revision: editRevision, dirty: true}));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveChain = saveChain.catch(() => {}).then(async () => {
+      const current = editDocument();
+      const response = await fetch('/api/edit/' + report.job_id, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({edit: current, revision: editRevision})});
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error);
+      editRevision = data.revision;
+      const latest = editDocument();
+      const dirty = JSON.stringify(latest) !== JSON.stringify(current);
+      localStorage.setItem(key, JSON.stringify({edit: latest, revision: editRevision, dirty}));
+      if (dirty) queueEditSave();
+    }).catch(error => stMain.show('השמירה במק נכשלה: ' + error.message + ' · עותק נשמר בדפדפן.', 0, {error: true}));
+  }, 350);
+}
+EDIT_CONTROLS.forEach(id => $('#' + id).addEventListener('change', queueEditSave));
+addEventListener('pagehide', () => {
+  if (!report) return;
+  plainFetch('/api/edit/' + report.job_id, {method: 'POST', keepalive: true, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({edit: editDocument(), revision: editRevision})}).catch(() => {});
+});
 const tracks = []; // {name, duration, kind:'file'|'youtube', pending}
 const JOB_KEY = 'rk-motion-job';   // lets a reopened page find its running job
 const totalMusicDuration = () => tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
@@ -708,7 +755,7 @@ function applyNotify(on) {
   const btn = $('#notifyToggle');
   btn.classList.toggle('off', !on);
   btn.setAttribute('aria-pressed', String(on));
-  btn.title = on ? 'התראה כשהניתוח או הייצוא מסתיימים' : 'ההתראות כבויות';
+  btn.title = on ? 'התראה בסיום כאשר הדף פתוח; אין התראה כאשר Safari מושעה' : 'ההתראות כבויות';
   $('#notifyLabel').textContent = on ? 'התראות' : 'ללא התראות';
   localStorage.setItem(NOTIFY_KEY, on ? 'on' : 'off');
 }
@@ -798,15 +845,23 @@ const mimeFor = name => MIME[String(name).split('.').pop().toLowerCase()] || 'ap
    for the file spends that activation, and the browser then refuses the sheet
    outright — so the file is pulled into memory as soon as it is ready and the
    tap only has to hand over something already in hand. */
-let readyFile = null;             // {url, file}
+const shareFiles = new Map();
+const MAX_SHARE_BYTES = 64 * 1048576;
 
 async function prepareToShare(url, filename) {
-  readyFile = null;
+  shareFiles.delete(url);
   if (!CAN_SHARE_FILES) return saveMode('הקובץ יירד למכשיר');
   saveMode('מכינה לשיתוף…');
   try {
-    const blob = await (await fetch(url)).blob();
-    readyFile = { url, file: new File([blob], filename, { type: mimeFor(filename) }) };
+    const metadata = await fetch(url, {method: 'HEAD'});
+    const size = Number(metadata.headers.get('Content-Length'));
+    if (!metadata.ok || !size || size > MAX_SHARE_BYTES) return saveMode('קובץ גדול — הורדה לקבצים, ומשם שמירה בתמונות');
+    const response = await fetch(url);
+    if (!response.ok) throw Error('ההורדה נכשלה');
+    const blob = await response.blob();
+    if (blob.size > MAX_SHARE_BYTES) return saveMode('קובץ גדול — הורדה לקבצים');
+    if (shareFiles.size >= 2) shareFiles.delete(shareFiles.keys().next().value);
+    shareFiles.set(url, new File([blob], filename, { type: mimeFor(filename) }));
     saveMode(`מוכן לשיתוף · ${(blob.size / 1048576).toFixed(1)}MB`);
   } catch (error) {
     // Silence here is what made a tap look dead: the button promised a share
@@ -825,14 +880,14 @@ function saveMode(text) {
 
 function asDownload(anchor) {
   anchor.addEventListener('click', event => {
-    const ready = readyFile;
+    const ready = shareFiles.get(anchor.getAttribute('href'));
     event.preventDefault();
     const url = anchor.getAttribute('href');
     const name = anchor.getAttribute('download') || 'RK-Motion.mp4';
-    if (!ready || ready.url !== url) return downloadFile(url, name);
-    navigator.share({ files: [ready.file] }).catch(error => {
+    if (!ready) return downloadFile(url, name);
+    navigator.share({ files: [ready] }).catch(error => {
       if (error?.name === 'AbortError') return;   // closing the sheet is a decision
-      readyFile = null;
+      shareFiles.delete(url);
       saveMode(`השיתוף נחסם (${error?.name || 'שגיאה'}) — מוריד את הקובץ`);
       downloadFile(url, name);
     });
@@ -867,6 +922,24 @@ if (CAN_SHARE_FILES) {
 /* Without yt-dlp the YouTube search is replaced by a how-to-enable note;
    the header shows the running version. */
 fetch('/api/capabilities').then(r => r.json()).then(caps => {
+  if (caps.pairing) {
+    const button = document.createElement('button');
+    button.textContent = 'חיבור לאייפון';
+    button.onclick = async () => {
+      try {
+        const response = await fetch('/api/pairing'), data = await response.json();
+        if (!response.ok) throw Error(data.error);
+        let panel = $('#pairPanel');
+        if (!panel) {panel = document.createElement('section'); panel.id = 'pairPanel'; panel.className = 'card'; $('#drop').before(panel);}
+        panel.replaceChildren();
+        const image = document.createElement('img'); image.src = '/api/pairing/qr?t=' + Date.now(); image.style.width = '220px'; image.style.background = 'white'; image.alt = 'קוד לחיבור האייפון';
+        const link = document.createElement('a'); link.href = data.url; link.textContent = 'קישור פרטי לחיבור — בתוקף לעשר דקות';
+        panel.append(image, document.createElement('br'), link);
+        panel.scrollIntoView({behavior: 'smooth'});
+      } catch (error) {alert(error.message);}
+    };
+    $('#appVersion').after(button);
+  }
   if (!caps.youtube) {
     document.querySelectorAll('.youtube-search,.rights,.sep,#ytResults').forEach(el => el.hidden = true);
     $('#ytMissing').hidden = false;
@@ -894,7 +967,9 @@ $('#wholeVideo').onchange();
 $('#restart').onclick = async () => {
   if (report?.clips?.length && !confirm('להתחיל מחדש? העריכה הנוכחית תימחק.')) return;
   const jobId = report?.job_id || localStorage.getItem(JOB_KEY);
+  if (jobId) localStorage.removeItem('rk-edit-' + jobId);
   localStorage.removeItem(JOB_KEY);
+  localStorage.removeItem('rk-upload');
   if (jobId) {
     try { await fetch('/api/reset/' + jobId, { method: 'POST' }); }
     catch { /* the page is being reset either way */ }
@@ -1030,6 +1105,8 @@ async function keepAwake(on) {
   } catch { /* unsupported or denied — nothing else depends on it */ }
 }
 function setBusy(n) {
+  if (n === 3) exportRunning = true;
+  else if (n === 0) exportRunning = false;
   for (let i = 1; i <= 3; i++) $('#step' + i).classList.toggle('busy', i === n);
   keepAwake(n > 0);
 }
@@ -1096,62 +1173,78 @@ function pollAnalyse(statusUrl) {
 }
 
 async function upload(files) {
-  files = [...files].filter(f => f.type.startsWith('video/'));
+  files = [...files].filter(f => f.type.startsWith('video/') || /\.(mov|mp4|m4v|mkv|webm|avi)$/i.test(f.name));
   if (!files.length) { stMain.hide(); return; }
-  invalidateDownload();
-  setBusy(1);
-  uploading = true;
+  invalidateDownload(); setBusy(1); uploading = true;
   try {
-    stMain.show(`מכינה ${files.length} סרטונים…`, 0);
-    go(stMain.el);
-    const session = await request('/api/prepare', '');
+    const manifest = files.map(f => ({name: f.name, size: f.size, modified: f.lastModified}));
+    let pending;
+    try { pending = JSON.parse(localStorage.getItem('rk-upload') || 'null'); } catch {}
+    if (!pending || JSON.stringify(pending.manifest) !== JSON.stringify(manifest)) {
+      const session = await request('/api/prepare', '');
+      pending = {job_id: session.job_id, manifest, uploads: []};
+      localStorage.setItem('rk-upload', JSON.stringify(pending));
+    }
+    localStorage.setItem(JOB_KEY, pending.job_id);
     let sent = 0, total = files.reduce((sum, f) => sum + f.size, 0);
     const started = performance.now();
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      const tag = files.length > 1 ? `מעלה סרטון ${i + 1}/${files.length}: ${f.name}` : `מעלה: ${f.name}`;
-      stMain.show(tag, Math.round(sent / total * 100));
-      await new Promise((resolve, reject) => {
-        const x = new XMLHttpRequest();
-        x.open('POST', '/api/video/' + session.job_id);
-        x.setRequestHeader('X-Filename', encodeURIComponent(f.name));
-        x.upload.onprogress = e => {
-          if (!e.lengthComputable) return;
-          const done = sent + e.loaded;
-          const rate = done / ((performance.now() - started) / 1000);   // bytes/sec so far
-          const remaining = rate > 0 ? (total - done) / rate : NaN;
-          stMain.show(`${tag} · ${Math.round(done / total * 100)}%` + etaText(remaining), Math.round(done / total * 100));
-        };
-        x.onload = () => x.status === 200 ? resolve() : reject(new Error(x.responseText));
-        x.onerror = reject;
-        x.send(f);
-      });
+      if (!pending.uploads[i]) {
+        const created = await request('/api/uploads/' + pending.job_id, JSON.stringify({name: f.name, size: f.size}), {'Content-Type': 'application/json'});
+        pending.uploads[i] = created.upload_id;
+        localStorage.setItem('rk-upload', JSON.stringify(pending));
+      }
+      const uploadId = pending.uploads[i], statusUrl = '/api/uploads/' + pending.job_id + '/' + uploadId;
+      let state = await (await fetch(statusUrl)).json();
+      if (state.error) throw Error(state.error);
+      let failures = 0;
+      while (state.offset < f.size) {
+        const offset = state.offset, chunk = f.slice(offset, Math.min(f.size, offset + 8 * 1048576));
+        const tag = `מעלה סרטון ${i + 1}/${files.length}: ${f.name}`;
+        try {
+          state = await new Promise((resolve, reject) => {
+            const x = new XMLHttpRequest();
+            x.open('POST', '/api/chunk/' + pending.job_id + '/' + uploadId);
+            x.setRequestHeader('Upload-Offset', offset); x.timeout = 120000;
+            x.upload.onprogress = e => {
+              const done = sent + offset + e.loaded;
+              const rate = done / Math.max(.1, (performance.now() - started) / 1000);
+              stMain.show(tag + etaText((total - done) / rate), Math.round(done / total * 100));
+            };
+            x.onload = () => {
+              let d; try {d = JSON.parse(x.responseText);} catch {return reject(Error('תגובה לא תקינה מהמק'));}
+              x.status === 200 ? resolve(d) : reject(Error(d.error || 'ההעלאה נכשלה'));
+            };
+            x.onerror = x.ontimeout = () => reject(Error('החיבור למק נקטע'));
+            x.send(chunk);
+          });
+          failures = 0;
+        } catch (error) {
+          if (++failures > 3) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000 * failures));
+          const response = await fetch(statusUrl);
+          state = await response.json();
+          if (!response.ok) throw Error(state.error);
+        }
+      }
       sent += f.size;
     }
-    // From here on the work lives on the server, so the page may be closed.
     uploading = false;
-    stMain.show($('#wholeVideo').checked ? 'מכינה את הסרטון…' : 'מתחילה ניתוח…', 3, { working: true });
-    const maxLen = $('#maxLength').value.trim();
     const headers = {};
+    const maxLen = $('#maxLength').value.trim();
     if (maxLen) headers['X-Max-Scene-Length'] = maxLen;
     if ($('#wholeVideo').checked) headers['X-Whole-Video'] = '1';
-    const start = await request('/api/analyse-batch/' + session.job_id, '', headers);
-    localStorage.setItem(JOB_KEY, session.job_id);
-    report = await pollAnalyse(start.status_url);
-    stMain.show(report.whole ? 'הסרטון מוכן — אפשר להוסיף מוזיקה ולייצא.'
-                             : 'הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
-    setBusy(0);
-    show();
-    notifyDone(report.whole ? 'הסרטון מוכן' : 'הניתוח הושלם',
-               report.whole ? 'אפשר להוסיף מוזיקה ולייצא.'
-                            : `נמצאו ${report.clips.length} קטעי אקשן — אפשר לבחור ולייצא.`);
+    const start = await request('/api/analyse-batch/' + pending.job_id, '', headers);
+    localStorage.removeItem('rk-upload');
+    report = await pollAnalyse(start.status_url); editRevision = 0;
+    stMain.show(report.whole ? 'הסרטון מוכן — אפשר להוסיף מוזיקה ולייצא.' : 'הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+    setBusy(0); show();
+    notifyDone('הסרטון מוכן', `נמצאו ${report.clips.length} קטעים.`);
   } catch (error) {
     setBusy(0);
-    stMain.show(error.message || 'לא ניתן לנתח את הסרטונים.', 0, { error: true });
-    notifyDone('הניתוח נכשל', error.message || 'לא ניתן לנתח את הסרטונים.');
-  } finally {
-    uploading = false;
-  }
+    stMain.show((error.message || 'ההעלאה נכשלה') + ' · בחרו שוב את אותם הקבצים כדי להמשיך.', 0, {error: true});
+  } finally { uploading = false; }
 }
 // iOS copies/transcodes the clip out of Photos before `change` fires, which can
 // take a while with nothing on screen — say so as soon as the picker opens.
@@ -1171,6 +1264,19 @@ async function restoreMusic(jobId) {
     const r = await fetch('/api/session/' + jobId);
     if (!r.ok) return;
     const d = await r.json();
+    editRevision = d.revision || 0;
+    let cached;
+    try {cached = JSON.parse(localStorage.getItem('rk-edit-' + jobId) || 'null');} catch {}
+    const edit = cached?.dirty && cached.revision === editRevision ? cached.edit : d.edit;
+    if (edit) {
+      restoringEdit = true;
+      report.clips = edit.clips;
+      for (const [id, value] of Object.entries(edit.settings || {})) {
+        const control = $('#' + id);
+        if (control && EDIT_CONTROLS.includes(id)) control.type === 'checkbox' ? control.checked = value : control.value = value;
+      }
+      restoringEdit = false;
+    }
     (d.music || []).forEach(t => tracks.push({ name: t.name, duration: t.duration, kind: t.kind }));
     if (d.pending_music) {
       tracks.push({ ...d.pending_music, pending: true, previewUrl: '/api/music-preview/' + jobId });
@@ -1223,14 +1329,14 @@ async function resumeSession() {
       report = await pollAnalyse('/api/analyse-status/' + jobId);
       setBusy(0);
       stMain.show('הניתוח הושלם — בחרו את הקטעים הטובים ביותר.', 100);
+      await restoreMusic(jobId);
       show();
       notifyDone('הניתוח הושלם', `נמצאו ${report.clips.length} קטעי אקשן — אפשר לבחור ולייצא.`);
-      restoreMusic(jobId);
     } else if (d.state === 'done' && d.report) {
       report = d.report;
+      await restoreMusic(jobId);
       show();
       stMain.show('חזרנו לעריכה שלך — הקטעים כבר מוכנים.', 100);
-      await restoreMusic(jobId);
       resumeExport(jobId);
     } else {
       localStorage.removeItem(JOB_KEY);
@@ -1476,9 +1582,9 @@ function updateSummary() {
     : 'בחרו לפחות קטע אחד כדי לייצא.';
   $('#export').textContent = n ? (report.whole ? 'ייצוא ובחירת מיקום' : `ייצוא ובחירת מיקום · ${pieces}`)
                                : 'ייצוא הסרט';
-  $('#export').disabled = !n;
+  $('#export').disabled = !n || exportRunning;
   $('#barExport').textContent = n ? `ייצוא · ${withDot}${fmt(finalLength)}` : 'בחרו קטעים';
-  $('#barExport').disabled = !n;
+  $('#barExport').disabled = !n || exportRunning;
 }
 
 function render() {
@@ -1486,6 +1592,7 @@ function render() {
   [...timeline.querySelectorAll('i')].forEach(m => m.remove());
   if (!report.clips.length) {
     clipsEl.innerHTML = '<div class="empty">לא נמצאו קטעי אקשן ברורים. נסו סרטון אחר או הגדרת אורך אחרת.</div>';
+    queueSave();
     return updateSummary();
   }
   report.clips.forEach((c, i) => {
@@ -1514,7 +1621,7 @@ function render() {
     check.onchange = () => { c.selected = check.checked; invalidateDownload(); render(); };
     const applyTimes = () => {
       const nextStart = +start.value, nextEnd = +end.value;
-      if (nextStart < 0 || nextEnd <= nextStart) {
+      if (!Number.isFinite(nextStart) || !Number.isFinite(nextEnd) || nextStart < 0 || nextEnd <= nextStart || nextEnd > report.duration) {
         stExport.show('זמן הסיום חייב להיות אחרי זמן ההתחלה.', 0, { error: true });
         return render();
       }
@@ -1554,6 +1661,7 @@ function render() {
     timeline.append(mark);
   });
   updateSummary();
+  queueEditSave();
 }
 
 function move(i, d) {
@@ -1776,10 +1884,10 @@ $('#attachYoutubeMusic').onclick = async () => {
 async function saveFinishedMovie(url) {
   if (!saveHandle) return false;
   stExport.show('שומרת את הסרט במיקום שבחרת…', 99, { working: true });
-  const response = await fetch(url), blob = await response.blob();
+  const response = await fetch(url);
+  if (!response.ok || !response.body) throw Error('Download failed');
   const writer = await saveHandle.createWritable();
-  await writer.write(blob);
-  await writer.close();
+  await response.body.pipeTo(writer);
   return true;
 }
 
@@ -1861,6 +1969,7 @@ function exportProgress(statusUrl, btn) {
 
 $('#export').onclick = async () => {
   armAlerts();
+  if (exportRunning) return;
   const chosen = selected();
   if (!chosen.length) return stExport.show('בחרו לפחות קטע אחד.', 0, { error: true });
   if (musicUploading) return stExport.show('ממתינים שהמוזיקה תעלה.', 0, { error: true });
@@ -1888,7 +1997,7 @@ $('#export').onclick = async () => {
   try {
     const r = await fetch('/api/export', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
       body: JSON.stringify({
         job_id: report.job_id,
         clips: chosen.map(({ thumb, uid, manual, ...clip }) => clip),
@@ -1904,7 +2013,7 @@ $('#export').onclick = async () => {
       }),
     });
     const d = await r.json();
-    if (d.error) { stExport.show(d.error, 0, { error: true }); btn.disabled = false; setBusy(0); return; }
+    if (!r.ok || d.error) { stExport.show(d.error, 0, { error: true }); btn.disabled = false; setBusy(0); return; }
     exportProgress(d.status_url, btn);
   } catch {
     stExport.show('הייצוא נכשל. נסו שוב.', 0, { error: true });

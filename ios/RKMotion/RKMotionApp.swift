@@ -143,7 +143,8 @@ struct EditorView: View {
                     defer {if access {source.stopAccessingSecurityScopedResource()}}
                     let target = TransferStore.directory("imports").appendingPathComponent(UUID().uuidString).appendingPathExtension(source.pathExtension)
                     try FileManager.default.copyItem(at: source, to: target)
-                    Task {if importingMusic {await model.importMusic(target)} else {await model.importVideo(target)}}
+                    let music = importingMusic
+                    Task {if music {await model.importMusic(target)} else {await model.importVideo(target)}}
                 } catch {model.message = error.localizedDescription}
             }
             .confirmationDialog("למחוק את הפרויקט ואת הסרטונים שלו במק?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -187,7 +188,8 @@ struct EditorView: View {
             }.onMove {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}
              .onDelete {model.edit.clips.remove(atOffsets: $0)}
             Button("הוספת קטע ידני") {
-                let start = min(player?.currentTime().seconds ?? 0, max(0, (model.report?.duration ?? 0) - 1))
+                let playhead = player?.currentTime().seconds ?? 0
+                let start = min(playhead.isFinite ? max(0, playhead) : 0, max(0, (model.report?.duration ?? 0) - 1))
                 var clip = Clip(start: max(0, start), end: min(model.report?.duration ?? 0, start + 5)); clip.manual = true
                 model.edit.clips.append(clip)
             }.disabled(model.busy)

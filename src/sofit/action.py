@@ -17,6 +17,9 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
+from .process import StreamProcess, run as run_process
+from .storage import validate_clips
+
 
 def _need_ffmpeg() -> None:
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
@@ -25,7 +28,7 @@ def _need_ffmpeg() -> None:
 
 def duration(path: str) -> float:
     _need_ffmpeg()
-    result = subprocess.run(
+    result = run_process(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
          "-of", "default=noprint_wrappers=1:nokey=1", path],
         capture_output=True, text=True, check=True,
@@ -41,18 +44,18 @@ def run_with_progress(cmd: list[str], total_seconds: float, progress=None) -> No
     conversions sitting on a full bar with nothing to say.
     """
     if progress is None or total_seconds <= 0:
-        subprocess.run(cmd, check=True, capture_output=True)
+        run_process(cmd, check=True, capture_output=True)
         return
     watched = [cmd[0], "-progress", "pipe:1", "-nostats", *cmd[1:]]
-    proc = subprocess.Popen(watched, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    assert proc.stdout
-    for line in proc.stdout:
-        key, _, value = line.strip().partition("=")
-        if key == "out_time_us" and value.isdigit():
-            progress(min(1.0, int(value) / 1e6 / total_seconds))
-    stderr = proc.stderr.read() if proc.stderr else ""
-    if proc.wait() != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=stderr)
+    with StreamProcess(watched, text=True) as proc:
+        assert proc.stdout
+        for line in proc.stdout:
+            key, _, value = line.strip().partition("=")
+            if key == "out_time_us" and value.isdigit():
+                progress(min(1.0, int(value) / 1e6 / total_seconds))
+        code = proc.wait()
+        if code != 0:
+            raise subprocess.CalledProcessError(code, cmd, stderr=proc.stderr.read())
     progress(1.0)
 
 
@@ -107,14 +110,14 @@ def h264_encoder() -> str:
         return _H264_ENCODER
     _H264_ENCODER = "libx264"
     try:
-        listed = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+        listed = run_process(["ffmpeg", "-hide_banner", "-encoders"],
                                 capture_output=True, text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return _H264_ENCODER
     for name in HARDWARE_ENCODERS.get(sys.platform, []):
         if name not in listed:
             continue
-        probe = subprocess.run(
+        probe = run_process(
             ["ffmpeg", "-v", "error", "-f", "lavfi",
              "-i", "testsrc2=size=320x240:rate=10:duration=0.5",
              "-c:v", name, "-pix_fmt", "yuv420p", "-f", "null", "-"], capture_output=True)
@@ -134,11 +137,11 @@ def h264_args(width: int = 0, height: int = 0, source_bitrate: int = 0,
     """
     encoder = h264_encoder()
     if encoder == "libx264":
-        return ["-c:v", "libx264", *(software or SOFTWARE_ENCODE)]
+        return ["-c:v", "libx264", *(software or SOFTWARE_ENCODE), "-pix_fmt", "yuv420p"]
     sized = int(width * height * 30 * bpp) if width and height else 12_000_000
     target = min(max(int(max(sized, source_bitrate * 1.25)), 2_000_000), 80_000_000)
     return ["-c:v", encoder, "-b:v", str(target),
-            "-maxrate", str(int(target * 1.5)), "-bufsize", str(target * 2)]
+            "-maxrate", str(int(target * 1.5)), "-bufsize", str(target * 2), "-pix_fmt", "yuv420p"]
 
 
 def _software_encode(cmd: list[str]) -> list[str]:
@@ -150,6 +153,8 @@ def _software_encode(cmd: list[str]) -> list[str]:
     while tail < len(out) - 1 and out[tail] in {"-b:v", "-maxrate", "-bufsize"}:
         del out[tail:tail + 2]
     out[tail:tail] = SOFTWARE_ENCODE
+    if "-pix_fmt" not in out:
+        out[-1:-1] = ["-pix_fmt", "yuv420p"]
     return out
 
 
@@ -187,7 +192,7 @@ def _motion_per_second(path: str, fps: int = 2, width: int = 160, height: int = 
     cmd = ["ffmpeg", "-v", "error", "-i", path, "-an", "-vf",
            f"fps={fps},scale={width}:{height}:flags=fast_bilinear,format=gray",
            "-f", "rawvideo", "-"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = StreamProcess(cmd)
     assert proc.stdout
     frame_size = width * height
     previous: bytes | None = None
@@ -205,9 +210,13 @@ def _motion_per_second(path: str, fps: int = 2, width: int = 160, height: int = 
         index += 1
         if progress and index % (fps * 2) == 0:
             progress(index / fps)
-    stderr = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
-    if proc.wait() not in (0, None):
-        raise RuntimeError(f"ffmpeg video analysis failed: {stderr[-500:]}")
+    try:
+        code = proc.wait()
+        stderr = proc.stderr.read().decode("utf-8", "replace")
+        if code != 0:
+            raise RuntimeError(f"ffmpeg video analysis failed: {stderr[-500:]}")
+    finally:
+        proc.close()
     return {second: sum(samples) / len(samples) for second, samples in values.items()}
 
 
@@ -215,7 +224,9 @@ def _audio_per_second(path: str, sample_rate: int = 8000, progress=None) -> dict
     """RMS loudness per second from a small mono PCM stream."""
     cmd = ["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar",
            str(sample_rate), "-f", "s16le", "-"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if not _has_audio(path):
+        return {}
+    proc = StreamProcess(cmd)
     assert proc.stdout
     block = sample_rate * 2
     out: dict[int, float] = {}
@@ -230,8 +241,12 @@ def _audio_per_second(path: str, sample_rate: int = 8000, progress=None) -> dict
         second += 1
         if progress and second % 5 == 0:
             progress(second)
-    # Some silent/no-audio videos make ffmpeg exit 1; visual scoring still works.
-    proc.wait()
+    try:
+        code = proc.wait()
+        if code:
+            raise RuntimeError(f"ffmpeg audio analysis failed: {proc.stderr.read().decode('utf-8', 'replace')[-500:]}")
+    finally:
+        proc.close()
     return out
 
 
@@ -282,7 +297,7 @@ def analyse_action(path: str, threshold: float = .55, min_duration: int = 5,
         raise ValueError("threshold must be in the range 0..1")
     if min_duration < 1 or padding < 0:
         raise ValueError("min_duration must be >= 1 and padding must be >= 0")
-    if max_duration is not None and max_duration < 1:
+    if max_duration is not None and (not math.isfinite(max_duration) or max_duration < 1):
         raise ValueError("max_duration must be at least 1 second")
     total = duration(path)
     span = max(total, 1.0)
@@ -329,7 +344,7 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
                "-t", str(clip["duration"]), "-map", "0:v:0", "-map", "0:a?",
                "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac",
                "-movflags", "+faststart", str(target)]
-        subprocess.run(cmd, check=True, capture_output=True)
+        run_process(cmd, check=True, capture_output=True)
         outputs.append(str(target))
     return outputs
 
@@ -355,18 +370,21 @@ QUALITY_PROFILES = {
 def _output_size(path: str, max_height: int | None, aspect: str) -> tuple[int, int]:
     """The frame this export will actually produce, for sizing the bitrate."""
     try:
-        result = subprocess.run(
+        result = run_process(
             ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
              "stream=width,height", "-of", "csv=p=0", path],
             capture_output=True, text=True, check=True)
         width, height = (int(value) for value in result.stdout.strip().split(",")[:2])
     except Exception:
         return 1920, 1080          # a sane middle when the source will not say
+    if aspect == "9:16":
+        height = min(height, int(width * 16 / 9))
+        width = int(height * 9 / 16)
     if max_height and height > max_height:
         width, height = round(width * max_height / height), max_height
     if aspect == "9:16":
         width = height * 9 // 16   # the frame is cropped, not letterboxed
-    return max(width, 2), max(height, 2)
+    return max(width // 2 * 2, 2), max(height // 2 * 2, 2)
 
 
 def _encode_args(path: str, profile: dict, aspect: str) -> list[str]:
@@ -383,14 +401,17 @@ def _scale_filter(max_height: int | None) -> str | None:
     """Downscale-only filter: small sources are never blown up."""
     if max_height is None:
         return None
-    return f"scale=-2:'min({max_height},ih)'"
+    return f"scale=-2:'trunc(min({max_height},ih)/2)*2',setsar=1"
 
 
 def _crop_filter(max_height: int | None) -> str:
     """Center-crop/scale to a 9:16 vertical frame for Stories/Reels."""
-    height = max_height or 1920
-    width = (height * 9 // 16) // 2 * 2  # even width, required by most encoders
-    return f"scale=w={width}:h={height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+    cap = max_height or 16384
+    # Crop inside the available pixels, then downscale only. Never enlarge a
+    # 720p source merely because the selected maximum is 1080p.
+    return ("crop=w='trunc(min(iw,ih*9/16)/2)*2':"
+            "h='trunc(min(ih,iw*16/9)/2)*2',"
+            f"scale=-2:'trunc(min({cap},ih)/2)*2',setsar=1")
 
 
 def _frame_filter(aspect: str, max_height: int | None) -> str | None:
@@ -398,7 +419,7 @@ def _frame_filter(aspect: str, max_height: int | None) -> str | None:
 
 
 def _has_audio(path: str) -> bool:
-    result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
+    result = run_process(["ffprobe", "-v", "error", "-select_streams", "a:0",
                              "-show_entries", "stream=index", "-of", "csv=p=0", path],
                             capture_output=True, text=True, check=True)
     return bool(result.stdout.strip())
@@ -418,6 +439,7 @@ def export_edited_movie(path: str, clips: list[dict], output: str,
     if not clips:
         raise ValueError("select at least one clip before exporting")
     _need_ffmpeg()
+    validate_clips(clips, duration(path))
     if transition not in TRANSITIONS:
         raise ValueError(f"unsupported transition: {transition}")
     if not .1 <= transition_duration <= 3:
@@ -506,7 +528,7 @@ def _export_hard_cuts(path: str, clips: list[dict], target: Path, profile: dict,
         listing = Path(tmp) / "concat.txt"
         # Paths generated above are trusted local temp files. ffconcat quotes apostrophes.
         listing.write_text("".join("file '" + str(part).replace("'", "'\\\\''") + "'\n" for part in parts))
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
+        run_process(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
                         "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(target)],
                        check=True, capture_output=True)
 
@@ -527,7 +549,7 @@ def _speed_up_movie(target: Path, speed: float, progress=None) -> None:
 def _strip_audio(target: Path) -> None:
     """Remove original camera/ride audio before optional music is mixed."""
     silent = target.with_name(target.stem + ".silent.mp4")
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(target), "-map", "0:v:0",
+    run_process(["ffmpeg", "-y", "-v", "error", "-i", str(target), "-map", "0:v:0",
                     "-c:v", "copy", "-an", "-movflags", "+faststart", str(silent)],
                    check=True, capture_output=True)
     silent.replace(target)
