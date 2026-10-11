@@ -69,7 +69,16 @@ final class LocalEngineTests: XCTestCase {
         edit.settings["transitionDuration"] = .text("0.3")
         edit.settings["aspect"] = .text("9:16")
         let output = folder.appendingPathComponent("result.mp4")
-        let expected = try await engine.export(project, edit: edit, output: output) {fraction, text in print("NATIVE EXPORT: \(fraction) \(text)")}
+        let expected: Double
+        do {
+            expected = try await engine.export(project, edit: edit, output: output) {fraction, text in print("NATIVE EXPORT: \(fraction) \(text)")}
+        } catch {
+            // A bare CancellationError says nothing about who cancelled. Whether
+            // this test's own task is cancelled separates "something is
+            // cancelling us" from "the export session cancelled itself".
+            XCTFail("export threw \(type(of: error)): \(error) · test task cancelled: \(Task.isCancelled) · output written: \(FileManager.default.fileExists(atPath: output.path))")
+            throw error
+        }
         let result = AVURLAsset(url: output)
         let actual = try await result.load(.duration).seconds
         XCTAssertEqual(actual, expected, accuracy: 0.1)
