@@ -1,10 +1,10 @@
-name: iPhone companion
+name: iPhone standalone
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['ios/**', 'scripts/build-ios.sh', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', '.github/workflows/ios.yml']
   pull_request:
-    paths: ['ios/**', 'scripts/build-ios.sh', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', '.github/workflows/ios.yml']
   workflow_dispatch:
 permissions:
   contents: read

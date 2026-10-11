@@ -2,29 +2,29 @@
 {
 archiveVersion = 1; classes = {}; objectVersion = 56;
 objects = {
-		1400E165E23D5A012B6B40E2 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Connection.swift"; sourceTree = "<group>"; };
-		76F16AC4971F542D044DC134 = { isa = PBXBuildFile; fileRef = 1400E165E23D5A012B6B40E2; };
 		25E368C81D1D57FAD40902D0 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorModel.swift"; sourceTree = "<group>"; };
 		63B59C58795ED1C937155E13 = { isa = PBXBuildFile; fileRef = 25E368C81D1D57FAD40902D0; };
+		E89CF3AF6496B03911042ECF = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalEngine.swift"; sourceTree = "<group>"; };
+		C42E296B2D10850840CB11EF = { isa = PBXBuildFile; fileRef = E89CF3AF6496B03911042ECF; };
+		1BCB6E9098EDF3C8586A717A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalStore.swift"; sourceTree = "<group>"; };
+		AC3A21473E11C62457512BFF = { isa = PBXBuildFile; fileRef = 1BCB6E9098EDF3C8586A717A; };
 		1CC326AC7BD7880DDEECA3A9 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models.swift"; sourceTree = "<group>"; };
 		5438F6952B2A53255241A6E8 = { isa = PBXBuildFile; fileRef = 1CC326AC7BD7880DDEECA3A9; };
 		1D10975204BD5FC5C60EFA38 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RKMotionApp.swift"; sourceTree = "<group>"; };
 		3BB5784C9606238E6C5245CA = { isa = PBXBuildFile; fileRef = 1D10975204BD5FC5C60EFA38; };
-		F42C8F8EBC7792FE762BF2D6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Transfers.swift"; sourceTree = "<group>"; };
-		8F5B7EDFBCCE111836699D8C = { isa = PBXBuildFile; fileRef = F42C8F8EBC7792FE762BF2D6; };
 		8BF729FFE074CAEE622C0292 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		06271BAF49532C879AA3C58B = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6D3E1FE7B9D4981A01FED2ED = { isa = PBXBuildFile; fileRef = 8BF729FFE074CAEE622C0292; };
 		A172CEDCAE47474B615C54D5 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = RKMotion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; children = (A172CEDCAE47474B615C54D5,); name = Products; sourceTree = "<group>"; };
-		3B321D4C1A98E53F25157DEF = { isa = PBXGroup; children = (1400E165E23D5A012B6B40E2,25E368C81D1D57FAD40902D0,1CC326AC7BD7880DDEECA3A9,1D10975204BD5FC5C60EFA38,F42C8F8EBC7792FE762BF2D6,8BF729FFE074CAEE622C0292,06271BAF49532C879AA3C58B,); path = RKMotion; sourceTree = "<group>"; };
+		3B321D4C1A98E53F25157DEF = { isa = PBXGroup; children = (25E368C81D1D57FAD40902D0,E89CF3AF6496B03911042ECF,1BCB6E9098EDF3C8586A717A,1CC326AC7BD7880DDEECA3A9,1D10975204BD5FC5C60EFA38,8BF729FFE074CAEE622C0292,06271BAF49532C879AA3C58B,); path = RKMotion; sourceTree = "<group>"; };
 		0D6E4079E36703EBD37C0072 = { isa = PBXGroup; children = (3B321D4C1A98E53F25157DEF,0A3E27B8CA818264D75C8D81,); sourceTree = "<group>"; };
-		878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (76F16AC4971F542D044DC134,63B59C58795ED1C937155E13,5438F6952B2A53255241A6E8,3BB5784C9606238E6C5245CA,8F5B7EDFBCCE111836699D8C,); runOnlyForDeploymentPostprocessing = 0; };
+		878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (63B59C58795ED1C937155E13,C42E296B2D10850840CB11EF,AC3A21473E11C62457512BFF,5438F6952B2A53255241A6E8,3BB5784C9606238E6C5245CA,); runOnlyForDeploymentPostprocessing = 0; };
 		41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (6D3E1FE7B9D4981A01FED2ED,); runOnlyForDeploymentPostprocessing = 0; };
 		E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		488864B3D19480A82F7F1786 = { isa = XCBuildConfiguration; name = Debug; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}; };
 		952548237D7F645F11D1E7B6 = { isa = XCBuildConfiguration; name = Debug; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.13.0;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; MARKETING_VERSION = 0.14.0;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
@@ -33,7 +33,7 @@ objects = {
         SWIFT_EMIT_LOC_STRINGS = YES;SWIFT_OPTIMIZATION_LEVEL = "-Onone";}; };
 		35B1014F135DE9B45529B733 = { isa = XCBuildConfiguration; name = Release; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}; };
 		E2D3A31BEAA1368FC62DA77A = { isa = XCBuildConfiguration; name = Release; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.13.0;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; MARKETING_VERSION = 0.14.0;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;

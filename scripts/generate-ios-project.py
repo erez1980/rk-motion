@@ -36,7 +36,7 @@ add("frameworks", 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; 
 for kind in ("Debug", "Release"):
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.13.0;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; MARKETING_VERSION = 0.14.0;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
