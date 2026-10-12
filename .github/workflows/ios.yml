@@ -14,7 +14,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Select supported App Store toolchain
@@ -25,6 +25,22 @@ jobs:
         run: python3 scripts/check-ios-store.py
       - name: Compile simulator app
         run: bash scripts/build-ios.sh simulator
+      - name: Keep YouTube out of the store build
+        # Guideline 5.2.3 bars downloading from YouTube. The personal build must
+        # carry the library; a build under the store's conditions must not hold
+        # a byte of it. Checking both keeps the second check from passing only
+        # because the library was never linked at all.
+        run: |
+          personal=build/ios/DerivedData/Build/Products/Release-iphonesimulator/RKMotion.app/RKMotion
+          nm "$personal" | grep -q YouTubeKit || { echo "personal build lacks YouTubeKit"; exit 1; }
+          xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios/StoreConditions \
+            CODE_SIGNING_ALLOWED=NO RK_PERSONAL_CONDITIONS= build
+          store=build/ios/StoreConditions/Build/Products/Release-iphonesimulator/RKMotion.app/RKMotion
+          test -f "$store"
+          if nm "$store" | grep -q YouTubeKit; then echo "YouTubeKit symbols reached the store-condition binary"; nm "$store" | grep YouTubeKit | head; exit 1; fi
+          if strings "$store" | grep -q 'youtubei/v1'; then echo "YouTube API endpoints reached the store-condition binary"; exit 1; fi
+          echo "personal build carries YouTubeKit; store-condition build holds none of it"
       - name: Test local analysis and export on simulator
         run: |
           rk_sim=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for vs in d["devices"].values() for v in vs if v["name"].startswith("iPhone")))')

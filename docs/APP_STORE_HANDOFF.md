@@ -20,8 +20,12 @@ Erez asked on 2026-10-12 to implement the App Store blockers first, then the
 review findings from highest to lowest priority, and leave a durable handoff
 so Claude can continue without repeating completed work. The target device
 is iPhone 17 Pro. The app must remain standalone and process media locally.
-Do not introduce a Mac server, cloud processing, account requirement or
-YouTube downloader into the iPhone app. Do not publish to App Store or buy
+Do not introduce a Mac server, cloud processing or account requirement into
+the iPhone app. YouTube music download: Erez decided on 2026-10-12 to allow it
+in personal builds only (Xcode/unsigned/simulator). It compiles under
+`RK_YOUTUBE`, which the store archive turns off (`RK_PERSONAL_CONDITIONS=`),
+and CI proves the store-condition binary holds none of it. Never let it into
+the store build: guideline 5.2.3 bars it. Do not publish to App Store or buy
 membership without Erez's explicit instruction. A development branch/PR is
 authorized. No Apple credentials are currently available.
 
@@ -138,6 +142,22 @@ authorized. No Apple credentials are currently available.
   check proves every Hebrew literal has a translation; it cannot prove every
   path looks one up. Text handed to a system API leaves the app past every
   view that would localize it, so it must be localized where it is handed over.
+
+- Checkpoint 5 (YouTube music, personal builds, Claude): yt-dlp cannot run on
+  iOS (since 2025.11 it needs an external JavaScript runtime such as Deno), so
+  the app uses YouTubeKit 0.4.9 (pinned exact; release 2026-08-18) with
+  extraction forced to `.local`: its remote fallback would send the video to a
+  third-party server. The audio stream is the highest-bitrate audio-only stream
+  AVFoundation can play, fetched in 4 MB ranged requests because YouTube slows
+  one long request to playback speed, then added through the existing
+  `importMusic`, exactly like a Files import. UI: a link-paste alert beside
+  "add music from Files"; no YouTube search in the app. Tests cover link
+  detection (including lookalike hosts) and file naming only. Not verified
+  anywhere: that extraction and download work against YouTube today. CI cannot
+  check it (YouTube refuses data-centre clients); only a device can, and a
+  YouTube change can break it until YouTubeKit is updated. Residual: the
+  translated strings for this screen ship in the store bundle as text
+  resources; the code and the library do not.
 
 ## Current release limits and next steps
 

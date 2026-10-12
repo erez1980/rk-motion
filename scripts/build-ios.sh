@@ -45,10 +45,12 @@ case "$rk_mode" in
     if [ "${RK_ENABLE_BACKGROUND_GPU:-0}" = 1 ]; then
       rk_background_args=(CODE_SIGN_ENTITLEMENTS="$rk_root/ios/RKMotion/BackgroundGPU.entitlements" RK_BACKGROUND_GPU_ENABLED=YES)
     fi
+    # Guideline 5.2.3 bars downloading from YouTube: the store archive compiles
+    # without the personal-only features (RK_PERSONAL_CONDITIONS emptied).
     xcodebuild "${rk_args[@]}" "${rk_background_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' \
       -archivePath "$rk_output/RKMotion-Store.xcarchive" -allowProvisioningUpdates \
       DEVELOPMENT_TEAM="$RK_DEVELOPMENT_TEAM" PRODUCT_BUNDLE_IDENTIFIER="$RK_BUNDLE_ID" \
-      CURRENT_PROJECT_VERSION="$RK_BUILD_NUMBER" archive
+      CURRENT_PROJECT_VERSION="$RK_BUILD_NUMBER" RK_PERSONAL_CONDITIONS= archive
     RK_EXPORT_OPTIONS="$rk_output/StoreExportOptions.plist" python3 - <<'PY'
 import os, plistlib
 with open(os.environ['RK_EXPORT_OPTIONS'], 'wb') as f:
