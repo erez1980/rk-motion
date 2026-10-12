@@ -24,6 +24,15 @@ enum YouTubeMusic {
         return (name.isEmpty ? "YouTube" : name) + ".m4a"
     }
 
+    /// A 200 carries the whole file. A 206 may legitimately return less than
+    /// was asked for, so once the size is known only reaching it ends the
+    /// download; without a size, a short piece is the only end marker left.
+    static func finished(status: Int, received: Int, requested: Int, offset: Int, total: Int?) -> Bool {
+        if status == 200 {return true}
+        if let total {return offset >= total}
+        return received < requested
+    }
+
     /// Extracts on this iPhone and downloads the best audio stream AVFoundation
     /// can read. Extraction stays local: the library can also fall back to a
     /// remote server, which would hand the video to a third party.
@@ -55,10 +64,14 @@ enum YouTubeMusic {
                 }
                 try handle.write(contentsOf: data); offset += data.count
                 if total == nil, http.statusCode == 206, let range = http.value(forHTTPHeaderField: "Content-Range"),
-                   let size = Int(range.split(separator: "/").last ?? "") {total = size}
+                   let size = Int(range.split(separator: "/").last ?? "") {
+                    total = size
+                    // The file is moved into the project, which skips the import's
+                    // space check, so hold the app's usual reserve here instead.
+                    try LocalStore.checkSpace(required: Int64(max(0, size - offset)) + 256 * 1024 * 1024)
+                }
                 await progress(min(1, Double(offset) / Double(max(1, total ?? offset))))
-                // A 200 is the whole file; a short piece or a known end is the last one.
-                if http.statusCode == 200 || data.count < chunk || offset >= (total ?? .max) {break}
+                if finished(status: http.statusCode, received: data.count, requested: chunk, offset: offset, total: total) {break}
             }
         } catch {
             try? FileManager.default.removeItem(at: target); throw error
