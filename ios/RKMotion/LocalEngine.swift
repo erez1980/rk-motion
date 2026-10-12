@@ -2,9 +2,11 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import CoreMedia
+import OSLog
 
 // Only native Apple frameworks: source files never leave the device.
 actor LocalEngine {
+    private let logger = Logger(subsystem: "com.rkmotion", category: "MediaPerformance")
     typealias Progress = @Sendable (Double, String) async -> Void
     private func time(_ seconds: Double) -> CMTime {CMTime(seconds: seconds, preferredTimescale: 60000)}
     static func normalized(_ values: [Double]) -> [Double] {
@@ -21,14 +23,29 @@ actor LocalEngine {
             if let last = groups.last?.last, second <= last + 2 {groups[groups.count - 1].append(second)}
             else {groups.append([second])}
         }
-        return groups.flatMap {group -> [Clip] in
-            let first = group.first!, last = group.last!
-            let start = max(0, Double(first) - 2), end = min(duration, Double(last) + 3)
+        // Padding adjacent groups can overlap; merge those windows before
+        // splitting, so footage does not appear twice in the default edit.
+        var windows: [(Double, Double)] = []
+        for group in groups {
+            let start = max(0, Double(group.first!) - 2), end = min(duration, Double(group.last!) + 3)
+            if let previous = windows.last, start <= previous.1 {
+                windows[windows.count - 1].1 = max(previous.1, end)
+            } else {windows.append((start, end))}
+        }
+        return windows.flatMap {window -> [Clip] in
+            let start = window.0, end = window.1
+            let first = max(0, Int(start)), last = min(scores.count - 1, max(first, Int(ceil(end)) - 1))
             guard end - start >= min(5, duration) else {return []}
             let score = scores[first...last].reduce(0, +) / Double(last - first + 1)
             // Split long activity spans so the editor stays useful for long rides.
             return stride(from: start, to: end, by: 30).map {Clip(start: $0, end: min(end, $0 + 30), score: score)}
-        }.sorted {($0.score ?? 0) > ($1.score ?? 0)}
+        }.sorted {$0.start < $1.start}
+    }
+    func sourceDimensions(_ source: URL) async throws -> CGSize {
+        guard let video = try await AVURLAsset(url: source).loadTracks(withMediaType: .video).first else {return .zero}
+        let natural = try await video.load(.naturalSize), preferred = try await video.load(.preferredTransform)
+        let bounds = CGRect(origin: .zero, size: natural).applying(preferred)
+        return CGSize(width: abs(bounds.width), height: abs(bounds.height))
     }
     func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> (Double, [Double], [Clip]) {
         try Task.checkCancellation()
@@ -43,16 +60,18 @@ actor LocalEngine {
         var motion = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
         var previous: [UInt8]?
         let frameCount = Int(ceil(duration * 2))
-        // Bounded batches avoid overlapping one-shot generator lifetimes and
-        // keep decoded preview images out of memory after each small batch.
+        // Reuse the decoder while keeping only a bounded batch of tiny images.
+        // Measure on real HEVC sources before claiming a speed improvement.
+        let scanStarted = Date()
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 160, height: 90)
+        generator.requestedTimeToleranceBefore = time(0.15)
+        generator.requestedTimeToleranceAfter = time(0.15)
+        defer {generator.cancelAllCGImageGeneration()}
         for first in stride(from: 0, to: frameCount, by: 16) {
             try Task.checkCancellation()
             let last = min(frameCount, first + 16)
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 160, height: 90)
-            generator.requestedTimeToleranceBefore = time(0.15)
-            generator.requestedTimeToleranceAfter = time(0.15)
             let times = (first..<last).map {time(min(Double($0) / 2, max(0, duration - 0.05)))}
             var frames: [Int: [UInt8]] = [:]
             for await result in generator.images(for: times) {
@@ -77,6 +96,7 @@ actor LocalEngine {
         let audio = try await loudness(asset, duration: duration, progress: progress)
         let m = Self.normalized(motion), a = Self.normalized(audio)
         let scores = m.indices.map {0.65 * m[$0] + 0.35 * a[$0]}
+        logger.info("Analysis completed: sourceSeconds=\(duration, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public)")
         await progress(1, "הניתוח הושלם באייפון")
         return (duration, scores, Self.ranges(scores: scores, duration: duration))
     }
@@ -156,7 +176,14 @@ actor LocalEngine {
         let scale = min(1, (cap ?? h) / h)
         return CGSize(width: max(2, floor(w * scale / 2) * 2), height: max(2, floor(h * scale / 2) * 2))
     }
-    func export(_ project: LocalProject, edit: Edit, output: URL, progress: @escaping Progress) async throws -> Double {
+    struct PreparedEdit {
+        let composition: AVMutableComposition
+        let video: AVMutableVideoComposition
+        let audio: AVMutableAudioMix
+        let length: Double
+        let preset: String
+    }
+    func prepare(_ project: LocalProject, edit: Edit, progress: Progress) async throws -> PreparedEdit {
         let source = LocalStore.file(project.source, project: project.id)
         let asset = AVURLAsset(url: source)
         let total = try await asset.load(.duration).seconds
@@ -182,10 +209,11 @@ actor LocalEngine {
         let segments = Self.timeline(clips: clips, speed: speed, transition: transition == "cut" ? 0 : fade)
         let length = segments.last!.end
         guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
-        try LocalStore.checkSpace(required: Int64(length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
         let composition = AVMutableComposition()
         let videos = (0..<2).map {_ in composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!}
         let original = try await asset.loadTracks(withMediaType: .audio).first
+        let originalAudioRange: CMTimeRange?
+        if let original {originalAudioRange = try await original.load(.timeRange)} else {originalAudioRange = nil}
         let muted = edit.settings["muteOriginal"]?.bool ?? false
         let audios = original != nil && !muted ? (0..<2).map {_ in composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!} : []
         let audioParams = audios.map {AVMutableAudioMixInputParameters(track: $0)}
@@ -199,9 +227,8 @@ actor LocalEngine {
             let range = CMTimeRange(start: time(clips[index].start), duration: time(clips[index].duration))
             try videos[segment.track].insertTimeRange(range, of: video, at: time(segment.start))
             videos[segment.track].scaleTimeRange(CMTimeRange(start: time(segment.start), duration: range.duration), toDuration: time(segment.duration))
-            if let original, !muted {
+            if let original, let audioRange = originalAudioRange, !muted {
                 // Camera audio may be slightly shorter than video; preserve silence in the tail.
-                let audioRange = try await original.load(.timeRange)
                 let available = CMTimeRangeGetIntersection(range, otherRange: audioRange)
                 if available.duration.seconds > 0 {
                     let audioStart = segment.start + (available.start.seconds - range.start.seconds) / speed
@@ -297,13 +324,27 @@ actor LocalEngine {
         catch {check.problems.append(error.localizedDescription)}
         guard valid else {
             let detail = check.problems.isEmpty ? "סיבה לא ידועה" : check.problems.joined(separator: " · ")
-            throw AppError(message: "הרכבת הסרט נכשלה: " + detail)
+            throw AppError(message: NSLocalizedString("הרכבת הסרט נכשלה: ", comment: "Composition failure prefix") + detail)
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
-        guard let session = AVAssetExportSession(asset: composition, presetName: preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
+        return PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
+    }
+    func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
+        let prepared = try await prepare(project, edit: edit) {_, _ in}
+        try Task.checkCancellation()
+        let item = AVPlayerItem(asset: prepared.composition)
+        item.videoComposition = prepared.video; item.audioMix = prepared.audio
+        return item
+    }
+    func export(_ project: LocalProject, edit: Edit, output: URL, progress: @escaping Progress) async throws -> Double {
+        let started = Date()
+        let prepared = try await prepare(project, edit: edit, progress: progress)
+        let size = prepared.video.renderSize
+        try LocalStore.checkSpace(required: Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
+        guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
         session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
-        session.videoComposition = videoComposition; session.audioMix = mix
+        session.videoComposition = prepared.video; session.audioMix = prepared.audio
         let observer = Task {
             while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}
         }
@@ -324,7 +365,8 @@ actor LocalEngine {
         default: throw session.error ?? AppError(message: "הייצוא נכשל באייפון.")
         }
         await progress(1, "הסרט מוכן באייפון")
-        return length
+        logger.info("Export completed: outputSeconds=\(prepared.length, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(started), privacy: .public), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue, privacy: .public)")
+        return prepared.length
     }
 }
 
@@ -343,19 +385,19 @@ final class CompositionCheck: NSObject, AVVideoCompositionValidationHandling {
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidValueForKey key: String) -> Bool {
-        note("ערך לא תקין: \(key)")
+        note(String(format: NSLocalizedString("ערך לא תקין: %@", comment: "Invalid composition value"), key))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingEmptyTimeRange timeRange: CMTimeRange) -> Bool {
-        note("פער ללא הוראה: \(seconds(timeRange))")
+        note(String(format: NSLocalizedString("פער ללא הוראה: %@", comment: "Uncovered composition range"), seconds(timeRange)))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTimeRangeIn instruction: any AVVideoCompositionInstructionProtocol) -> Bool {
-        note("טווח זמן לא תקין: \(seconds(instruction.timeRange))")
+        note(String(format: NSLocalizedString("טווח זמן לא תקין: %@", comment: "Invalid instruction range"), seconds(instruction.timeRange)))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTrackIDIn instruction: any AVVideoCompositionInstructionProtocol,
                           layerInstruction: AVVideoCompositionLayerInstruction, asset: AVAsset) -> Bool {
-        note("ערוץ לא תקין \(layerInstruction.trackID) בטווח \(seconds(instruction.timeRange))")
+        note(String(format: NSLocalizedString("ערוץ לא תקין %@ בטווח %@", comment: "Invalid composition track"), "\(layerInstruction.trackID)", seconds(instruction.timeRange)))
     }
 }

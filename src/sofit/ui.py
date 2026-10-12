@@ -46,6 +46,7 @@ STATIC_ASSETS = {
     "manifest.webmanifest": "application/manifest+json",
 }
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
+_UPLOAD_RESERVATIONS_LOCK = threading.RLock()
 JOBS: dict[str, dict] = {}
 PROJECT_ROOT: Path | None = None
 _JOB_LOCK = threading.RLock()
@@ -659,7 +660,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                       "music": {".mp3", ".m4a", ".aac", ".wav", ".ogg"}}
         if kind not in extensions or suffix not in extensions[kind] or not 0 < size <= (30 if kind == "video" else 2) * 1024**3:
             raise ValueError("Invalid file type or size.")
-        with _job_lock(job):
+        with _UPLOAD_RESERVATIONS_LOCK, _job_lock(job):
             if job.get("_worker"):
                 return self._json(409, {"error": "Wait for the running operation."})
             reserved = sum(u["size"] - u["offset"] for j in list(JOBS.values())

@@ -50,10 +50,16 @@ struct LocalProject: Codable, Identifiable {
     var source: String
     var duration: Double = 0
     var scores: [Double] = []
+    var scoresFile: String?
     var analyzed = false
     var wholeVideo = false
     var edit = Edit(clips: [])
     var music: [LocalMusic] = []
     var exports: [LocalExport] = []
 }
-struct AppError: LocalizedError {let message: String; var errorDescription: String? {message}}
+struct AppError: LocalizedError {
+    let message: String
+    // Engine failures are thrown as Hebrew source text; the catalog turns them
+    // into the reader's language, and an assembled message passes through.
+    var errorDescription: String? {NSLocalizedString(message, comment: "Engine failure shown to the rider")}
+}

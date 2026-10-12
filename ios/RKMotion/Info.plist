@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).mediaProcessing</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>he</string>
 	<key>CFBundleDisplayName</key>
@@ -24,11 +28,17 @@
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>שמירת הסרט שייצאתם בספריית התמונות באייפון.</string>
+	<key>RKBackgroundGPUEnabled</key>
+	<string>$(RK_BACKGROUND_GPU_ENABLED)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

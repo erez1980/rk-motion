@@ -20,11 +20,17 @@ for file in files:
     builds.append(add("build-" + file.name, f'isa = PBXBuildFile; fileRef = {uid(file.name)};'))
 iconset = IOS / "RKMotion" / "Assets.xcassets" / "AppIcon.appiconset"
 iconset.mkdir(parents=True, exist_ok=True)
-shutil.copyfile(ROOT / "packaging" / "app-icon.png", iconset / "icon.png")
+shutil.copyfile(IOS / "RKMotion" / "Resources" / "AppIcon.png", iconset / "icon.png")
 (iconset / "Contents.json").write_text(json.dumps({"images": [{"filename": "icon.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}], "info": {"author": "xcode", "version": 1}}, indent=2))
 (iconset.parent / "Contents.json").write_text('{"info":{"author":"xcode","version":1}}\n')
 refs.append(add("assets", 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";'))
 refs.append(add("info", 'isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>";'))
+refs.append(add("privacy", 'isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>";'))
+refs.append(add("strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>";'))
+refs.append(add("info-strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>";'))
+add("strings-build", f'isa = PBXBuildFile; fileRef = {uid("strings")};')
+add("info-strings-build", f'isa = PBXBuildFile; fileRef = {uid("info-strings")};')
+add("privacy-build", f'isa = PBXBuildFile; fileRef = {uid("privacy")};')
 add("asset-build", f'isa = PBXBuildFile; fileRef = {uid("assets")};')
 add("app", 'isa = PBXFileReference; explicitFileType = wrapper.application; path = RKMotion.app; sourceTree = BUILT_PRODUCTS_DIR;')
 test_files = sorted((IOS / "RKMotionTests").glob("*.swift"))
@@ -46,18 +52,18 @@ add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")}
 add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RKMotion; sourceTree = "<group>";')
 add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
-add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},); runOnlyForDeploymentPostprocessing = 0;')
+add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},); runOnlyForDeploymentPostprocessing = 0;')
 add("frameworks", 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
 for kind in ("Debug", "Release"):
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; MARKETING_VERSION = 0.14.0;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.15.0;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
         SUPPORTS_MACCATALYST = NO; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-        SWIFT_EMIT_LOC_STRINGS = YES;'''
+        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;'''
     settings += 'SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ENABLE_TESTABILITY = YES;' if kind == "Debug" else 'SWIFT_OPTIMIZATION_LEVEL = "-O";'
     add("target-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{{settings}}};')
 for prefix in ("project", "target"):

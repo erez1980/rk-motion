@@ -2,9 +2,9 @@ name: iPhone standalone
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', '.github/workflows/ios.yml']
   pull_request:
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', '.github/workflows/ios.yml']
   workflow_dispatch:
 concurrency:
   group: ios-${{ github.head_ref || github.ref_name }}
@@ -17,12 +17,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select supported App Store toolchain
+        run: |
+          test -d /Applications/Xcode_26.3.app
+          echo "DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Check App Store metadata
+        run: python3 scripts/check-ios-store.py
       - name: Compile simulator app
         run: bash scripts/build-ios.sh simulator
       - name: Test local analysis and export on simulator
         run: |
           rk_sim=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for vs in d["devices"].values() for v in vs if v["name"].startswith("iPhone")))')
-          xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Debug -destination "platform=iOS Simulator,id=$rk_sim" -derivedDataPath build/ios/Tests CODE_SIGNING_ALLOWED=NO test
+          xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Debug -destination "platform=iOS Simulator,id=$rk_sim" -derivedDataPath build/ios/Tests -resultBundlePath build/ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO test
       - name: Build unsigned iPhone IPA
         run: bash scripts/build-ios.sh unsigned
       - uses: actions/upload-artifact@v4
@@ -30,3 +36,11 @@ jobs:
           name: RK-Motion-unsigned-IPA
           path: build/ios/RK-Motion-unsigned.ipa
           if-no-files-found: error
+
+      - name: Preserve native test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RK-Motion-test-results
+          path: build/ios/TestResults.xcresult
+          if-no-files-found: ignore
