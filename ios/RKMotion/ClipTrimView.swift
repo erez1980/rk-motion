@@ -22,7 +22,7 @@ struct ClipTrimView: View {
                     Text("משך הקטע: \(max(0, clip.end - clip.start), specifier: "%.2f") שניות")
                 }
             }.navigationTitle("חיתוך קטע")
-             .toolbar {Button("סיום") {player?.pause(); dismiss()}}
+             .toolbar {Button("בוצע") {player?.pause(); dismiss()}}
              .task {
                  clip.start = min(max(0, clip.start), duration - 0.01)
                  clip.end = min(duration, max(clip.start + 0.01, clip.end))

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fail early for Store metadata mistakes, including generated resource drift."""
+import json
 import plistlib
 import struct
 from pathlib import Path
@@ -22,5 +23,30 @@ project = (ROOT / 'ios/RKMotion.xcodeproj/project.pbxproj').read_text()
 assert 'path = PrivacyInfo.xcprivacy' in project
 privacy_ref = project.split('path = PrivacyInfo.xcprivacy')[0].rsplit('\n', 1)[-1].split(' = ')[0].strip()
 assert f'fileRef = {privacy_ref};' in project
-assert 'NSPhotoLibraryAddUsageDescription' in plistlib.loads((app / 'Info.plist').read_bytes())
+info = plistlib.loads((app / 'Info.plist').read_bytes())
+assert 'NSPhotoLibraryAddUsageDescription' in info
+
+
+def catalog(name):
+    data = json.loads((app / name).read_text())
+    missing = {}
+    for key, entry in data['strings'].items():
+        for language in ('he', 'en'):
+            unit = (entry.get('localizations') or {}).get(language, {}).get('stringUnit', {})
+            if unit.get('state') != 'translated' or not unit.get('value'):
+                missing.setdefault(language, []).append(key)
+    assert not missing, f'{name} is missing translations: ' + '; '.join(
+        f'{language}: {sorted(keys)[:5]}' for language, keys in sorted(missing.items()))
+    return data
+
+
+catalog('Localizable.xcstrings')
+# iOS reads the permission prompt from Info.plist, which Localizable.xcstrings
+# never covers, so every usage description needs its own catalog entry.
+prompts = catalog('InfoPlist.xcstrings')['strings']
+unlocalized = sorted(k for k in info if k.endswith('UsageDescription') and k not in prompts)
+assert not unlocalized, f'permission prompts without InfoPlist.xcstrings entries: {unlocalized}'
+assert 'path = InfoPlist.xcstrings' in project, 'Regenerate the Xcode project'
+prompt_ref = project.split('path = InfoPlist.xcstrings')[0].rsplit('\n', 1)[-1].split(' = ')[0].strip()
+assert f'fileRef = {prompt_ref};' in project, 'InfoPlist.xcstrings is not in a build phase'
 print('Store metadata checks passed (signing, App Store validation and device tests remain separate).')

@@ -3,6 +3,12 @@
   "strings": {
     "אודות ועזרה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About & Help"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -13,6 +19,12 @@
     },
     "אחסון מקומי": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local storage"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -23,6 +35,12 @@
     },
     "איכות מרבית": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum quality"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -33,6 +51,12 @@
     },
     "אפשרויות ייצוא": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export options"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -41,8 +65,30 @@
         }
       }
     },
+    "בוצע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בוצע"
+          }
+        }
+      }
+    },
     "בחירת סרטון": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a video"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -53,6 +99,12 @@
     },
     "בחירת סרטון מקבצים": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a video from Files"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -63,6 +115,12 @@
     },
     "בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a video to create your first project."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -73,6 +131,12 @@
     },
     "ביטול הפעולה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -83,6 +147,12 @@
     },
     "ביטול שינוי": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -93,6 +163,12 @@
     },
     "גרסה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -103,6 +179,12 @@
     },
     "דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub reports are public. Do not attach private videos or personal information."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -113,6 +195,12 @@
     },
     "הוספת מוזיקה מקבצים": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add music from Files"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -123,6 +211,12 @@
     },
     "הוספת קטע ידני": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a clip manually"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -133,6 +227,12 @@
     },
     "הזנת זמנים מדויקת": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter exact times"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -143,6 +243,12 @@
     },
     "החלת מצב הבחירה על הפרויקט": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply this mode to the project"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -153,6 +259,12 @@
     },
     "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports are currently SDR at 30 frames per second. Activity detection uses motion and audio level, and suggests clips for you to review."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -163,6 +275,12 @@
     },
     "המסה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dissolve"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -173,6 +291,12 @@
     },
     "הסרה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -183,6 +307,12 @@
     },
     "הסרטון כבר ערוך — להשאיר אותו שלם": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video is already edited — keep it whole"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -193,6 +323,12 @@
     },
     "הסרטונים, המוזיקה והעריכות מעובדים ונשמרים באייפון. אין צורך בחשבון ואין שרת עיבוד, פרסומות או כלי מעקב באפליקציה.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos, music and edits are processed and stored on your iPhone. No account is needed, and the app has no processing server, ads or trackers."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -203,6 +339,12 @@
     },
     "הסרת שמע הרכיבה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute the ride audio"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -213,6 +355,12 @@
     },
     "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This replaces the current clips; you can undo the change."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -223,6 +371,12 @@
     },
     "הפקת הצעות מחדש": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate suggestions"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -233,6 +387,12 @@
     },
     "הפרויקטים שלי": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My projects"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -243,6 +403,12 @@
     },
     "הצעות הפעילות יוחלפו; ניתן לבטל את השינוי.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The activity suggestions will be replaced; you can undo the change."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -253,6 +419,12 @@
     },
     "התחלה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -263,6 +435,12 @@
     },
     "התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The preview includes cuts, order, speed and music, without exporting a file."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -273,6 +451,12 @@
     },
     "התקדמות העיבוד": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Processing progress"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -283,6 +467,12 @@
     },
     "חזק": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loud"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -293,6 +483,12 @@
     },
     "חיתוך": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cut"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -303,6 +499,12 @@
     },
     "חיתוך הקטע": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trim the clip"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -313,6 +515,12 @@
     },
     "חיתוך קטע": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trim clip"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -323,6 +531,12 @@
     },
     "יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background processing depends on your iOS version, your device and the signing entitlements. iOS may stop the work; the source and the edit are kept, and you can try again."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -333,6 +547,12 @@
     },
     "כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All exports are SDR at 30fps. Source resolution does not mean HDR preservation or lossless export."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -343,6 +563,12 @@
     },
     "מאוזן": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Balanced"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -353,6 +579,12 @@
     },
     "מהירות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -363,6 +595,12 @@
     },
     "מהרכיבה לרגעים הטובים": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From the ride to the best moments"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -373,6 +611,12 @@
     },
     "מחיקה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -383,6 +627,12 @@
     },
     "מחיקת הסרט": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the movie"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -393,6 +643,12 @@
     },
     "מחיקת הפרויקט מהאייפון": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the project from this iPhone"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -403,6 +659,12 @@
     },
     "מחיקת סרט שנוצר אינה מוחקת את המקור או את העריכה. עותקים שנשמרו בתמונות אינם נמחקים.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting a finished movie does not delete the source or the edit. Copies already saved to Photos are not deleted."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -413,6 +675,12 @@
     },
     "מחיקת פרויקט מוחקת את קבציו באפליקציה. עותקים ששמרתם בתמונות או שיתפתם נשארים ביעד שלהם. גיבויי המכשיר עשויים לכלול נתוני אפליקציה בהתאם להגדרות Apple.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting a project removes its files from the app. Copies you saved to Photos or shared stay where they are. Device backups may include app data, depending on your Apple settings."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -423,6 +691,12 @@
     },
     "מסגרת": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Framing"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -433,6 +707,12 @@
     },
     "מעבר": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transition"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -443,6 +723,12 @@
     },
     "מקור": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -453,6 +739,12 @@
     },
     "משך המעבר": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transition length"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -463,6 +755,12 @@
     },
     "ניגון המקור": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play the source"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -473,6 +771,12 @@
     },
     "ניגון הסרט הערוך": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play the edited movie"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -483,6 +787,12 @@
     },
     "ניגון הקטע שנבחר": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play the selected clip"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -493,6 +803,12 @@
     },
     "ניסיון חוזר לשמירת הפרויקט": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try saving the project again"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -503,6 +819,12 @@
     },
     "ניקוי קבצים זמניים שנותרו": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean up leftover temporary files"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -513,6 +835,12 @@
     },
     "ניתוח הסרטון באייפון": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze the video on this iPhone"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -523,6 +851,12 @@
     },
     "ניתוח, עריכה וייצוא — הכול באייפון שלכם.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis, editing and export — all on your iPhone."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -533,6 +867,12 @@
     },
     "נפח הפרויקט: ": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project size: "
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -543,6 +883,12 @@
     },
     "סטורי 9:16": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "9:16 Story"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -553,6 +899,12 @@
     },
     "סיום": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -563,6 +915,12 @@
     },
     "סיום הקטע בשניות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip end, in seconds"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -573,6 +931,12 @@
     },
     "סרט מ־": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie from "
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -583,6 +947,12 @@
     },
     "סרטון שנמצא רק ב־iCloud עשוי לרדת דרך בורר התמונות של Apple. שיתוף ושמירה לתמונות נעשים רק לפי בחירתכם.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A video stored only in iCloud may be downloaded through Apple's photo picker. Sharing and saving to Photos happen only when you choose to."
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -593,6 +963,12 @@
     },
     "סרטים שנוצרו באייפון": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movies created on this iPhone"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -603,6 +979,12 @@
     },
     "עוצמת מוזיקה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music level"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -613,6 +995,12 @@
     },
     "עזרה ותמיכה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help & support"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -623,6 +1011,12 @@
     },
     "עיבוד מקומי באייפון": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local processing on your iPhone"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -633,6 +1027,12 @@
     },
     "פרטיות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -643,6 +1043,12 @@
     },
     "קטעי הסרט — גררו לשינוי סדר": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie clips — drag to reorder"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -653,6 +1059,12 @@
     },
     "רגישות זיהוי הפעילות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity detection sensitivity"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -663,6 +1075,12 @@
     },
     "רזולוציית מקור": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source resolution"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -673,6 +1091,12 @@
     },
     "רקע": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -683,6 +1107,12 @@
     },
     "שחזור שינוי": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redo"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -693,6 +1123,12 @@
     },
     "שימוש במוזיקה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use music"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -703,6 +1139,12 @@
     },
     "שמירה ושיתוף": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save & share"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -713,6 +1155,12 @@
     },
     "שמירת הסרט בתמונות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the movie to Photos"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -723,6 +1171,12 @@
     },
     "תחילת הקטע בשניות": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip start, in seconds"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -733,6 +1187,12 @@
     },
     "תצוגה וחיתוך הקטע": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview and trim the clip"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -743,6 +1203,12 @@
     },
     "תצוגה מקדימה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",
@@ -753,6 +1219,12 @@
     },
     "תצוגה מקדימה של העריכה": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview the edit"
+          }
+        },
         "he": {
           "stringUnit": {
             "state": "translated",

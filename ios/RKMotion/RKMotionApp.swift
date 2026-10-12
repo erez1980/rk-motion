@@ -121,7 +121,7 @@ struct EditorView: View {
                 NavigationLink {AboutView()} label: {Label("עזרה", systemImage: "questionmark.circle")}
             }
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("סיום") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
+                ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("בוצע") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
             }
             .tint(Color(red: 0.20, green: 0.69, blue: 0.47))
             .task {await model.restore()}

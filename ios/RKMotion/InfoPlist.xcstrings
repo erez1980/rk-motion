@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "he",
+  "strings": {
+    "NSPhotoLibraryAddUsageDescription": {
+      "comment": "Photos add-only permission prompt shown by iOS.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saves the movie you exported to your iPhone photo library."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירת הסרט שייצאתם בספריית התמונות באייפון."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
