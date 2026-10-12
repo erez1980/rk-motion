@@ -36,7 +36,7 @@ import Foundation
         }
         guard registered else {return false}
         self.launch = launch; self.expire = expire; running = true
-        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: "העיבוד מתבצע באייפון")
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: NSLocalizedString("העיבוד מתבצע באייפון", comment: "Continued processing task subtitle"))
         request.strategy = .fail; request.requiredResources = .gpu
         do {try BGTaskScheduler.shared.submit(request); return true}
         catch {running = false; self.launch = nil; self.expire = nil; return false}

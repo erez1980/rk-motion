@@ -39,7 +39,7 @@ struct EditorView: View {
                         ProgressView(value: model.percent, total: 100)
                             .accessibilityLabel("התקדמות העיבוד")
                             .accessibilityValue("\(Int(model.percent)) אחוז")
-                        Text(model.message).font(.footnote)
+                        Text(LocalizedStringKey(model.message)).font(.footnote)
                         Button("ביטול הפעולה") {model.cancel()}.disabled(!model.canCancel)
                     }
                 }
@@ -106,7 +106,7 @@ struct EditorView: View {
                 }
                 if !model.message.isEmpty && !model.busy {
                     Section {
-                        Text(model.message).font(.footnote).textSelection(.enabled)
+                        Text(LocalizedStringKey(model.message)).font(.footnote).textSelection(.enabled)
                         if model.photoPermissionDenied {
                             Button("פתיחת הגדרות הרשאת תמונות") {if let url = URL(string: UIApplication.openSettingsURLString) {UIApplication.shared.open(url)}}
                         }
@@ -203,7 +203,7 @@ struct EditorView: View {
             Picker("מעבר", selection: setting("transition", fallback: "cut")) {
                 Text("חיתוך").tag("cut"); Text("המסה").tag("dissolve")
             }
-            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text($0 + " שניות").tag($0)}}
+            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text("\($0) שניות").tag($0)}}
             Toggle("הסרת שמע הרכיבה", isOn: Binding(get: {model.edit.settings["muteOriginal"]?.bool ?? false}, set: {model.edit.settings["muteOriginal"] = .flag($0)}))
             Button("הוספת מוזיקה מקבצים") {importingMusic = true; showImporter = true}
             if let songs = model.project?.music, !songs.isEmpty {

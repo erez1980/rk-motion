@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "he",
   "strings": {
+    "%@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ שניות"
+          }
+        }
+      }
+    },
     "אודות ועזרה": {
       "localizations": {
         "en": {
@@ -13,6 +29,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "אודות ועזרה"
+          }
+        }
+      }
+    },
+    "אורך הסרט הערוך צריך להיות עד 24 שעות.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The edited movie must be at most 24 hours long."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך הסרט הערוך צריך להיות עד 24 שעות."
           }
         }
       }
@@ -49,6 +81,54 @@
         }
       }
     },
+    "אין מספיק מקום פנוי באייפון. פנו מקום ונסו שוב.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough free space on this iPhone. Free some space and try again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין מספיק מקום פנוי באייפון. פנו מקום ונסו שוב."
+          }
+        }
+      }
+    },
+    "אין ערוץ וידאו.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No video track."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין ערוץ וידאו."
+          }
+        }
+      }
+    },
+    "אפשרו שמירה בתמונות בהגדרות האייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow saving to Photos in your iPhone settings"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשרו שמירה בתמונות בהגדרות האייפון"
+          }
+        }
+      }
+    },
     "אפשרויות ייצוא": {
       "localizations": {
         "en": {
@@ -65,6 +145,22 @@
         }
       }
     },
+    "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the selected clips, their times and the export settings."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא."
+          }
+        }
+      }
+    },
     "בוצע": {
       "localizations": {
         "en": {
@@ -77,6 +173,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "בוצע"
+          }
+        }
+      }
+    },
+    "בחירה מתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose from Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירה מתמונות"
           }
         }
       }
@@ -113,6 +225,22 @@
         }
       }
     },
+    "בחרו לפחות קטע אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least one clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו לפחות קטע אחד"
+          }
+        }
+      }
+    },
     "בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם.": {
       "localizations": {
         "en": {
@@ -125,6 +253,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם."
+          }
+        }
+      }
+    },
+    "בחרו סרטון תקין באורך של עד 24 שעות.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a valid video of up to 24 hours."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו סרטון תקין באורך של עד 24 שעות."
+          }
+        }
+      }
+    },
+    "בחרו קובץ שמע תקין.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a valid audio file."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו קובץ שמע תקין."
+          }
+        }
+      }
+    },
+    "בחרו קטעים לייצוא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select clips to export"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו קטעים לייצוא"
           }
         }
       }
@@ -193,6 +369,38 @@
         }
       }
     },
+    "האייפון מכין את הקובץ…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your iPhone is preparing the file…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "האייפון מכין את הקובץ…"
+          }
+        }
+      }
+    },
+    "הגדרות מוזיקה לא תקינות.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The music settings are not valid."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הגדרות מוזיקה לא תקינות."
+          }
+        }
+      }
+    },
     "הוספת מוזיקה מקבצים": {
       "localizations": {
         "en": {
@@ -257,6 +465,38 @@
         }
       }
     },
+    "הייצוא אינו זמין במכשיר זה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export is not available on this device."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הייצוא אינו זמין במכשיר זה."
+          }
+        }
+      }
+    },
+    "הייצוא בוטל. העריכה נשמרה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export cancelled. The edit was saved."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הייצוא בוטל. העריכה נשמרה."
+          }
+        }
+      }
+    },
     "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה.": {
       "localizations": {
         "en": {
@@ -269,6 +509,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה."
+          }
+        }
+      }
+    },
+    "הייצוא נכשל באייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The export failed on this iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הייצוא נכשל באייפון."
+          }
+        }
+      }
+    },
+    "המוזיקה נשמרה באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The music was saved on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המוזיקה נשמרה באייפון"
           }
         }
       }
@@ -289,6 +561,102 @@
         }
       }
     },
+    "המתינו לסיום הפעולה הנוכחית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current operation to finish"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המתינו לסיום הפעולה הנוכחית"
+          }
+        }
+      }
+    },
+    "הניקוי הסתיים. פונו ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleanup finished. Freed "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניקוי הסתיים. פונו "
+          }
+        }
+      }
+    },
+    "הניקוי לא הושלם: ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleanup did not finish: "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניקוי לא הושלם: "
+          }
+        }
+      }
+    },
+    "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis cancelled. The video was kept and you can try again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."
+          }
+        }
+      }
+    },
+    "הניתוח הושלם באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis finished on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניתוח הושלם באייפון"
+          }
+        }
+      }
+    },
+    "הניתוח הושלם — כל העיבוד נעשה באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis finished — all processing happened on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניתוח הושלם — כל העיבוד נעשה באייפון"
+          }
+        }
+      }
+    },
     "הסרה": {
       "localizations": {
         "en": {
@@ -305,6 +673,86 @@
         }
       }
     },
+    "הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie was removed from the list but its file could not be deleted: "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: "
+          }
+        }
+      }
+    },
+    "הסרט מוכן באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie is ready on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט מוכן באייפון"
+          }
+        }
+      }
+    },
+    "הסרט נוצר באייפון ומוכן לשמירה ושיתוף": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie was created on this iPhone and is ready to save and share"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"
+          }
+        }
+      }
+    },
+    "הסרט נשמר בתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie was saved to Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט נשמר בתמונות"
+          }
+        }
+      }
+    },
+    "הסרט שנוצר נמחק מהאפליקציה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The finished movie was deleted from the app"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט שנוצר נמחק מהאפליקציה"
+          }
+        }
+      }
+    },
     "הסרטון כבר ערוך — להשאיר אותו שלם": {
       "localizations": {
         "en": {
@@ -317,6 +765,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "הסרטון כבר ערוך — להשאיר אותו שלם"
+          }
+        }
+      }
+    },
+    "הסרטון נשמר. אפשר לחדש את הניתוח.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video was saved. You can run the analysis again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטון נשמר. אפשר לחדש את הניתוח."
           }
         }
       }
@@ -353,6 +817,22 @@
         }
       }
     },
+    "העיבוד מתבצע באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Processing runs on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "העיבוד מתבצע באייפון"
+          }
+        }
+      }
+    },
     "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי.": {
       "localizations": {
         "en": {
@@ -385,6 +865,38 @@
         }
       }
     },
+    "הפרויקט נמחק מהאייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project was deleted from this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקט נמחק מהאייפון"
+          }
+        }
+      }
+    },
+    "הפרויקט נשמר באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project is saved on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקט נשמר באייפון"
+          }
+        }
+      }
+    },
     "הפרויקטים שלי": {
       "localizations": {
         "en": {
@@ -397,6 +909,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "הפרויקטים שלי"
+          }
+        }
+      }
+    },
+    "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The activity suggestions were restored. You can undo the change."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי."
           }
         }
       }
@@ -417,6 +945,38 @@
         }
       }
     },
+    "הרכבת הסרט נכשלה: ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assembling the movie failed: "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הרכבת הסרט נכשלה: "
+          }
+        }
+      }
+    },
+    "השמע מכיל חותמות זמן לא תקינות.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio contains invalid timestamps."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השמע מכיל חותמות זמן לא תקינות."
+          }
+        }
+      }
+    },
     "התחלה": {
       "localizations": {
         "en": {
@@ -429,6 +989,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "התחלה"
+          }
+        }
+      }
+    },
+    "התחלה במוזיקה — שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music start — seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התחלה במוזיקה — שניות"
+          }
+        }
+      }
+    },
+    "התצוגה המקדימה בוטלה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The preview was cancelled"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התצוגה המקדימה בוטלה"
           }
         }
       }
@@ -461,6 +1053,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "התקדמות העיבוד"
+          }
+        }
+      }
+    },
+    "זמן התחלת המוזיקה נמצא מעבר לסוף הקובץ.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The music start time is past the end of the file."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זמן התחלת המוזיקה נמצא מעבר לסוף הקובץ."
+          }
+        }
+      }
+    },
+    "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip times must fall inside the video, and the end must come after the start"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה"
           }
         }
       }
@@ -529,6 +1153,54 @@
         }
       }
     },
+    "ייבוא הסרטון בוטל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video import was cancelled"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייבוא הסרטון בוטל"
+          }
+        }
+      }
+    },
+    "ייצוא הסרט באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the movie on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא הסרט באייפון"
+          }
+        }
+      }
+    },
+    "ייצוא סרטון רכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting a ride video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא סרטון רכיבה"
+          }
+        }
+      }
+    },
     "יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב.": {
       "localizations": {
         "en": {
@@ -561,6 +1233,150 @@
         }
       }
     },
+    "כל הסרטון נבחר. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The whole video is selected. You can undo the change."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל הסרטון נבחר. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No activity clips were found. Change the sensitivity or add a clip manually."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני."
+          }
+        }
+      }
+    },
+    "לא נותרו קטעים לייצוא.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No clips are left to export."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נותרו קטעים לייצוא."
+          }
+        }
+      }
+    },
+    "לא ניתן לפענח את השמע בסרטון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio in the video could not be decoded."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לפענח את השמע בסרטון."
+          }
+        }
+      }
+    },
+    "לא ניתן לקרוא את הסרטון שנבחר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected video could not be read."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לקרוא את הסרטון שנבחר."
+          }
+        }
+      }
+    },
+    "לא ניתן לקרוא פריים מהסרטון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A frame could not be read from the video."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לקרוא פריים מהסרטון."
+          }
+        }
+      }
+    },
+    "לא ניתן לקרוא פריימים מהסרטון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frames could not be read from the video."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לקרוא פריימים מהסרטון."
+          }
+        }
+      }
+    },
+    "למחוק את הפרויקט ואת הקבצים שלו מהאייפון?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the project and its files from this iPhone?"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "למחוק את הפרויקט ואת הקבצים שלו מהאייפון?"
+          }
+        }
+      }
+    },
+    "לפעולות ארוכות השאירו את האפליקציה פתוחה; גרסה זו משתמשת בזמן רקע מוגבל.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For long operations keep the app open; this build uses limited background time."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לפעולות ארוכות השאירו את האפליקציה פתוחה; גרסה זו משתמשת בזמן רקע מוגבל."
+          }
+        }
+      }
+    },
     "מאוזן": {
       "localizations": {
         "en": {
@@ -573,6 +1389,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "מאוזן"
+          }
+        }
+      }
+    },
+    "מדיניות הפרטיות המלאה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The full privacy policy"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מדיניות הפרטיות המלאה"
           }
         }
       }
@@ -605,6 +1437,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "מהרכיבה לרגעים הטובים"
+          }
+        }
+      }
+    },
+    "מוכן לניתוח": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready for analysis"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוכן לניתוח"
+          }
+        }
+      }
+    },
+    "מוסיפה מוזיקה מקומית…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding local music…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוסיפה מוזיקה מקומית…"
           }
         }
       }
@@ -689,6 +1553,118 @@
         }
       }
     },
+    "מייצאת את הסרט באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting the movie on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מייצאת את הסרט באייפון…"
+          }
+        }
+      }
+    },
+    "מייצאת באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מייצאת באייפון…"
+          }
+        }
+      }
+    },
+    "מכינה את העריכה באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the edit on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מכינה את העריכה באייפון…"
+          }
+        }
+      }
+    },
+    "ממדי הסרטון או איכות הייצוא אינם תקינים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video dimensions or the export quality are not valid."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ממדי הסרטון או איכות הייצוא אינם תקינים."
+          }
+        }
+      }
+    },
+    "מנתחת באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מנתחת באייפון…"
+          }
+        }
+      }
+    },
+    "מנתחת שמע באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing audio on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מנתחת שמע באייפון…"
+          }
+        }
+      }
+    },
+    "מנתחת תנועה באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing motion on this iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מנתחת תנועה באייפון…"
+          }
+        }
+      }
+    },
     "מסגרת": {
       "localizations": {
         "en": {
@@ -717,6 +1693,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "מעבר"
+          }
+        }
+      }
+    },
+    "מעתיקה את הסרטון לאחסון המקומי…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copying the video to local storage…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מעתיקה את הסרטון לאחסון המקומי…"
           }
         }
       }
@@ -849,6 +1841,22 @@
         }
       }
     },
+    "ניתוח סרטון רכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing a ride video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח סרטון רכיבה"
+          }
+        }
+      }
+    },
     "ניתוח, עריכה וייצוא — הכול באייפון שלכם.": {
       "localizations": {
         "en": {
@@ -893,6 +1901,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "סטורי 9:16"
+          }
+        }
+      }
+    },
+    "סיבה לא ידועה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "an unknown reason"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיבה לא ידועה"
           }
         }
       }
@@ -993,6 +2017,22 @@
         }
       }
     },
+    "עזרה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עזרה"
+          }
+        }
+      }
+    },
     "עזרה ותמיכה": {
       "localizations": {
         "en": {
@@ -1005,6 +2045,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "עזרה ותמיכה"
+          }
+        }
+      }
+    },
+    "עיבוד ברקע זמין בגרסה זו. iOS עשויה לעצור את הפעולה אם חסרים משאבים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background processing is available in this build. iOS may stop the work if resources run short."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עיבוד ברקע זמין בגרסה זו. iOS עשויה לעצור את הפעולה אם חסרים משאבים."
           }
         }
       }
@@ -1025,6 +2081,38 @@
         }
       }
     },
+    "פענוח השמע הופסק.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio decoding was stopped."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פענוח השמע הופסק."
+          }
+        }
+      }
+    },
+    "פרויקטים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פרויקטים"
+          }
+        }
+      }
+    },
     "פרטיות": {
       "localizations": {
         "en": {
@@ -1041,6 +2129,38 @@
         }
       }
     },
+    "פתיחת הגדרות הרשאת תמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Photos permission settings"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתיחת הגדרות הרשאת תמונות"
+          }
+        }
+      }
+    },
+    "קובץ המוזיקה אינו מכיל שמע.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The music file contains no audio."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קובץ המוזיקה אינו מכיל שמע."
+          }
+        }
+      }
+    },
     "קטעי הסרט — גררו לשינוי סדר": {
       "localizations": {
         "en": {
@@ -1053,6 +2173,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "קטעי הסרט — גררו לשינוי סדר"
+          }
+        }
+      }
+    },
+    "קריאת דגימות השמע נכשלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the audio samples failed."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קריאת דגימות השמע נכשלה."
+          }
+        }
+      }
+    },
+    "קריאת השמע נכשלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the audio failed."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קריאת השמע נכשלה."
           }
         }
       }
@@ -1085,6 +2237,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "רזולוציית מקור"
+          }
+        }
+      }
+    },
+    "רכיבה ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ride "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רכיבה "
           }
         }
       }
@@ -1137,6 +2305,22 @@
         }
       }
     },
+    "שיתוף קובץ הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share the movie file"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיתוף קובץ הסרט"
+          }
+        }
+      }
+    },
     "שמירה ושיתוף": {
       "localizations": {
         "en": {
@@ -1169,6 +2353,54 @@
         }
       }
     },
+    "שמירת הפרויקט נכשלה: ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving the project failed: "
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירת הפרויקט נכשלה: "
+          }
+        }
+      }
+    },
+    "שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שניות"
+          }
+        }
+      }
+    },
+    "תוצאה צפויה: %.1f שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expected result: %.1f seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תוצאה צפויה: %.1f שניות"
+          }
+        }
+      }
+    },
     "תחילת הקטע בשניות": {
       "localizations": {
         "en": {
@@ -1181,6 +2413,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "תחילת הקטע בשניות"
+          }
+        }
+      }
+    },
+    "תמיכה ודיווח תקלה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support and bug reports"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמיכה ודיווח תקלה"
           }
         }
       }
@@ -1229,6 +2477,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "תצוגה מקדימה של העריכה"
+          }
+        }
+      }
+    },
+    "תצוגה מקדימה של העריכה — ללא יצירת קובץ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview the edit — no file is created"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תצוגה מקדימה של העריכה — ללא יצירת קובץ"
           }
         }
       }

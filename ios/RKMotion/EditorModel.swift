@@ -40,7 +40,7 @@ import SwiftUI
         let cap: Double? = quality == "original" ? nil : ["720", "whatsapp"].contains(quality) ? 720 : 1080
         let size = LocalEngine.frame(source: sourceDimensions, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
         let dimensions = sourceDimensions.width > 0 ? " · \(Int(size.width))×\(Int(size.height))" : ""
-        return String(format: "תוצאה צפויה: %.1f שניות", duration) + dimensions + " · SDR · 30fps"
+        return String(format: NSLocalizedString("תוצאה צפויה: %.1f שניות", comment: "Expected output duration"), duration) + dimensions + " · SDR · 30fps"
     }
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
@@ -106,7 +106,7 @@ import SwiftUI
                 try await persistence.save(p, revision: version)
                 if version == revision {saveFailed = false}
             } catch is CancellationError {} catch {
-                if version == revision {saveFailed = true; message = "שמירת הפרויקט נכשלה: " + error.localizedDescription}
+                if version == revision {saveFailed = true; message = NSLocalizedString("שמירת הפרויקט נכשלה: ", comment: "Project save failure prefix") + error.localizedDescription}
             }
         }
     }
@@ -118,7 +118,7 @@ import SwiftUI
             try await persistence.save(p, revision: version)
             if version == revision {saveFailed = false}
             return true
-        } catch {saveFailed = true; message = "שמירת הפרויקט נכשלה: " + error.localizedDescription; return false}
+        } catch {saveFailed = true; message = NSLocalizedString("שמירת הפרויקט נכשלה: ", comment: "Project save failure prefix") + error.localizedDescription; return false}
     }
     private func refreshLibrary(_ p: LocalProject) {projects.removeAll {$0.id == p.id}; projects.insert(p, at: 0)}
     private func setBusy(_ value: Bool) {
@@ -150,7 +150,7 @@ import SwiftUI
         setBusy(true)
         guard await save() else {setBusy(false); return}
         percent = 0; message = "מעתיקה את הסרטון לאחסון המקומי…"
-        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : "רכיבה " + Date().formatted(date: .abbreviated, time: .shortened)
+        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("רכיבה ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         do {
@@ -290,7 +290,7 @@ import SwiftUI
             project = p; refreshLibrary(p)
             if movieURL?.lastPathComponent == result.file {movieURL = nil}
             projectBytes = await persistence.bytes(p)
-            message = warning.map {"הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: " + $0} ?? "הסרט שנוצר נמחק מהאפליקציה"
+            message = warning.map {NSLocalizedString("הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: ", comment: "Export removed but file left behind") + $0} ?? "הסרט שנוצר נמחק מהאפליקציה"
         } catch {message = error.localizedDescription}
         setBusy(false)
     }
@@ -315,8 +315,8 @@ import SwiftUI
         do {
             let bytes = try await persistence.cleanTemporaryFiles()
             if let p = project {projectBytes = await persistence.bytes(p)}
-            message = "הניקוי הסתיים. פונו " + ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-        } catch {message = "הניקוי לא הושלם: " + error.localizedDescription}
+            message = NSLocalizedString("הניקוי הסתיים. פונו ", comment: "Cleanup finished prefix") + ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        } catch {message = NSLocalizedString("הניקוי לא הושלם: ", comment: "Cleanup failure prefix") + error.localizedDescription}
         setBusy(false)
     }
     func saveToPhotos(_ file: URL) async {

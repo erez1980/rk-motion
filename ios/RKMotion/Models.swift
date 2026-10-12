@@ -57,4 +57,9 @@ struct LocalProject: Codable, Identifiable {
     var music: [LocalMusic] = []
     var exports: [LocalExport] = []
 }
-struct AppError: LocalizedError {let message: String; var errorDescription: String? {message}}
+struct AppError: LocalizedError {
+    let message: String
+    // Engine failures are thrown as Hebrew source text; the catalog turns them
+    // into the reader's language, and an assembled message passes through.
+    var errorDescription: String? {NSLocalizedString(message, comment: "Engine failure shown to the rider")}
+}

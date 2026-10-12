@@ -324,7 +324,7 @@ actor LocalEngine {
         catch {check.problems.append(error.localizedDescription)}
         guard valid else {
             let detail = check.problems.isEmpty ? "סיבה לא ידועה" : check.problems.joined(separator: " · ")
-            throw AppError(message: "הרכבת הסרט נכשלה: " + detail)
+            throw AppError(message: NSLocalizedString("הרכבת הסרט נכשלה: ", comment: "Composition failure prefix") + detail)
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
