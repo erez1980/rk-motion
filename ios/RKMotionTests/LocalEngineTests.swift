@@ -79,6 +79,11 @@ final class LocalEngineTests: XCTestCase {
             XCTFail("export threw \(type(of: error)): \(error) · test task cancelled: \(Task.isCancelled) · output written: \(FileManager.default.fileExists(atPath: output.path))")
             throw error
         }
+        let preview = try await engine.preview(project, edit: edit)
+        let previewDuration = try await preview.asset.load(.duration).seconds
+        XCTAssertEqual(previewDuration, expected, accuracy: 0.1)
+        XCTAssertEqual(preview.videoComposition?.renderSize, CGSize(width: 134, height: 240))
+        XCTAssertNotNil(preview.audioMix)
         let result = AVURLAsset(url: output)
         let actual = try await result.load(.duration).seconds
         XCTAssertEqual(actual, expected, accuracy: 0.1)

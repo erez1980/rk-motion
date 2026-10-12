@@ -25,28 +25,28 @@ authorized. No Apple credentials are currently available.
 ## Priority queue and findings
 
 ### P0: submission blockers (in progress)
-- [ ] Select Xcode 26+ explicitly and assert SDK/toolchain requirements.
-- [ ] Add bundled PrivacyInfo.xcprivacy for UserDefaults and disk-space APIs.
-- [ ] Provide an opaque 1024px primary icon without changing desktop imagery.
-- [ ] Add signed distribution archive/export + validation instructions; retain
+- [x] Select Xcode 26+ explicitly and assert SDK/toolchain requirements.
+- [x] Add bundled PrivacyInfo.xcprivacy for UserDefaults and disk-space APIs.
+- [x] Provide an opaque 1024px primary icon without changing desktop imagery.
+- [x] Add signed distribution archive/export + validation instructions; retain
       unsigned IPA for personal testing. Never commit credentials.
-- [ ] In-app privacy/support screen and publishable privacy policy page.
+- [x] In-app privacy/support screen and publishable privacy policy page.
       Public hosting URL and support contact require owner configuration.
 
 ### P1: reliability and editing
-- [ ] Move debounced persistence off MainActor and flush before state changes.
+- [x] Move debounced persistence off MainActor and flush before state changes.
       Do not silently continue import/export after failed persistence.
-- [ ] Make whole-video mode apply to an already analyzed project with undo.
-- [ ] Preview the actual composition before export; preserve exact export math.
+- [x] Make whole-video mode apply to an already analyzed project with undo.
+- [x] Preview the actual composition before export; preserve exact export math.
 - [ ] Add per-export deletion, storage information, orphan cleanup.
 - [ ] Register background grace before work begins; continued processing on
       iOS 26 requires GPU capability/signing and physical validation.
 
 ### P2: performance, clarity and tests
-- [ ] Reuse bounded frame generator; measure before claiming speedups.
-- [ ] Merge padded activity overlaps and default to chronological order.
-- [ ] Load source audio metadata once, not inside every clip iteration.
-- [ ] Clarify resolution-only original option and actual SDR/30fps output.
+- [x] Reuse bounded frame generator; measure before claiming speedups.
+- [x] Merge padded activity overlaps and default to chronological order.
+- [x] Load source audio metadata once, not inside every clip iteration.
+- [x] Clarify resolution-only original option and actual SDR/30fps output.
 - [ ] Split navigation into projects/editor/settings; improve trimming/preview.
 - [ ] Localization/accessibility and actionable permission/error messages.
 - [ ] Add focused native tests for new behavior; export CI logs/xcresult on failure.
@@ -69,3 +69,16 @@ authorized. No Apple credentials are currently available.
 - 2026-10-12: baseline reviewed; no implementation changes yet. Submission
   blockers confirmed: outdated SDK, missing manifest, RGBA transparent icon,
   unsigned-only distribution. Native CI passing on baseline.
+
+- 2026-10-12 checkpoint 1: PR #2 created at https://github.com/erez1980/rk-motion/pull/2.
+  Remote P0 commit c9c28c39f852154d73703e7dc23dfc2e06abf279. CI run
+  38206222424 compiled successfully with Xcode 26.3; simulator tests running.
+  `scripts/check-ios-store.py`, shell syntax and diff checks passed locally.
+  Public privacy link targets main and becomes live only after merge.
+- Checkpoint 2 (native CI pending): ProjectPersistence serial actor + revision
+  guards, debounced saves, split scores.json with legacy read compatibility,
+  explicit flush gates, whole-video application/undo, per-export deletion/storage
+  display, shared composition for preview/export, chronological merged activity
+  windows, reused image generator and local-only performance logging. Added
+  native regression tests. Signed export/account/physical checks remain unrun.
+  Full iOS 26 background continued-processing is NOT implemented yet.

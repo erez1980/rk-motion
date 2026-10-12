@@ -24,19 +24,34 @@ enum LocalStore {
     }
     static func folder(_ id: String) -> URL {root.appendingPathComponent(id, isDirectory: true)}
     static func file(_ name: String, project: String) -> URL {folder(project).appendingPathComponent(name)}
-    static func save(_ project: LocalProject) throws {
+    static func save(_ project: LocalProject, writeScores: Bool = true) throws {
         try FileManager.default.createDirectory(at: folder(project.id), withIntermediateDirectories: true)
-        try JSONEncoder().encode(project).write(to: file("project.json", project: project.id), options: .atomic)
+        // Analysis data is immutable between scans; don't rewrite it on every trim.
+        if writeScores {
+            try JSONEncoder().encode(project.scores).write(to: file("scores.json", project: project.id), options: .atomic)
+        }
+        var metadata = project; metadata.scores = []
+        try JSONEncoder().encode(metadata).write(to: file("project.json", project: project.id), options: .atomic)
     }
     static func load() -> [LocalProject] {
         let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         return folders.compactMap {url in
             guard let data = try? Data(contentsOf: url.appendingPathComponent("project.json")),
-                  let p = try? JSONDecoder().decode(LocalProject.self, from: data),
+                  var p = try? JSONDecoder().decode(LocalProject.self, from: data),
                   UUID(uuidString: p.id) != nil, p.source == URL(fileURLWithPath: p.source).lastPathComponent,
                   FileManager.default.fileExists(atPath: file(p.source, project: p.id).path) else {return nil}
+            if let scoreData = try? Data(contentsOf: url.appendingPathComponent("scores.json")),
+               let scores = try? JSONDecoder().decode([Double].self, from: scoreData) {p.scores = scores}
             return p
         }.sorted {$0.created > $1.created}
+    }
+    static func bytes(in folder: URL) -> Int64 {
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey]
+        guard let items = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: Array(keys)) else {return 0}
+        return items.compactMap {$0 as? URL}.reduce(Int64(0)) {sum, url in
+            guard let value = try? url.resourceValues(forKeys: keys), value.isRegularFile == true else {return sum}
+            return sum + Int64(value.fileSize ?? 0)
+        }
     }
     static func checkSpace(at source: URL) throws {
         let bytes = Int64(try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)

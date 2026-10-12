@@ -24,6 +24,10 @@ struct EditorView: View {
                 }
                 Section("בחירת סרטון") {
                     Toggle("הסרטון כבר ערוך — להשאיר אותו שלם", isOn: $model.wholeVideo)
+                    if model.project?.analyzed == true {
+                        Button("החלת מצב הבחירה על הפרויקט") {model.applyWholeVideo()}
+                        Text("הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי.").font(.caption)
+                    }
                     PhotosPicker(selection: $selectedVideo, matching: .videos, preferredItemEncoding: .current) {Label("בחירה מתמונות", systemImage: "photo.on.rectangle")}
                     Button("בחירת סרטון מקבצים") {importingMusic = false; showImporter = true}
                 }.disabled(model.busy || selectedVideo != nil)
@@ -38,6 +42,11 @@ struct EditorView: View {
                     Section("תצוגה מקדימה") {
                         if let player {VideoPlayer(player: player).frame(height: 220)}
                         Button("ניגון המקור") {player = model.sourceURL.map(AVPlayer.init(url:))}
+                        if project.analyzed {
+                            Button("תצוגה מקדימה של העריכה") {model.preview()}
+                                .disabled(model.busy || model.edit.clips.allSatisfy {$0.selected == false})
+                            Text("התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ.").font(.caption)
+                        }
                         if project.duration > 0 {Text("משך המקור: \(Int(project.duration)) שניות").font(.caption)}
                         if !project.analyzed {Button("ניתוח הסרטון באייפון") {model.analyze()}.disabled(model.busy)}
                     }
@@ -66,6 +75,9 @@ struct EditorView: View {
                                 Button("סרט מ־" + result.created.formatted(date: .abbreviated, time: .shortened)) {
                                     model.movieURL = LocalStore.file(result.file, project: project.id)
                                     player = AVPlayer(url: model.movieURL!)
+                                }.swipeActions {
+                                    Button("מחיקת הסרט", role: .destructive) {player?.pause(); Task {await model.deleteExport(result)}}
+                                        .disabled(model.busy)
                                 }
                             }
                         }
@@ -77,12 +89,16 @@ struct EditorView: View {
                             Button("ניגון הסרט הערוך") {player = AVPlayer(url: movie)}
                         }
                     }
+                    Section("אחסון מקומי") {
+                        Text("נפח הפרויקט: " + ByteCountFormatter.string(fromByteCount: model.projectBytes, countStyle: .file))
+                        Text("מחיקת סרט שנוצר אינה מוחקת את המקור או את העריכה. עותקים שנשמרו בתמונות אינם נמחקים.").font(.caption)
+                    }
                     Section {Button("מחיקת הפרויקט מהאייפון", role: .destructive) {confirmDelete = true}.disabled(model.busy)}
                 }
                 if !model.projects.isEmpty {
                     Section("פרויקטים שמורים באייפון") {
                         ForEach(model.projects) {project in
-                            Button {model.open(project)} label: {
+                            Button {Task {await model.open(project)}} label: {
                                 VStack(alignment: .leading) {
                                     Text(project.name).lineLimit(1)
                                     Text(project.created.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
@@ -91,7 +107,12 @@ struct EditorView: View {
                         }
                     }
                 }
-                if !model.message.isEmpty && !model.busy {Section {Text(model.message).font(.footnote).textSelection(.enabled)}}
+                if !model.message.isEmpty && !model.busy {
+                    Section {
+                        Text(model.message).font(.footnote).textSelection(.enabled)
+                        if model.saveFailed {Button("ניסיון חוזר לשמירת הפרויקט") {Task {_ = await model.save()}}}
+                    }
+                }
             }
             .navigationTitle("RK Motion")
             .toolbar {
@@ -99,8 +120,12 @@ struct EditorView: View {
                 NavigationLink {AboutView()} label: {Label("עזרה", systemImage: "questionmark.circle")}
             }
             .tint(Color(red: 0.20, green: 0.69, blue: 0.47))
-            .task {model.restore()}
+            .task {await model.restore()}
             .onChange(of: model.edit) {previous, _ in model.changed(from: previous)}
+            .onChange(of: model.previewItem) {_, item in
+                if let item {player = AVPlayer(playerItem: item)}
+                else if player?.currentItem?.asset is AVComposition {player?.pause(); player = model.sourceURL.map(AVPlayer.init(url:))}
+            }
             .onChange(of: model.project?.id) {_, _ in player = model.sourceURL.map(AVPlayer.init(url:))}
             .onChange(of: selectedVideo) {_, item in
                 guard let item else {return}
@@ -125,7 +150,7 @@ struct EditorView: View {
                 }
             }
             .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("מחיקה", role: .destructive) {model.reset()}
+                Button("מחיקה", role: .destructive) {player?.pause(); player = nil; Task {await model.reset()}}
             }
         }
     }
@@ -142,8 +167,8 @@ struct EditorView: View {
                     }.font(.footnote)
                     if let score = clip.score {Text("ציון פעילות: \(Int(score * 100))%").font(.caption).foregroundStyle(.secondary)}
                 }.disabled(model.busy)
-            }.onMove {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}
-             .onDelete {model.edit.clips.remove(atOffsets: $0)}
+            }.onMove {if !model.busy {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}}
+             .onDelete {if !model.busy {model.edit.clips.remove(atOffsets: $0)}}
             Button("הוספת קטע ידני") {
                 let playhead = player?.currentTime().seconds ?? 0
                 let start = min(playhead.isFinite ? max(0, playhead) : 0, max(0, (model.project?.duration ?? 0) - 1))
@@ -158,8 +183,9 @@ struct EditorView: View {
     private var optionsSection: some View {
         Section("אפשרויות ייצוא") {
             Picker("איכות מרבית", selection: setting("quality", fallback: "1080")) {
-                Text("1080p").tag("1080"); Text("720p").tag("720"); Text("מקור").tag("original"); Text("WhatsApp").tag("whatsapp")
+                Text("1080p").tag("1080"); Text("720p").tag("720"); Text("רזולוציית מקור").tag("original"); Text("WhatsApp").tag("whatsapp")
             }
+            Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(.caption).foregroundStyle(.secondary)
             Picker("מסגרת", selection: setting("aspect", fallback: "source")) {Text("מקור").tag("source"); Text("סטורי 9:16").tag("9:16")}
             Picker("מהירות", selection: setting("speed", fallback: "1")) {ForEach(["1", "1.25", "1.5", "2"], id: \.self) {Text($0 + "×").tag($0)}}
             Picker("מעבר", selection: setting("transition", fallback: "cut")) {
@@ -171,7 +197,7 @@ struct EditorView: View {
             if let songs = model.project?.music, !songs.isEmpty {
                 Toggle("שימוש במוזיקה", isOn: Binding(get: {model.edit.settings["useMusic"]?.bool ?? true}, set: {model.edit.settings["useMusic"] = .flag($0)}))
                 ForEach(songs) {song in
-                    HStack {Text(song.name).font(.caption); Spacer(); Button("הסרה") {model.removeMusic(song.id)}}
+                    HStack {Text(song.name).font(.caption); Spacer(); Button("הסרה") {Task {await model.removeMusic(song.id)}}}
                 }
                 TextField("התחלה במוזיקה — שניות", text: setting("musicStart", fallback: "0")).keyboardType(.decimalPad)
                 Picker("עוצמת מוזיקה", selection: setting("musicVolume", fallback: "0.65")) {Text("רקע").tag("0.35"); Text("מאוזן").tag("0.65"); Text("חזק").tag("1")}
