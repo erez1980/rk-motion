@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PhotosUI
 import AVKit
 import UniformTypeIdentifiers
@@ -14,13 +15,15 @@ struct EditorView: View {
     @State private var importingMusic = false
     @State private var confirmDelete = false
     @State private var player: AVPlayer?
+    private struct TrimSelection: Identifiable {let id: String}
+    @State private var trimming: TrimSelection?
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     Text("מהרכיבה לרגעים הטובים").font(.title2.bold())
                     Text("ניתוח, עריכה וייצוא — הכול באייפון שלכם.").foregroundStyle(.secondary)
-                    Text("לסרטונים ארוכים השאירו את האפליקציה פתוחה בזמן העיבוד.").font(.caption).foregroundStyle(.secondary)
+                    Text(model.backgroundDescription).font(.caption).foregroundStyle(.secondary)
                 }
                 Section("בחירת סרטון") {
                     Toggle("הסרטון כבר ערוך — להשאיר אותו שלם", isOn: $model.wholeVideo)
@@ -61,6 +64,7 @@ struct EditorView: View {
                         clipsSection
                         optionsSection
                         Section {
+                            Text(model.exportSummary).font(.caption).foregroundStyle(.secondary)
                             Button {model.exportMovie()} label: {Label("ייצוא הסרט באייפון", systemImage: "film.stack")}
                                 .disabled(model.busy || model.edit.clips.isEmpty || model.edit.clips.allSatisfy {$0.selected == false})
                             HStack {
@@ -91,21 +95,10 @@ struct EditorView: View {
                     }
                     Section("אחסון מקומי") {
                         Text("נפח הפרויקט: " + ByteCountFormatter.string(fromByteCount: model.projectBytes, countStyle: .file))
+                        Button("ניקוי קבצים זמניים שנותרו") {Task {await model.cleanTemporaryFiles()}}.disabled(model.busy)
                         Text("מחיקת סרט שנוצר אינה מוחקת את המקור או את העריכה. עותקים שנשמרו בתמונות אינם נמחקים.").font(.caption)
                     }
                     Section {Button("מחיקת הפרויקט מהאייפון", role: .destructive) {confirmDelete = true}.disabled(model.busy)}
-                }
-                if !model.projects.isEmpty {
-                    Section("פרויקטים שמורים באייפון") {
-                        ForEach(model.projects) {project in
-                            Button {Task {await model.open(project)}} label: {
-                                VStack(alignment: .leading) {
-                                    Text(project.name).lineLimit(1)
-                                    Text(project.created.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.disabled(model.busy)
-                        }
-                    }
                 }
                 if !model.message.isEmpty && !model.busy {
                     Section {
@@ -117,7 +110,11 @@ struct EditorView: View {
             .navigationTitle("RK Motion")
             .toolbar {
                 if model.project?.analyzed == true {EditButton().disabled(model.busy)}
+                NavigationLink {ProjectLibraryView(model: model)} label: {Label("פרויקטים", systemImage: "square.grid.2x2")}
                 NavigationLink {AboutView()} label: {Label("עזרה", systemImage: "questionmark.circle")}
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("סיום") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
             }
             .tint(Color(red: 0.20, green: 0.69, blue: 0.47))
             .task {await model.restore()}
@@ -149,6 +146,12 @@ struct EditorView: View {
                 case .failure(let error): model.message = error.localizedDescription
                 }
             }
+            .sheet(item: $trimming) {selection in
+                if let index = model.edit.clips.firstIndex(where: {$0.id == selection.id}),
+                   let source = model.sourceURL, let duration = model.project?.duration, duration > 0.01 {
+                    ClipTrimView(clip: $model.edit.clips[index], source: source, duration: duration)
+                }
+            }
             .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) {player?.pause(); player = nil; Task {await model.reset()}}
             }
@@ -159,18 +162,25 @@ struct EditorView: View {
             ForEach($model.edit.clips) {$clip in
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("קטע \(Int(clip.start.isFinite ? clip.start : 0))–\(Int(clip.end.isFinite ? clip.end : 0)) שניות", isOn: Binding(get: {clip.selected != false}, set: {clip.selected = $0}))
-                    HStack {
+                    if (model.project?.duration ?? 0) > 0.01 {
+                        Button("תצוגה וחיתוך הקטע") {trimming = TrimSelection(id: clip.id)}
+                            .accessibilityLabel("תצוגה וחיתוך קטע שמתחיל ב־\(Int(clip.start.isFinite ? clip.start : 0)) שניות")
+                    }
+                    DisclosureGroup("הזנת זמנים מדויקת") {
+                      HStack {
                         Text("התחלה")
                         TextField("שניות", value: $clip.start, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
                         Text("סיום")
                         TextField("שניות", value: $clip.end, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
-                    }.font(.footnote)
+                      }.font(.footnote)
+                    }
                     if let score = clip.score {Text("ציון פעילות: \(Int(score * 100))%").font(.caption).foregroundStyle(.secondary)}
                 }.disabled(model.busy)
             }.onMove {if !model.busy {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}}
              .onDelete {if !model.busy {model.edit.clips.remove(atOffsets: $0)}}
             Button("הוספת קטע ידני") {
-                let playhead = player?.currentTime().seconds ?? 0
+                // Edited-preview time is not a timestamp in the original.
+                let playhead = player?.currentItem?.asset is AVComposition ? 0 : (player?.currentTime().seconds ?? 0)
                 let start = min(playhead.isFinite ? max(0, playhead) : 0, max(0, (model.project?.duration ?? 0) - 1))
                 var clip = Clip(start: max(0, start), end: min(model.project?.duration ?? 0, start + 5)); clip.manual = true
                 model.edit.clips.append(clip)

@@ -4,13 +4,15 @@ import Foundation
 /// debounce task from overwriting a later explicit flush.
 actor ProjectPersistence {
     private var revisions: [String: Int] = [:]
+    private var scoreFiles: [String: String] = [:]
     private var scores: [String: [Double]] = [:]
     func load() -> [LocalProject] {LocalStore.load()}
     func save(_ project: LocalProject, revision: Int) throws {
         try Task.checkCancellation()
         guard revision >= revisions[project.id, default: -1] else {return}
         let writeScores = scores[project.id] != project.scores
-        try LocalStore.save(project, writeScores: writeScores)
+        let scoreFile = try LocalStore.save(project, writeScores: writeScores, scoresFile: scoreFiles[project.id])
+        scoreFiles[project.id] = scoreFile
         scores[project.id] = project.scores
         revisions[project.id] = revision
     }
@@ -21,7 +23,8 @@ actor ProjectPersistence {
     }
     func deleteProject(_ id: String) throws {
         try FileManager.default.removeItem(at: LocalStore.folder(id))
-        revisions.removeValue(forKey: id); scores.removeValue(forKey: id)
+        revisions.removeValue(forKey: id); scores.removeValue(forKey: id); scoreFiles.removeValue(forKey: id)
     }
+    func cleanTemporaryFiles() throws -> Int64 {try LocalStore.cleanTemporaryFiles()}
     func bytes(_ project: LocalProject) -> Int64 {LocalStore.bytes(in: LocalStore.folder(project.id))}
 }

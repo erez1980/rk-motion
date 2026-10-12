@@ -50,6 +50,7 @@ struct LocalProject: Codable, Identifiable {
     var source: String
     var duration: Double = 0
     var scores: [Double] = []
+    var scoresFile: String?
     var analyzed = false
     var wholeVideo = false
     var edit = Edit(clips: [])

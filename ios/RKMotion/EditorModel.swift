@@ -18,11 +18,32 @@ import UIKit
     @Published var redoAvailable = false
     @Published var previewItem: AVPlayerItem?
     @Published var projectBytes: Int64 = 0
+    @Published var sourceDimensions: CGSize = .zero
+    var exportSummary: String {
+        let selected = edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}
+        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let fade = edit.settings["transition"]?.string == "dissolve" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        guard !selected.isEmpty, speed > 0 else {return "בחרו קטעים לייצוא"}
+        let duration = LocalEngine.timeline(clips: selected, speed: speed, transition: fade).last?.end ?? 0
+        let quality = edit.settings["quality"]?.string ?? "1080"
+        let cap: Double? = quality == "original" ? nil : ["720", "whatsapp"].contains(quality) ? 720 : 1080
+        let size = LocalEngine.frame(source: sourceDimensions, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
+        let dimensions = sourceDimensions.width > 0 ? " · \(Int(size.width))×\(Int(size.height))" : ""
+        return String(format: "תוצאה צפויה: %.1f שניות", duration) + dimensions + " · SDR · 30fps"
+    }
     @Published var saveFailed = false
     private let persistence = ProjectPersistence()
     private var saveTask: Task<Void, Never>?
     private var revision = 0
     private let engine = LocalEngine()
+    private let continued = ContinuedProcessing.shared
+    private var processingSucceeded = false
+    var backgroundDescription: String {
+        continued.enabled ? "עיבוד ברקע זמין בגרסה זו. iOS עשויה לעצור את הפעולה אם חסרים משאבים." : "לפעולות ארוכות השאירו את האפליקציה פתוחה; גרסה זו משתמשת בזמן רקע מוגבל."
+    }
+    private func launchProcessing(title: String, _ launch: @escaping () -> Void) {
+        if !continued.start(title: title, launch: {[weak self] in self?.endBackground(); launch()}, expire: {[weak self] in self?.operation?.cancel()}) {launch()}
+    }
     private var operation: Task<Void, Never>?
     private var suppressedEdit: Edit?
     private var undoStack: [Edit] = [], redoStack: [Edit] = []
@@ -44,6 +65,7 @@ import UIKit
         undoStack = []; redoStack = []; updateUndo()
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
+        sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(value.source, project: value.id))) ?? .zero
         previewItem = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
@@ -86,12 +108,13 @@ import UIKit
     private func refreshLibrary(_ p: LocalProject) {projects.removeAll {$0.id == p.id}; projects.insert(p, at: 0)}
     private func setBusy(_ value: Bool) {
         busy = value; UIApplication.shared.isIdleTimerDisabled = value
+        if value {processingSucceeded = false}
         if value && backgroundID == .invalid {
             backgroundID = UIApplication.shared.beginBackgroundTask(withName: "Finish local processing") {[weak self] in
                 self?.operation?.cancel(); self?.endBackground()
             }
         }
-        if !value {operation = nil; endBackground()}
+        if !value {continued.complete(success: processingSucceeded); operation = nil; endBackground()}
     }
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
@@ -106,6 +129,7 @@ import UIKit
             revision += 1; try await persistence.save(p, revision: revision); project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
             undoStack = []; redoStack = []; updateUndo(); refreshLibrary(p)
             UserDefaults.standard.set(p.id, forKey: "localProject")
+            sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
             previewItem = nil; projectBytes = await persistence.bytes(p)
             setBusy(false); analyze()
         } catch {setBusy(false); message = error.localizedDescription; try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
@@ -115,7 +139,8 @@ import UIKit
         p.wholeVideo = wholeVideo; project = p
         setBusy(true); percent = 0; message = "מנתחת באייפון…"
         let whole = wholeVideo
-        operation = Task {
+        launchProcessing(title: "ניתוח סרטון רכיבה") { [self] in
+          operation = Task {
             guard await save() else {setBusy(false); return}
             do {
                 let (duration, scores, clips) = try await engine.analyze(LocalStore.file(p.source, project: p.id), whole: whole) {[weak self] fraction, text in
@@ -125,13 +150,14 @@ import UIKit
                 guard var current = project, current.id == p.id else {return}
                 current.duration = duration; current.scores = scores; current.analyzed = true
                 project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewItem = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
-                if await save() {message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
+                if await save() {processingSucceeded = true; message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
             setBusy(false)
+          }
         }
     }
-    private func progress(_ fraction: Double, _ text: String) {percent = fraction * 100; message = text}
+    private func progress(_ fraction: Double, _ text: String) {percent = fraction * 100; message = text; continued.update(fraction, subtitle: text)}
     func retune() {
         guard let p = project, !busy else {return}
         let previous = edit
@@ -178,23 +204,25 @@ import UIKit
         let snapshot = edit
         setBusy(true); percent = 0; message = "מייצאת באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
-        operation = Task {
+        launchProcessing(title: "ייצוא סרטון רכיבה") { [self] in
+          operation = Task {
             guard await save() else {setBusy(false); return}
             do {
                 let duration = try await engine.export(p, edit: snapshot, output: output) {[weak self] fraction, text in await self?.progress(fraction, text)}
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
                 current.exports.append(LocalExport(file: file, duration: duration)); project = current; movieURL = output
-                if await save() {projectBytes = await persistence.bytes(current); message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"}
+                if await save() {processingSucceeded = true; projectBytes = await persistence.bytes(current); message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"}
             } catch is CancellationError {try? FileManager.default.removeItem(at: output); message = "הייצוא בוטל. העריכה נשמרה."}
             catch {try? FileManager.default.removeItem(at: output); message = error.localizedDescription}
             setBusy(false)
+          }
         }
     }
     func cancel() {operation?.cancel()}
     func pause() {
         scheduleSave(immediate: true)
-        if busy && backgroundID == .invalid {
+        if busy && !continued.hasActiveTask && backgroundID == .invalid {
             backgroundID = UIApplication.shared.beginBackgroundTask(withName: "Finish local processing") {[weak self] in
                 self?.operation?.cancel(); self?.endBackground()
             }
@@ -238,13 +266,26 @@ import UIKit
     func preview() {
         guard !busy, let p = project, p.analyzed else {return}
         let snapshot = edit; setBusy(true); percent = 0
-        operation = Task {
+        launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
+          operation = Task {
             guard await save() else {setBusy(false); return}
-            do {previewItem = try await engine.preview(p, edit: snapshot); message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
+            do {previewItem = try await engine.preview(p, edit: snapshot); processingSucceeded = true; message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
             catch is CancellationError {message = "התצוגה המקדימה בוטלה"}
             catch {message = error.localizedDescription}
             setBusy(false)
+          }
         }
+    }
+    func cleanTemporaryFiles() async {
+        guard !busy else {return}
+        setBusy(true)
+        guard await save() else {setBusy(false); return}
+        do {
+            let bytes = try await persistence.cleanTemporaryFiles()
+            if let p = project {projectBytes = await persistence.bytes(p)}
+            message = "הניקוי הסתיים. פונו " + ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        } catch {message = "הניקוי לא הושלם: " + error.localizedDescription}
+        setBusy(false)
     }
     func saveToPhotos(_ file: URL) async {
         let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)

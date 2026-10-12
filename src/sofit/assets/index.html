@@ -1592,7 +1592,7 @@ function render() {
   [...timeline.querySelectorAll('i')].forEach(m => m.remove());
   if (!report.clips.length) {
     clipsEl.innerHTML = '<div class="empty">לא נמצאו קטעי אקשן ברורים. נסו סרטון אחר או הגדרת אורך אחרת.</div>';
-    queueSave();
+    queueEditSave();
     return updateSummary();
   }
   report.clips.forEach((c, i) => {

@@ -41,6 +41,12 @@ actor LocalEngine {
             return stride(from: start, to: end, by: 30).map {Clip(start: $0, end: min(end, $0 + 30), score: score)}
         }.sorted {$0.start < $1.start}
     }
+    func sourceDimensions(_ source: URL) async throws -> CGSize {
+        guard let video = try await AVURLAsset(url: source).loadTracks(withMediaType: .video).first else {return .zero}
+        let natural = try await video.load(.naturalSize), preferred = try await video.load(.preferredTransform)
+        let bounds = CGRect(origin: .zero, size: natural).applying(preferred)
+        return CGSize(width: abs(bounds.width), height: abs(bounds.height))
+    }
     func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> (Double, [Double], [Clip]) {
         try Task.checkCancellation()
         let asset = AVURLAsset(url: source)

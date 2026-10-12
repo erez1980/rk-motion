@@ -59,7 +59,7 @@ for kind in ("Debug", "Release"):
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
         SUPPORTS_MACCATALYST = NO; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-        SWIFT_EMIT_LOC_STRINGS = YES;'''
+        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;'''
     settings += 'SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ENABLE_TESTABILITY = YES;' if kind == "Debug" else 'SWIFT_OPTIMIZATION_LEVEL = "-O";'
     add("target-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{{settings}}};')
 for prefix in ("project", "target"):

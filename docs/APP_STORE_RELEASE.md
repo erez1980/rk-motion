@@ -55,3 +55,17 @@ Actual validation/signing has not been performed without the owner account.
 
 The project generator can rewrite personal Xcode signing settings. Use the
 environment overrides above for repeatable builds, and review generated diffs.
+
+## Optional iOS 26 continued background processing
+
+The integration is implemented but disabled by default, including unsigned
+IPAs, because GPU access needs a matching signed profile and device support.
+To enable it on a paid distribution build, add Background GPU Access to the
+registered app ID/profile and set `RK_ENABLE_BACKGROUND_GPU=1` before running
+`build-ios.sh store`. The script then includes BackgroundGPU.entitlements and
+the runtime feature flag. iOS 26+ and `supportedResources.contains(.gpu)` are
+also required. Denied scheduler requests fall back to foreground processing.
+The continuous task reports progress and handles expiration/cancellation.
+It does not implement checkpointed export resumption. Verify it on the target
+iPhone with locking, app switching and user/system cancellation before claiming
+background support in Store metadata. No signature/profile was available here.

@@ -41,7 +41,11 @@ case "$rk_mode" in
     : "${RK_BUILD_NUMBER:?Set RK_BUILD_NUMBER to a new positive integer for each upload}"
     case "$RK_BUILD_NUMBER" in ''|*[!0-9]*) echo 'RK_BUILD_NUMBER must be a positive integer' >&2; exit 2 ;; esac
     test "$RK_BUILD_NUMBER" -gt 0
-    xcodebuild "${rk_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' \
+    rk_background_args=()
+    if [ "${RK_ENABLE_BACKGROUND_GPU:-0}" = 1 ]; then
+      rk_background_args=(CODE_SIGN_ENTITLEMENTS="$rk_root/ios/RKMotion/BackgroundGPU.entitlements" RK_BACKGROUND_GPU_ENABLED=YES)
+    fi
+    xcodebuild "${rk_args[@]}" "${rk_background_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' \
       -archivePath "$rk_output/RKMotion-Store.xcarchive" -allowProvisioningUpdates \
       DEVELOPMENT_TEAM="$RK_DEVELOPMENT_TEAM" PRODUCT_BUNDLE_IDENTIFIER="$RK_BUNDLE_ID" \
       CURRENT_PROJECT_VERSION="$RK_BUILD_NUMBER" archive

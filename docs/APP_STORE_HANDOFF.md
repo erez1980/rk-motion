@@ -38,8 +38,8 @@ authorized. No Apple credentials are currently available.
       Do not silently continue import/export after failed persistence.
 - [x] Make whole-video mode apply to an already analyzed project with undo.
 - [x] Preview the actual composition before export; preserve exact export math.
-- [ ] Add per-export deletion, storage information, orphan cleanup.
-- [ ] Register background grace before work begins; continued processing on
+- [x] Add per-export deletion, storage information, orphan cleanup.
+- [x] Register background grace before work begins; continued processing on
       iOS 26 requires GPU capability/signing and physical validation.
 
 ### P2: performance, clarity and tests
@@ -47,14 +47,14 @@ authorized. No Apple credentials are currently available.
 - [x] Merge padded activity overlaps and default to chronological order.
 - [x] Load source audio metadata once, not inside every clip iteration.
 - [x] Clarify resolution-only original option and actual SDR/30fps output.
-- [ ] Split navigation into projects/editor/settings; improve trimming/preview.
+- [x] Split navigation into projects/editor/settings; improve trimming/preview.
 - [ ] Localization/accessibility and actionable permission/error messages.
 - [ ] Add focused native tests for new behavior; export CI logs/xcresult on failure.
 - [ ] Track real on-device HEVC/HDR/long-clip/storage/background validation.
 
 ### Desktop-only review findings (lower priority)
-- [ ] Empty analysis calls undefined queueSave instead of queueEditSave.
-- [ ] Disk reservations race across projects (per-project lock is insufficient).
+- [x] Empty analysis calls undefined queueSave instead of queueEditSave.
+- [x] Disk reservations race across projects (per-project lock is insufficient).
 
 ## Resume procedure
 
@@ -81,4 +81,16 @@ authorized. No Apple credentials are currently available.
   display, shared composition for preview/export, chronological merged activity
   windows, reused image generator and local-only performance logging. Added
   native regression tests. Signed export/account/physical checks remain unrun.
-  Full iOS 26 background continued-processing is NOT implemented yet.
+  iOS 26 background integration is added in the next checkpoint; disabled by default until signed GPU capability/device validation.
+
+- Checkpoint 3 (native CI pending): project library with thumbnails, visual
+  trim sheet + clip playback, keyboard dismissal, output duration/dimensions,
+  explicit temporary cleanup and immutable score-file references (atomic
+  metadata commit; legacy scores/inline scores remain readable).
+  iOS 26 continuous-task integration reports progress/expiration, starts work
+  through the scheduler handler and requests GPU only for opt-in paid signed
+  builds. Unsigned/default builds use limited foreground grace. See release
+  guide for capability/profile/flag setup. Device validation remains essential.
+  Desktop empty-analysis typo and cross-project upload reservation race fixed.
+  Checkpoint 2 CI 38206639216 PASSED native compile/tests/device IPA; Python
+  CI 38206639230 PASSED. No performance speedup or physical testing claimed.
