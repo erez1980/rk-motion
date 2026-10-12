@@ -1,6 +1,6 @@
 # RK Motion: standalone iPhone editor
 
-Version 0.14.0 requires iOS 17+. All video analysis, timeline editing, audio
+Version 0.15.0 requires iOS 17+. All video analysis, timeline editing, audio
 mixing, and movie export run on the iPhone using AVFoundation. No Mac server,
 Wi-Fi connection, pairing, Python, FFmpeg, cloud API, or model key is needed.
 The Mac is used only to sign/install the IPA. Photos stored only in iCloud
@@ -44,12 +44,21 @@ Sources: [Apple signing](https://support.apple.com/guide/security/app-code-signi
 - Export one composition locally to MP4, including framing, speed,
   transitions, music, and closing fade. Save to Photos or share the file.
 
-Keep the app in the foreground for long processing jobs. It prevents
+The 0.15 editor adds a project library, visual clip trimming, composition
+preview with music, revision-guarded autosave, per-export deletion and explicit
+temporary-file cleanup. Activity suggestions are chronological and padded
+windows are merged to avoid repeating footage. Exports display actual dimensions.
+
+Keep default/personal unsigned builds in the foreground for long processing jobs. It prevents
 automatic screen locking while processing, and uses the system's limited
 background grace period if you switch apps. iOS can suspend/terminate long
 work. On background expiration the operation is canceled safely; reopen
 and retry from the saved source/edit. This version does not promise
-unlimited background processing or push notifications.
+unlimited background processing or push notifications. An optional iOS 26
+continuous-task integration is available for paid signed builds with Background
+GPU Access, compatible device support and the explicit build flag. See
+[Store release setup](APP_STORE_RELEASE.md). It remains subject to system
+expiration and requires actual lock/app-switch testing before release.
 
 Exports target SDR BT.709 at 30 fps for compatibility. Native decoders read
 MOV/MP4, supported HEVC, and orientation metadata. Actual Dolby Vision/HDR

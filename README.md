@@ -135,7 +135,7 @@ plain download — the file lands in **Files**, and iOS can share it into
 
 #### Standalone native iPhone app / IPA
 
-The SwiftUI app in [`ios/`](ios/) (v0.14.0, iOS 17+) processes videos entirely
+The SwiftUI app in [`ios/`](ios/) (v0.15.0, iOS 17+) processes videos entirely
 on the iPhone. Native AVFoundation handles activity analysis, clip editing,
 framing, playback speed, dissolves, soundtrack mixing, and MP4 export.
 Projects and original files are saved on the device; no Mac server, pairing,

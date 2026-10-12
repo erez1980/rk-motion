@@ -1,5 +1,19 @@
 # RK Motion App Store readiness — implementation handoff
 
+## Latest verified checkpoint — read first
+
+- Verified source commit: `9a5ece4cc965d5446cbf94e6ad9444209aed7221`.
+- Native workflow **38207915542 PASSED** on Xcode 26.3: simulator build,
+  **9 tests / 0 failures**, arm64 device archive and IPA publication.
+- Python workflow **38207915515 PASSED**; the suite contains **209 tests**.
+- IPA: https://github.com/erez1980/rk-motion/actions/runs/38207915542/artifacts/11728810168
+- PR: https://github.com/erez1980/rk-motion/pull/2 (draft, unmerged).
+- Subsequent checkpoint changes are documentation only; native code is the
+  verified source above. Check diff/CI before deciding another build is needed.
+- Next essential gates: owner Developer account/profile and actual iPhone
+  testing. Code/configuration work is ready for those gates. No credentials,
+  Store upload, on-device benchmark or physical validation was performed.
+
 ## Authorization and invariant
 
 Erez asked on 2026-10-12 to implement the App Store blockers first, then the
@@ -138,3 +152,10 @@ authorized. No Apple credentials are currently available.
   then its device archive was cancelled by the newer commit (not a code failure).
   5303d9a / 38207757193 failed compiling EditorModel because PhotosPickerItem
   needs SwiftUI imported alongside PhotosUI. Added SwiftUI; rerun latest head.
+
+- FINAL verified checkpoint: native 38207915542 passed all stages and published
+  artifact 11728810168. Native log: 9 tests, 0 failures; archive succeeded.
+  Latest Python workflow 38207915515 passed. Final metadata/generator/shell/
+  Python syntax/whitespace checks passed and working tree was clean before
+  this documentation update. Continue with the release/device gates above;
+  do not restart implementation or replay already-fixed failures.
