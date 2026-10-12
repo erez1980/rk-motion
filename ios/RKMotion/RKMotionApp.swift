@@ -13,6 +13,8 @@ struct EditorView: View {
     @State private var selectedVideo: PhotosPickerItem?
     @State private var showImporter = false
     @State private var importingMusic = false
+    @State private var askingYouTube = false
+    @State private var youTubeLink = ""
     @State private var confirmDelete = false
     @State private var player: AVPlayer?
     private struct TrimSelection: Identifiable {let id: String}
@@ -206,6 +208,12 @@ struct EditorView: View {
             Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0)).tag($0)}}
             Toggle("הסרת שמע הרכיבה", isOn: Binding(get: {model.edit.settings["muteOriginal"]?.bool ?? false}, set: {model.edit.settings["muteOriginal"] = .flag($0)}))
             Button("הוספת מוזיקה מקבצים") {importingMusic = true; showImporter = true}
+            Button("הורדת מוזיקה מ־YouTube") {youTubeLink = ""; askingYouTube = true}
+                .alert("הורדת מוזיקה מ־YouTube", isPresented: $askingYouTube) {
+                    TextField("קישור ל־YouTube", text: $youTubeLink).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                    Button("הורדה") {model.importYouTube(youTubeLink)}
+                    Button("ביטול", role: .cancel) {}
+                } message: {Text("הדביקו קישור לסרטון. השמע יורד ישירות לאייפון.")}
             if let songs = model.project?.music, !songs.isEmpty {
                 Toggle("שימוש במוזיקה", isOn: Binding(get: {model.edit.settings["useMusic"]?.bool ?? true}, set: {model.edit.settings["useMusic"] = .flag($0)}))
                 ForEach(songs) {song in

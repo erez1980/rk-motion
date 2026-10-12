@@ -49,6 +49,22 @@
         }
       }
     },
+    "YouTube סירב להוריד את השמע. נסו שוב מאוחר יותר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube refused to download the audio. Try again later."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube סירב להוריד את השמע. נסו שוב מאוחר יותר."
+          }
+        }
+      }
+    },
     "אודות ועזרה": {
       "localizations": {
         "en": {
@@ -337,6 +353,22 @@
         }
       }
     },
+    "ביטול": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול"
+          }
+        }
+      }
+    },
     "ביטול הפעולה": {
       "localizations": {
         "en": {
@@ -433,6 +465,54 @@
         }
       }
     },
+    "הדביקו קישור לסרטון YouTube.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a link to a YouTube video."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הדביקו קישור לסרטון YouTube."
+          }
+        }
+      }
+    },
+    "הדביקו קישור לסרטון. השמע יורד ישירות לאייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a link to a video. The audio downloads straight to your iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הדביקו קישור לסרטון. השמע יורד ישירות לאייפון."
+          }
+        }
+      }
+    },
+    "ההורדה בוטלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The download was cancelled."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההורדה בוטלה."
+          }
+        }
+      }
+    },
     "הוספת מוזיקה מקבצים": {
       "localizations": {
         "en": {
@@ -461,6 +541,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "הוספת קטע ידני"
+          }
+        }
+      }
+    },
+    "הורדה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הורדה"
+          }
+        }
+      }
+    },
+    "הורדת מוזיקה מ־YouTube": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download music from YouTube"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הורדת מוזיקה מ־YouTube"
           }
         }
       }
@@ -1409,6 +1521,38 @@
         }
       }
     },
+    "לא ניתן לשמור את השמע באייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio could not be saved on this iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לשמור את השמע באייפון."
+          }
+        }
+      }
+    },
+    "לא נמצא בסרטון שמע שהאייפון יכול לנגן.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video has no audio this iPhone can play."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נמצא בסרטון שמע שהאייפון יכול לנגן."
+          }
+        }
+      }
+    },
     "למחוק את הפרויקט ואת הקבצים שלו מהאייפון?": {
       "localizations": {
         "en": {
@@ -1533,6 +1677,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "מוסיפה מוזיקה מקומית…"
+          }
+        }
+      }
+    },
+    "מורידה את השמע מ־YouTube…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the audio from YouTube…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מורידה את השמע מ־YouTube…"
           }
         }
       }
@@ -2365,6 +2525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "קטעי הסרט — גררו לשינוי סדר"
+          }
+        }
+      }
+    },
+    "קישור ל־YouTube": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube link"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קישור ל־YouTube"
           }
         }
       }

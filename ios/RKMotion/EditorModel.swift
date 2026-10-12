@@ -216,6 +216,25 @@ import SwiftUI
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
+    /// Downloads a song's audio from a YouTube link, then adds it exactly as a
+    /// song picked from Files would be added.
+    func importYouTube(_ text: String) {
+        guard !busy, project != nil else {return}
+        guard let link = YouTubeMusic.link(in: text) else {message = "הדביקו קישור לסרטון YouTube."; return}
+        setBusy(true); percent = 0; message = "מורידה את השמע מ־YouTube…"
+        operation = Task {
+            do {
+                let file = try await YouTubeMusic.download(link, into: LocalStore.imports) {[weak self] fraction in
+                    await self?.progress(fraction, "מורידה את השמע מ־YouTube…")
+                }
+                setBusy(false)
+                await importMusic(file)
+                return
+            } catch is CancellationError {message = "ההורדה בוטלה."}
+            catch {message = error.localizedDescription}
+            setBusy(false)
+        }
+    }
     func removeMusic(_ id: String) async {
         guard !busy, var p = project, let song = p.music.first(where: {$0.id == id}) else {return}
         p.music.removeAll {$0.id == id}
