@@ -1,4 +1,3 @@
-#if RK_YOUTUBE
 import XCTest
 @testable import RKMotion
 
@@ -27,4 +26,3 @@ final class YouTubeMusicTests: XCTestCase {
         XCTAssertEqual(YouTubeMusic.fileName(for: String(repeating: "א", count: 200)), String(repeating: "א", count: 80) + ".m4a")
     }
 }
-#endif

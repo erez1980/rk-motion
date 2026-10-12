@@ -6,6 +6,3 @@ dist/
 build/
 .venv/
 venv/
-
-# Generated during an App Store build; never committed.
-ios/RKMotion-Store.xcodeproj/

@@ -216,7 +216,6 @@ import SwiftUI
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
-#if RK_YOUTUBE
     /// Downloads a song's audio from a YouTube link, then adds it exactly as a
     /// song picked from Files would be added.
     func importYouTube(_ text: String) {
@@ -236,7 +235,6 @@ import SwiftUI
             setBusy(false)
         }
     }
-#endif
     func removeMusic(_ id: String) async {
         guard !busy, var p = project, let song = p.music.first(where: {$0.id == id}) else {return}
         p.music.removeAll {$0.id == id}

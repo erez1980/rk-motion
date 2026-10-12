@@ -1,10 +1,8 @@
-#if RK_YOUTUBE
 import Foundation
 import YouTubeKit
 
-/// Personal builds only. App Store guideline 5.2.3 bars downloading from
-/// YouTube, so the store build compiles without RK_YOUTUBE and none of this,
-/// nor the package it uses, reaches that binary; CI checks the binary.
+/// Adds a song to a project from a YouTube link. Not for an App Store build:
+/// guideline 5.2.3 bars downloading from YouTube.
 enum YouTubeMusic {
     typealias Progress = @Sendable (Double) async -> Void
 
@@ -68,4 +66,3 @@ enum YouTubeMusic {
         return target
     }
 }
-#endif

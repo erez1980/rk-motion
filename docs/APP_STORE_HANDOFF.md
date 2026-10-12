@@ -21,14 +21,12 @@ review findings from highest to lowest priority, and leave a durable handoff
 so Claude can continue without repeating completed work. The target device
 is iPhone 17 Pro. The app must remain standalone and process media locally.
 Do not introduce a Mac server, cloud processing or account requirement into
-the iPhone app. YouTube music download: Erez decided on 2026-10-12 to allow it
-in personal builds only (Xcode/unsigned/simulator). The code compiles under
-`RK_YOUTUBE`, but turning that off is NOT enough: the package's object files
-and Swift metadata still reached the binary (CI caught it). The store archive
-is therefore built from `ios/RKMotion-Store.xcodeproj`, generated with
-`RK_STORE_PROJECT=1` and holding no package at all; CI builds that project and
-proves its binary has no YouTubeKit. Never let it into the store build:
-guideline 5.2.3 bars it. Do not publish to App Store or buy
+the iPhone app. Erez said on 2026-10-12 that he does not care about the App
+Store, so YouTube music download is simply part of the app. If App Store
+submission is ever revived, remove YouTube first (guideline 5.2.3 bars it),
+and know that a compile condition is not enough: CI showed YouTubeKit's object
+files and Swift metadata stay linked even when no code refers to them, so the
+package itself must leave the project. Do not publish to App Store or buy
 membership without Erez's explicit instruction. A development branch/PR is
 authorized. No Apple credentials are currently available.
 
@@ -146,23 +144,19 @@ authorized. No Apple credentials are currently available.
   path looks one up. Text handed to a system API leaves the app past every
   view that would localize it, so it must be localized where it is handed over.
 
-- Checkpoint 5 (YouTube music, personal builds, Claude): yt-dlp cannot run on
-  iOS (since 2025.11 it needs an external JavaScript runtime such as Deno), so
-  the app uses YouTubeKit 0.4.9 (pinned exact; release 2026-08-18) with
-  extraction forced to `.local`: its remote fallback would send the video to a
-  third-party server. The audio stream is the highest-bitrate audio-only stream
-  AVFoundation can play, fetched in 4 MB ranged requests because YouTube slows
-  one long request to playback speed, then added through the existing
-  `importMusic`, exactly like a Files import. UI: a link-paste alert beside
-  "add music from Files"; no YouTube search in the app. Tests cover link
-  detection (including lookalike hosts) and file naming only. Not verified
-  anywhere: that extraction and download work against YouTube today. CI cannot
-  check it (YouTube refuses data-centre clients); only a device can, and a
-  YouTube change can break it until YouTubeKit is updated. First CI run showed
-  a compile condition alone left YouTubeKit linked into a store-condition
-  binary; fixed by generating the store project without the package. Residual: the
-  translated strings for this screen ship in the store bundle as text
-  resources; the code and the library do not.
+- Checkpoint 5 (YouTube music, Claude): yt-dlp cannot run on iOS (since
+  2025.11 it needs an external JavaScript runtime such as Deno), so the app uses
+  YouTubeKit 0.4.9 (pinned exact; release 2026-08-18) with extraction forced to
+  `.local`: its remote fallback would send the video to a third-party server.
+  The highest-bitrate audio-only stream AVFoundation can play is fetched in
+  4 MB ranged requests, because YouTube slows one long request to playback
+  speed, then added through the existing `importMusic`, like a Files import.
+  UI: a link-paste alert beside "add music from Files"; no search in the app.
+  Tests cover link detection (including lookalike hosts) and file naming only.
+  Not verified anywhere: that extraction and download work against YouTube
+  today. CI cannot check it (YouTube refuses data-centre clients); only a device
+  can, and a YouTube change can break it until YouTubeKit is updated. A
+  store-only build split was tried and then removed at Erez's direction.
 
 ## Current release limits and next steps
 

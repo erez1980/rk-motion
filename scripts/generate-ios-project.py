@@ -2,15 +2,10 @@
 """Generate a dependency-free Xcode project; no XcodeGen/CocoaPods required."""
 import hashlib
 import json
-import os
 import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-# The App Store project must not link YouTubeKit at all: a compile condition
-# alone leaves the package's object files and Swift metadata in the binary.
-STORE = os.environ.get("RK_STORE_PROJECT") == "1"
-PERSONAL = '""' if STORE else "RK_YOUTUBE"
 IOS = ROOT / "ios"
 def uid(name):
     return hashlib.sha256(name.encode()).hexdigest()[:24].upper()
@@ -50,7 +45,7 @@ add("test-frameworks", 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483
 add("test-proxy", f'isa = PBXContainerItemProxy; containerPortal = {uid("project")}; proxyType = 1; remoteGlobalIDString = {uid("target")}; remoteInfo = RKMotion;')
 add("test-dependency", f'isa = PBXTargetDependency; target = {uid("target")}; targetProxy = {uid("test-proxy")};')
 for kind in ("Debug", "Release"):
-    add("test-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"; RK_PERSONAL_CONDITIONS = {PERSONAL}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";}};')
+    add("test-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";}};')
 add("test-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid("test-Debug")},{uid("test-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug;')
 add("test-target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("test-configs")}; buildPhases = ({uid("test-sources")},{uid("test-frameworks")},); buildRules = (); dependencies = ({uid("test-dependency")},); name = RKMotionTests; productName = RKMotionTests; productReference = {uid("test-product")}; productType = "com.apple.product-type.bundle.unit-test";')
 add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")},); name = Products; sourceTree = "<group>";')
@@ -58,14 +53,11 @@ add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RK
 add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
 add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},); runOnlyForDeploymentPostprocessing = 0;')
-# YouTube music is a personal-build feature. The package is linked here, but
-# only code compiled under RK_YOUTUBE refers to it, and the store build turns
-# that condition off; CI checks the store-condition binary holds none of it.
-if not STORE:
-    add("ytkit-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git"; requirement = {kind = exactVersion; version = 0.4.9;};')
-    add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("ytkit-package")}; productName = YouTubeKit;')
-    add("ytkit-build", f'isa = PBXBuildFile; productRef = {uid("ytkit-product")};')
-add("frameworks", f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({"" if STORE else uid("ytkit-build") + ","}); runOnlyForDeploymentPostprocessing = 0;')
+# YouTubeKit fetches a song's audio from a YouTube link, on the device.
+add("ytkit-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git"; requirement = {kind = exactVersion; version = 0.4.9;};')
+add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("ytkit-package")}; productName = YouTubeKit;')
+add("ytkit-build", f'isa = PBXBuildFile; productRef = {uid("ytkit-product")};')
+add("frameworks", f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({uid("ytkit-build")},); runOnlyForDeploymentPostprocessing = 0;')
 for kind in ("Debug", "Release"):
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -75,17 +67,14 @@ for kind in ("Debug", "Release"):
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
         SUPPORTS_MACCATALYST = NO; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;
-        RK_PERSONAL_CONDITIONS = %s;
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";'''
-    settings = settings % PERSONAL
+        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;'''
     settings += 'SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ENABLE_TESTABILITY = YES;' if kind == "Debug" else 'SWIFT_OPTIMIZATION_LEVEL = "-O";'
     add("target-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{{settings}}};')
 for prefix in ("project", "target"):
     add(prefix + "-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid(prefix + "-Debug")},{uid(prefix + "-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
-add("target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("target-configs")}; buildPhases = ({uid("sources")},{uid("frameworks")},{uid("resources")},); buildRules = (); dependencies = (); name = RKMotion; {"" if STORE else "packageProductDependencies = (" + uid("ytkit-product") + ",); "}productName = RKMotion; productReference = {uid("app")}; productType = "com.apple.product-type.application";')
-add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; {"" if STORE else "packageReferences = (" + uid("ytkit-package") + ",); "}productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},);')
-project = IOS / ("RKMotion-Store.xcodeproj" if STORE else "RKMotion.xcodeproj")
+add("target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("target-configs")}; buildPhases = ({uid("sources")},{uid("frameworks")},{uid("resources")},); buildRules = (); dependencies = (); name = RKMotion; packageProductDependencies = ({uid("ytkit-product")},); productName = RKMotion; productReference = {uid("app")}; productType = "com.apple.product-type.application";')
+add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; packageReferences = ({uid("ytkit-package")},); productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},);')
+project = IOS / "RKMotion.xcodeproj"
 project.mkdir(exist_ok=True)
 (project / "project.pbxproj").write_text('// !$*UTF8*$!\n{\narchiveVersion = 1; classes = {}; objectVersion = 56;\nobjects = {\n' + '\n'.join(objects) + '\n};\nrootObject = ' + uid("project") + ';\n}\n')
 scheme = project / "xcshareddata" / "xcschemes"

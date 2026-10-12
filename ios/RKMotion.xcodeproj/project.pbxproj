@@ -46,8 +46,8 @@ objects = {
 		B10CDED79664567B030B2B4F = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		DAB01D73CBBCF1FEDE84E2D6 = { isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = 34A04005BCAF206EEC990BD9; remoteInfo = RKMotion; };
 		F9A94CEF8CF7D85CE881E703 = { isa = PBXTargetDependency; target = 34A04005BCAF206EEC990BD9; targetProxy = DAB01D73CBBCF1FEDE84E2D6; };
-		88B88E0179E3F72210D21B33 = { isa = XCBuildConfiguration; name = Debug; buildSettings = {GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"; RK_PERSONAL_CONDITIONS = RK_YOUTUBE; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";}; };
-		A8A9BF34DBF8F1867F207864 = { isa = XCBuildConfiguration; name = Release; buildSettings = {GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"; RK_PERSONAL_CONDITIONS = RK_YOUTUBE; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";}; };
+		88B88E0179E3F72210D21B33 = { isa = XCBuildConfiguration; name = Debug; buildSettings = {GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";}; };
+		A8A9BF34DBF8F1867F207864 = { isa = XCBuildConfiguration; name = Release; buildSettings = {GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";}; };
 		AD7020964E1E033F765FE484 = { isa = XCConfigurationList; buildConfigurations = (88B88E0179E3F72210D21B33,A8A9BF34DBF8F1867F207864,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
 		9805CBD60EB4F66728D5D195 = { isa = PBXNativeTarget; buildConfigurationList = AD7020964E1E033F765FE484; buildPhases = (DEE94446A282611C16F7781C,B10CDED79664567B030B2B4F,); buildRules = (); dependencies = (F9A94CEF8CF7D85CE881E703,); name = RKMotionTests; productName = RKMotionTests; productReference = F739566ED5280322FF98A798; productType = "com.apple.product-type.bundle.unit-test"; };
 		0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; children = (A172CEDCAE47474B615C54D5,F739566ED5280322FF98A798,); name = Products; sourceTree = "<group>"; };
@@ -67,9 +67,7 @@ objects = {
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
         SUPPORTS_MACCATALYST = NO; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;
-        RK_PERSONAL_CONDITIONS = RK_YOUTUBE;
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ENABLE_TESTABILITY = YES;}; };
+        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ENABLE_TESTABILITY = YES;}; };
 		35B1014F135DE9B45529B733 = { isa = XCBuildConfiguration; name = Release; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}; };
 		E2D3A31BEAA1368FC62DA77A = { isa = XCBuildConfiguration; name = Release; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
         CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.15.0;
@@ -78,9 +76,7 @@ objects = {
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
         SUPPORTS_MACCATALYST = NO; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;
-        RK_PERSONAL_CONDITIONS = RK_YOUTUBE;
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) $(RK_PERSONAL_CONDITIONS)";SWIFT_OPTIMIZATION_LEVEL = "-O";}; };
+        SWIFT_EMIT_LOC_STRINGS = YES; RK_BACKGROUND_GPU_ENABLED = NO;SWIFT_OPTIMIZATION_LEVEL = "-O";}; };
 		B4E10CAA9C5E22150B71559C = { isa = XCConfigurationList; buildConfigurations = (488864B3D19480A82F7F1786,35B1014F135DE9B45529B733,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		4A807E8A027297B0B93701FB = { isa = XCConfigurationList; buildConfigurations = (952548237D7F645F11D1E7B6,E2D3A31BEAA1368FC62DA77A,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		34A04005BCAF206EEC990BD9 = { isa = PBXNativeTarget; buildConfigurationList = 4A807E8A027297B0B93701FB; buildPhases = (878A52FC5FF6A57D50B7B870,E2AA269EB967A8853A258BFA,41D311A605520FC7B8B9A980,); buildRules = (); dependencies = (); name = RKMotion; packageProductDependencies = (0D02440D30FABDDE46CF8857,); productName = RKMotion; productReference = A172CEDCAE47474B615C54D5; productType = "com.apple.product-type.application"; };
