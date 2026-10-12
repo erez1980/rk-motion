@@ -36,7 +36,7 @@ import Foundation
         }
         guard registered else {return false}
         self.launch = launch; self.expire = expire; running = true
-        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: NSLocalizedString("העיבוד מתבצע באייפון", comment: "Continued processing task subtitle"))
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: NSLocalizedString(title, comment: "Continued processing task title"), subtitle: NSLocalizedString("העיבוד מתבצע באייפון", comment: "Continued processing task subtitle"))
         request.strategy = .fail; request.requiredResources = .gpu
         do {try BGTaskScheduler.shared.submit(request); return true}
         catch {running = false; self.launch = nil; self.expire = nil; return false}
@@ -44,7 +44,9 @@ import Foundation
     func update(_ fraction: Double, subtitle: String) {
         guard #available(iOS 26.0, *), let task = taskObject as? BGContinuedProcessingTask else {return}
         task.progress.completedUnitCount = Int64(max(0, min(1, fraction)) * 1000)
-        task.updateTitle(task.title, subtitle: subtitle)
+        // The system shows this outside the app, past every view that would
+        // localize it, so the catalog lookup has to happen here.
+        task.updateTitle(task.title, subtitle: NSLocalizedString(subtitle, comment: "Continued processing progress"))
     }
     func complete(success: Bool) {
         if #available(iOS 26.0, *), let task = taskObject as? BGContinuedProcessingTask {task.setTaskCompleted(success: success)}

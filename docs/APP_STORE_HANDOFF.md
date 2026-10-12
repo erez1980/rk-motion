@@ -131,6 +131,13 @@ authorized. No Apple credentials are currently available.
   Swift sources that is not a catalog key; all three were confirmed to fail on
   deliberately broken input. Native and Python CI passed on 6da47a9 and
   a29977c. No device, VoiceOver or Dynamic Type validation was performed.
+- Codex review of 12363d9 (P2): the iOS 26 background Live Activity title and
+  progress line reached `BGContinuedProcessingTaskRequest` and `updateTitle`
+  as raw Hebrew, so an English device saw Hebrew there. Fixed at that boundary
+  in `ContinuedProcessing.swift`. Limit of the guard, keep in mind: the store
+  check proves every Hebrew literal has a translation; it cannot prove every
+  path looks one up. Text handed to a system API leaves the app past every
+  view that would localize it, so it must be localized where it is handed over.
 
 ## Current release limits and next steps
 
