@@ -22,10 +22,13 @@ so Claude can continue without repeating completed work. The target device
 is iPhone 17 Pro. The app must remain standalone and process media locally.
 Do not introduce a Mac server, cloud processing or account requirement into
 the iPhone app. YouTube music download: Erez decided on 2026-10-12 to allow it
-in personal builds only (Xcode/unsigned/simulator). It compiles under
-`RK_YOUTUBE`, which the store archive turns off (`RK_PERSONAL_CONDITIONS=`),
-and CI proves the store-condition binary holds none of it. Never let it into
-the store build: guideline 5.2.3 bars it. Do not publish to App Store or buy
+in personal builds only (Xcode/unsigned/simulator). The code compiles under
+`RK_YOUTUBE`, but turning that off is NOT enough: the package's object files
+and Swift metadata still reached the binary (CI caught it). The store archive
+is therefore built from `ios/RKMotion-Store.xcodeproj`, generated with
+`RK_STORE_PROJECT=1` and holding no package at all; CI builds that project and
+proves its binary has no YouTubeKit. Never let it into the store build:
+guideline 5.2.3 bars it. Do not publish to App Store or buy
 membership without Erez's explicit instruction. A development branch/PR is
 authorized. No Apple credentials are currently available.
 
@@ -155,7 +158,9 @@ authorized. No Apple credentials are currently available.
   detection (including lookalike hosts) and file naming only. Not verified
   anywhere: that extraction and download work against YouTube today. CI cannot
   check it (YouTube refuses data-centre clients); only a device can, and a
-  YouTube change can break it until YouTubeKit is updated. Residual: the
+  YouTube change can break it until YouTubeKit is updated. First CI run showed
+  a compile condition alone left YouTubeKit linked into a store-condition
+  binary; fixed by generating the store project without the package. Residual: the
   translated strings for this screen ship in the store bundle as text
   resources; the code and the library do not.
 
