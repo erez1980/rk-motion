@@ -8,6 +8,13 @@ if ! xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1; then
   echo "Install Xcode, then run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0 $rk_mode" >&2
   exit 2
 fi
+rk_xcode=$(xcodebuild -version | awk '/^Xcode / {print $2}')
+rk_sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+if [ "${rk_xcode%%.*}" -lt 26 ] || [ "${rk_sdk%%.*}" -lt 26 ]; then
+  echo "Xcode 26+ and iOS SDK 26+ are required for this Store-ready branch (found Xcode $rk_xcode / SDK $rk_sdk)." >&2
+  exit 2
+fi
+python3 "$rk_root/scripts/check-ios-store.py"
 mkdir -p "$rk_output"
 rk_args=(-project "$rk_root/ios/RKMotion.xcodeproj" -scheme RKMotion -configuration Release -derivedDataPath "$rk_output/DerivedData")
 case "$rk_mode" in
@@ -28,5 +35,28 @@ case "$rk_mode" in
     echo "IPA: $rk_output/RK-Motion-unsigned.ipa"
     echo "This IPA must be signed before it can run on a standard iPhone. Use Xcode Personal Team or re-sign with Sideloadly."
     ;;
-  *) echo "Usage: $0 [unsigned|simulator]" >&2; exit 2 ;;
+  store)
+    : "${RK_DEVELOPMENT_TEAM:?Set RK_DEVELOPMENT_TEAM to your paid Apple Developer team ID}"
+    : "${RK_BUNDLE_ID:?Set RK_BUNDLE_ID to your registered App Store bundle ID}"
+    : "${RK_BUILD_NUMBER:?Set RK_BUILD_NUMBER to a new positive integer for each upload}"
+    case "$RK_BUILD_NUMBER" in ''|*[!0-9]*) echo 'RK_BUILD_NUMBER must be a positive integer' >&2; exit 2 ;; esac
+    test "$RK_BUILD_NUMBER" -gt 0
+    xcodebuild "${rk_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' \
+      -archivePath "$rk_output/RKMotion-Store.xcarchive" -allowProvisioningUpdates \
+      DEVELOPMENT_TEAM="$RK_DEVELOPMENT_TEAM" PRODUCT_BUNDLE_IDENTIFIER="$RK_BUNDLE_ID" \
+      CURRENT_PROJECT_VERSION="$RK_BUILD_NUMBER" archive
+    RK_EXPORT_OPTIONS="$rk_output/StoreExportOptions.plist" python3 - <<'PY'
+import os, plistlib
+with open(os.environ['RK_EXPORT_OPTIONS'], 'wb') as f:
+    plistlib.dump({'method': 'app-store-connect', 'destination': 'export',
+                  'teamID': os.environ['RK_DEVELOPMENT_TEAM'], 'signingStyle': 'automatic',
+                  'manageAppVersionAndBuildNumber': False}, f)
+PY
+    xcodebuild -exportArchive -archivePath "$rk_output/RKMotion-Store.xcarchive" \
+      -exportPath "$rk_output/Store" -exportOptionsPlist "$rk_output/StoreExportOptions.plist" \
+      -allowProvisioningUpdates
+    echo "Signed distribution export: $rk_output/Store"
+    echo "Validate the archive in Xcode Organizer, then upload only when authorized. This script never uploads."
+    ;;
+  *) echo "Usage: $0 [unsigned|simulator|store]" >&2; exit 2 ;;
 esac

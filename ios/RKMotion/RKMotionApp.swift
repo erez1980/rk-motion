@@ -94,7 +94,10 @@ struct EditorView: View {
                 if !model.message.isEmpty && !model.busy {Section {Text(model.message).font(.footnote).textSelection(.enabled)}}
             }
             .navigationTitle("RK Motion")
-            .toolbar {if model.project?.analyzed == true {EditButton().disabled(model.busy)}}
+            .toolbar {
+                if model.project?.analyzed == true {EditButton().disabled(model.busy)}
+                NavigationLink {AboutView()} label: {Label("עזרה", systemImage: "questionmark.circle")}
+            }
             .tint(Color(red: 0.20, green: 0.69, blue: 0.47))
             .task {model.restore()}
             .onChange(of: model.edit) {previous, _ in model.changed(from: previous)}
