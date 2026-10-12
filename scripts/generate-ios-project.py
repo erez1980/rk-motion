@@ -26,6 +26,8 @@ shutil.copyfile(IOS / "RKMotion" / "Resources" / "AppIcon.png", iconset / "icon.
 refs.append(add("assets", 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";'))
 refs.append(add("info", 'isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>";'))
 refs.append(add("privacy", 'isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>";'))
+refs.append(add("strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>";'))
+add("strings-build", f'isa = PBXBuildFile; fileRef = {uid("strings")};')
 add("privacy-build", f'isa = PBXBuildFile; fileRef = {uid("privacy")};')
 add("asset-build", f'isa = PBXBuildFile; fileRef = {uid("assets")};')
 add("app", 'isa = PBXFileReference; explicitFileType = wrapper.application; path = RKMotion.app; sourceTree = BUILT_PRODUCTS_DIR;')
@@ -48,7 +50,7 @@ add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")}
 add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RKMotion; sourceTree = "<group>";')
 add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
-add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},); runOnlyForDeploymentPostprocessing = 0;')
+add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},); runOnlyForDeploymentPostprocessing = 0;')
 add("frameworks", 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
 for kind in ("Debug", "Release"):
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}};')

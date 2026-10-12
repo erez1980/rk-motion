@@ -37,6 +37,8 @@ struct EditorView: View {
                 if model.busy {
                     Section("עיבוד מקומי באייפון") {
                         ProgressView(value: model.percent, total: 100)
+                            .accessibilityLabel("התקדמות העיבוד")
+                            .accessibilityValue("\(Int(model.percent)) אחוז")
                         Text(model.message).font(.footnote)
                         Button("ביטול הפעולה") {model.cancel()}.disabled(!model.canCancel)
                     }
@@ -47,16 +49,17 @@ struct EditorView: View {
                         Button("ניגון המקור") {player = model.sourceURL.map(AVPlayer.init(url:))}
                         if project.analyzed {
                             Button("תצוגה מקדימה של העריכה") {model.preview()}
-                                .disabled(model.busy || model.edit.clips.allSatisfy {$0.selected == false})
+                                .disabled(model.busy || model.edit.clips.allSatisfy {$0.selected == false} || model.editValidationMessage != nil)
                             Text("התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ.").font(.caption)
                         }
                         if project.duration > 0 {Text("משך המקור: \(Int(project.duration)) שניות").font(.caption)}
                         if !project.analyzed {Button("ניתוח הסרטון באייפון") {model.analyze()}.disabled(model.busy)}
                     }
+                    .disabled(model.busy)
                     if project.analyzed {
                         if !project.scores.isEmpty {
                             Section("רגישות זיהוי הפעילות") {
-                                Slider(value: $model.threshold, in: 0.25...0.9, step: 0.05)
+                                Slider(value: $model.threshold, in: 0.25...0.9, step: 0.05).accessibilityLabel("רגישות זיהוי הפעילות")
                                 Button("הפקת הצעות מחדש") {model.retune()}
                                 Text("הצעות הפעילות יוחלפו; ניתן לבטל את השינוי.").font(.caption).foregroundStyle(.secondary)
                             }.disabled(model.busy)
@@ -65,8 +68,9 @@ struct EditorView: View {
                         optionsSection
                         Section {
                             Text(model.exportSummary).font(.caption).foregroundStyle(.secondary)
+                            if let problem = model.editValidationMessage {Text(problem).font(.caption).foregroundStyle(.red)}
                             Button {model.exportMovie()} label: {Label("ייצוא הסרט באייפון", systemImage: "film.stack")}
-                                .disabled(model.busy || model.edit.clips.isEmpty || model.edit.clips.allSatisfy {$0.selected == false})
+                                .disabled(model.busy || model.edit.clips.isEmpty || model.edit.clips.allSatisfy {$0.selected == false} || model.editValidationMessage != nil)
                             HStack {
                                 Button("ביטול שינוי") {model.undo()}.disabled(!model.undoAvailable || model.busy)
                                 Spacer(); Button("שחזור שינוי") {model.redo()}.disabled(!model.redoAvailable || model.busy)
@@ -80,7 +84,7 @@ struct EditorView: View {
                                     model.movieURL = LocalStore.file(result.file, project: project.id)
                                     player = AVPlayer(url: model.movieURL!)
                                 }.swipeActions {
-                                    Button("מחיקת הסרט", role: .destructive) {player?.pause(); Task {await model.deleteExport(result)}}
+                                    Button("מחיקת הסרט", role: .destructive) {player?.pause(); player = nil; Task {await model.deleteExport(result)}}
                                         .disabled(model.busy)
                                 }
                             }
@@ -91,7 +95,7 @@ struct EditorView: View {
                             Button("שמירת הסרט בתמונות") {Task {await model.saveToPhotos(movie)}}
                             ShareLink(item: movie) {Label("שיתוף קובץ הסרט", systemImage: "square.and.arrow.up")}
                             Button("ניגון הסרט הערוך") {player = AVPlayer(url: movie)}
-                        }
+                        }.disabled(model.busy)
                     }
                     Section("אחסון מקומי") {
                         Text("נפח הפרויקט: " + ByteCountFormatter.string(fromByteCount: model.projectBytes, countStyle: .file))
@@ -103,6 +107,9 @@ struct EditorView: View {
                 if !model.message.isEmpty && !model.busy {
                     Section {
                         Text(model.message).font(.footnote).textSelection(.enabled)
+                        if model.photoPermissionDenied {
+                            Button("פתיחת הגדרות הרשאת תמונות") {if let url = URL(string: UIApplication.openSettingsURLString) {UIApplication.shared.open(url)}}
+                        }
                         if model.saveFailed {Button("ניסיון חוזר לשמירת הפרויקט") {Task {_ = await model.save()}}}
                     }
                 }
@@ -126,13 +133,8 @@ struct EditorView: View {
             .onChange(of: model.project?.id) {_, _ in player = model.sourceURL.map(AVPlayer.init(url:))}
             .onChange(of: selectedVideo) {_, item in
                 guard let item else {return}
-                Task {
-                    do {
-                        model.message = "האייפון מכין את הקובץ…"
-                        if let picked = try await item.loadTransferable(type: PickedMovie.self) {await model.importVideo(picked.url)}
-                    } catch {model.message = error.localizedDescription}
-                    selectedVideo = nil
-                }
+                model.importPickedVideo(item)
+                selectedVideo = nil
             }
             .onChange(of: scenePhase) {_, phase in
                 if phase == .background {player?.pause(); model.pause()}
@@ -169,9 +171,9 @@ struct EditorView: View {
                     DisclosureGroup("הזנת זמנים מדויקת") {
                       HStack {
                         Text("התחלה")
-                        TextField("שניות", value: $clip.start, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
+                        TextField("שניות", value: $clip.start, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityLabel("תחילת הקטע בשניות")
                         Text("סיום")
-                        TextField("שניות", value: $clip.end, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
+                        TextField("שניות", value: $clip.end, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityLabel("סיום הקטע בשניות")
                       }.font(.footnote)
                     }
                     if let score = clip.score {Text("ציון פעילות: \(Int(score * 100))%").font(.caption).foregroundStyle(.secondary)}

@@ -24,7 +24,7 @@ authorized. No Apple credentials are currently available.
 
 ## Priority queue and findings
 
-### P0: submission blockers (in progress)
+### P0: submission blockers (code prepared; account validation pending)
 - [x] Select Xcode 26+ explicitly and assert SDK/toolchain requirements.
 - [x] Add bundled PrivacyInfo.xcprivacy for UserDefaults and disk-space APIs.
 - [x] Provide an opaque 1024px primary icon without changing desktop imagery.
@@ -48,8 +48,9 @@ authorized. No Apple credentials are currently available.
 - [x] Load source audio metadata once, not inside every clip iteration.
 - [x] Clarify resolution-only original option and actual SDR/30fps output.
 - [x] Split navigation into projects/editor/settings; improve trimming/preview.
-- [ ] Localization/accessibility and actionable permission/error messages.
-- [ ] Add focused native tests for new behavior; export CI logs/xcresult on failure.
+- [x] Hebrew String Catalog foundation, trim/progress accessibility labels and permission Settings action.
+- [ ] Full VoiceOver/Dynamic Type/rotation validation and English localization (not claimed complete).
+- [x] Add focused native tests for new behavior; export CI logs/xcresult on failure.
 - [ ] Track real on-device HEVC/HDR/long-clip/storage/background validation.
 
 ### Desktop-only review findings (lower priority)
@@ -94,3 +95,41 @@ authorized. No Apple credentials are currently available.
   Desktop empty-analysis typo and cross-project upload reservation race fixed.
   Checkpoint 2 CI 38206639216 PASSED native compile/tests/device IPA; Python
   CI 38206639230 PASSED. No performance speedup or physical testing claimed.
+
+## Current release limits and next steps
+
+- PR remains draft; no merge, purchase, signed upload or public release occurred.
+- Code uses new immutable `scores-<uuid>.json` references in project metadata.
+  Legacy inline scores and earlier `scores.json` remain readable. Explicit
+  cleanup removes unreferenced score generations and interrupted exports.
+- `ContinuedProcessing` is opt-in via `RK_ENABLE_BACKGROUND_GPU=1` for the
+  **store** build, matching app-ID capability/profile, supported GPU and iOS 26.
+  Scheduler rejection falls back to foreground. Ordinary background grace must
+  be ended when the continuous task launches, and not reintroduced by pause.
+- Import from Photos is now an owned cancellable operation; cleanup cannot run
+  while the picker is staging a file. Originals/edit metadata remain local.
+- The main-branch privacy URL will become valid after merge. Verify policy,
+  support contact, screenshots and Store privacy answers with the owner.
+- Do NOT promise lossless/60fps/HDR export: current output is SDR/30fps.
+- Do NOT claim measured speedups: generator reuse and audio metadata hoisting
+  are implemented, but only device benchmarks can establish their benefit.
+- Adaptive fast/detailed analysis and AVAssetReader comparison are deferred
+  until representative ride footage benchmarks exist; preserve detection quality.
+- UI now has library thumbnails and a visual trim sheet, not a complete
+  multi-track thumbnail timeline. That richer editor remains a later enhancement.
+- A real on-device smoke run is the next release gate after CI: import a local
+  HEVC ride, trim, reorder, preview with music, export, save to Photos, relaunch.
+  Then test long/HDR footage, low storage and signed-background locking/cancel.
+
+## Validation record (latest checkpoint)
+
+- P0 c9c28c3: native run 38206222424 passed all stages, Xcode 26.3.
+- Reliability 391b413: native run 38206639216 and Python run 38206639230 passed.
+- UI/background 925b088: native run 38207300070 compiled and was still running
+  tests when this entry was written; Python run 38207300047 passed.
+- Latest follow-up: serial Photos staging, visible permission Settings action,
+  Hebrew catalog, accessibility/input validation, deletion error consistency,
+  and concurrent disk-reservation regression test. Run latest-head CI before
+  marking this checkpoint verified. `scripts/check-ios-store.py`, shell syntax,
+  Python compile and whitespace checks pass locally. Local pytest unavailable;
+  Python CI owns execution. No local Xcode/device runtime is available.

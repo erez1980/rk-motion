@@ -232,3 +232,43 @@ def test_phone_upload_analyse_edit_export_and_restart(server, tmp_path):
     session = request(base, '/api/session/' + jid, token=token)[1]
     assert session['revision'] == 1 and session['edit']['clips'] == clips
     assert len(session['exports']) == 1
+
+
+def test_upload_space_is_reserved_across_projects(server, monkeypatch):
+    """Hold the first disk check open while another project requests space."""
+    from types import SimpleNamespace
+    httpd, base = server
+    token = pair(httpd, base)
+    jobs = [request(base, '/api/prepare', b'', token)[1]['job_id'] for _ in range(2)]
+    entered, release, concurrent = threading.Event(), threading.Event(), threading.Event()
+    calls = []
+
+    def disk_usage(_):
+        calls.append(True)
+        if len(calls) == 1:
+            entered.set()
+            assert release.wait(3)
+        else:
+            concurrent.set()
+        return SimpleNamespace(free=512 * 1024**2 + 30 * 1024**2)
+
+    monkeypatch.setattr(ui.shutil, 'disk_usage', disk_usage)
+    results = []
+    def upload(job):
+        results.append(request(base, '/api/uploads/' + job,
+                               {'name': 'ride.mov', 'size': 20 * 1024**2}, token)[0])
+    first = threading.Thread(target=upload, args=(jobs[0],))
+    second = threading.Thread(target=upload, args=(jobs[1],))
+    try:
+        first.start()
+        assert entered.wait(2)
+        second.start()
+        # Without the global reservation lock both disk checks enter together
+        # with reserved=0 and both uploads incorrectly fit.
+        assert not concurrent.wait(.2)
+    finally:
+        release.set()
+        first.join(4)
+        if second.ident is not None:
+            second.join(4)
+    assert sorted(results) == [201, 400]

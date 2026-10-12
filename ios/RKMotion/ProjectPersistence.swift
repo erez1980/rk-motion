@@ -16,10 +16,13 @@ actor ProjectPersistence {
         scores[project.id] = project.scores
         revisions[project.id] = revision
     }
-    func deleteExport(_ export: LocalExport, from project: LocalProject, revision: Int) throws {
+    func deleteExport(_ export: LocalExport, from project: LocalProject, revision: Int) throws -> String? {
         try save(project, revision: revision)
         let file = LocalStore.file(export.file, project: project.id)
-        if FileManager.default.fileExists(atPath: file.path) {try FileManager.default.removeItem(at: file)}
+        do {
+            if FileManager.default.fileExists(atPath: file.path) {try FileManager.default.removeItem(at: file)}
+            return nil
+        } catch {return error.localizedDescription}
     }
     func deleteProject(_ id: String) throws {
         try FileManager.default.removeItem(at: LocalStore.folder(id))

@@ -1,0 +1,766 @@
+{
+  "sourceLanguage": "he",
+  "strings": {
+    "אודות ועזרה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אודות ועזרה"
+          }
+        }
+      }
+    },
+    "אחסון מקומי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחסון מקומי"
+          }
+        }
+      }
+    },
+    "איכות מרבית": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איכות מרבית"
+          }
+        }
+      }
+    },
+    "אפשרויות ייצוא": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשרויות ייצוא"
+          }
+        }
+      }
+    },
+    "בחירת סרטון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירת סרטון"
+          }
+        }
+      }
+    },
+    "בחירת סרטון מקבצים": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירת סרטון מקבצים"
+          }
+        }
+      }
+    },
+    "בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם."
+          }
+        }
+      }
+    },
+    "ביטול הפעולה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול הפעולה"
+          }
+        }
+      }
+    },
+    "ביטול שינוי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול שינוי"
+          }
+        }
+      }
+    },
+    "גרסה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גרסה"
+          }
+        }
+      }
+    },
+    "דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי."
+          }
+        }
+      }
+    },
+    "הוספת מוזיקה מקבצים": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת מוזיקה מקבצים"
+          }
+        }
+      }
+    },
+    "הוספת קטע ידני": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת קטע ידני"
+          }
+        }
+      }
+    },
+    "הזנת זמנים מדויקת": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הזנת זמנים מדויקת"
+          }
+        }
+      }
+    },
+    "החלת מצב הבחירה על הפרויקט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החלת מצב הבחירה על הפרויקט"
+          }
+        }
+      }
+    },
+    "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה."
+          }
+        }
+      }
+    },
+    "המסה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המסה"
+          }
+        }
+      }
+    },
+    "הסרה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרה"
+          }
+        }
+      }
+    },
+    "הסרטון כבר ערוך — להשאיר אותו שלם": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטון כבר ערוך — להשאיר אותו שלם"
+          }
+        }
+      }
+    },
+    "הסרטונים, המוזיקה והעריכות מעובדים ונשמרים באייפון. אין צורך בחשבון ואין שרת עיבוד, פרסומות או כלי מעקב באפליקציה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטונים, המוזיקה והעריכות מעובדים ונשמרים באייפון. אין צורך בחשבון ואין שרת עיבוד, פרסומות או כלי מעקב באפליקציה."
+          }
+        }
+      }
+    },
+    "הסרת שמע הרכיבה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרת שמע הרכיבה"
+          }
+        }
+      }
+    },
+    "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "הפקת הצעות מחדש": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפקת הצעות מחדש"
+          }
+        }
+      }
+    },
+    "הפרויקטים שלי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקטים שלי"
+          }
+        }
+      }
+    },
+    "הצעות הפעילות יוחלפו; ניתן לבטל את השינוי.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצעות הפעילות יוחלפו; ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "התחלה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התחלה"
+          }
+        }
+      }
+    },
+    "התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ."
+          }
+        }
+      }
+    },
+    "התקדמות העיבוד": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התקדמות העיבוד"
+          }
+        }
+      }
+    },
+    "חזק": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזק"
+          }
+        }
+      }
+    },
+    "חיתוך": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיתוך"
+          }
+        }
+      }
+    },
+    "חיתוך הקטע": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיתוך הקטע"
+          }
+        }
+      }
+    },
+    "חיתוך קטע": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיתוך קטע"
+          }
+        }
+      }
+    },
+    "יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב."
+          }
+        }
+      }
+    },
+    "כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן."
+          }
+        }
+      }
+    },
+    "מאוזן": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מאוזן"
+          }
+        }
+      }
+    },
+    "מהירות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהירות"
+          }
+        }
+      }
+    },
+    "מהרכיבה לרגעים הטובים": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהרכיבה לרגעים הטובים"
+          }
+        }
+      }
+    },
+    "מחיקה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקה"
+          }
+        }
+      }
+    },
+    "מחיקת הסרט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת הסרט"
+          }
+        }
+      }
+    },
+    "מחיקת הפרויקט מהאייפון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת הפרויקט מהאייפון"
+          }
+        }
+      }
+    },
+    "מחיקת סרט שנוצר אינה מוחקת את המקור או את העריכה. עותקים שנשמרו בתמונות אינם נמחקים.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת סרט שנוצר אינה מוחקת את המקור או את העריכה. עותקים שנשמרו בתמונות אינם נמחקים."
+          }
+        }
+      }
+    },
+    "מחיקת פרויקט מוחקת את קבציו באפליקציה. עותקים ששמרתם בתמונות או שיתפתם נשארים ביעד שלהם. גיבויי המכשיר עשויים לכלול נתוני אפליקציה בהתאם להגדרות Apple.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת פרויקט מוחקת את קבציו באפליקציה. עותקים ששמרתם בתמונות או שיתפתם נשארים ביעד שלהם. גיבויי המכשיר עשויים לכלול נתוני אפליקציה בהתאם להגדרות Apple."
+          }
+        }
+      }
+    },
+    "מסגרת": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מסגרת"
+          }
+        }
+      }
+    },
+    "מעבר": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מעבר"
+          }
+        }
+      }
+    },
+    "מקור": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מקור"
+          }
+        }
+      }
+    },
+    "משך המעבר": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משך המעבר"
+          }
+        }
+      }
+    },
+    "ניגון המקור": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניגון המקור"
+          }
+        }
+      }
+    },
+    "ניגון הסרט הערוך": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניגון הסרט הערוך"
+          }
+        }
+      }
+    },
+    "ניגון הקטע שנבחר": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניגון הקטע שנבחר"
+          }
+        }
+      }
+    },
+    "ניסיון חוזר לשמירת הפרויקט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניסיון חוזר לשמירת הפרויקט"
+          }
+        }
+      }
+    },
+    "ניקוי קבצים זמניים שנותרו": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניקוי קבצים זמניים שנותרו"
+          }
+        }
+      }
+    },
+    "ניתוח הסרטון באייפון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח הסרטון באייפון"
+          }
+        }
+      }
+    },
+    "ניתוח, עריכה וייצוא — הכול באייפון שלכם.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח, עריכה וייצוא — הכול באייפון שלכם."
+          }
+        }
+      }
+    },
+    "נפח הפרויקט: ": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נפח הפרויקט: "
+          }
+        }
+      }
+    },
+    "סטורי 9:16": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סטורי 9:16"
+          }
+        }
+      }
+    },
+    "סיום": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיום"
+          }
+        }
+      }
+    },
+    "סיום הקטע בשניות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיום הקטע בשניות"
+          }
+        }
+      }
+    },
+    "סרט מ־": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט מ־"
+          }
+        }
+      }
+    },
+    "סרטון שנמצא רק ב־iCloud עשוי לרדת דרך בורר התמונות של Apple. שיתוף ושמירה לתמונות נעשים רק לפי בחירתכם.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטון שנמצא רק ב־iCloud עשוי לרדת דרך בורר התמונות של Apple. שיתוף ושמירה לתמונות נעשים רק לפי בחירתכם."
+          }
+        }
+      }
+    },
+    "סרטים שנוצרו באייפון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטים שנוצרו באייפון"
+          }
+        }
+      }
+    },
+    "עוצמת מוזיקה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עוצמת מוזיקה"
+          }
+        }
+      }
+    },
+    "עזרה ותמיכה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עזרה ותמיכה"
+          }
+        }
+      }
+    },
+    "עיבוד מקומי באייפון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עיבוד מקומי באייפון"
+          }
+        }
+      }
+    },
+    "פרטיות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פרטיות"
+          }
+        }
+      }
+    },
+    "קטעי הסרט — גררו לשינוי סדר": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטעי הסרט — גררו לשינוי סדר"
+          }
+        }
+      }
+    },
+    "רגישות זיהוי הפעילות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רגישות זיהוי הפעילות"
+          }
+        }
+      }
+    },
+    "רזולוציית מקור": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רזולוציית מקור"
+          }
+        }
+      }
+    },
+    "רקע": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רקע"
+          }
+        }
+      }
+    },
+    "שחזור שינוי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שחזור שינוי"
+          }
+        }
+      }
+    },
+    "שימוש במוזיקה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שימוש במוזיקה"
+          }
+        }
+      }
+    },
+    "שמירה ושיתוף": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירה ושיתוף"
+          }
+        }
+      }
+    },
+    "שמירת הסרט בתמונות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירת הסרט בתמונות"
+          }
+        }
+      }
+    },
+    "תחילת הקטע בשניות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תחילת הקטע בשניות"
+          }
+        }
+      }
+    },
+    "תצוגה וחיתוך הקטע": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תצוגה וחיתוך הקטע"
+          }
+        }
+      }
+    },
+    "תצוגה מקדימה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תצוגה מקדימה"
+          }
+        }
+      }
+    },
+    "תצוגה מקדימה של העריכה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תצוגה מקדימה של העריכה"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

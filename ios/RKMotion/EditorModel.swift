@@ -3,6 +3,7 @@ import AVFoundation
 import Combine
 import Photos
 import UIKit
+import PhotosUI
 
 @MainActor final class EditorModel: ObservableObject {
     @Published var projects: [LocalProject] = []
@@ -19,6 +20,15 @@ import UIKit
     @Published var previewItem: AVPlayerItem?
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
+    var editValidationMessage: String? {
+        guard let p = project else {return nil}
+        let clips = edit.clips.filter {$0.selected != false}
+        guard !clips.isEmpty else {return "בחרו לפחות קטע אחד"}
+        if clips.contains(where: {!$0.start.isFinite || !$0.end.isFinite || $0.start < 0 || $0.end <= $0.start || $0.end > p.duration}) {
+            return "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה"
+        }
+        return nil
+    }
     var exportSummary: String {
         let selected = edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
@@ -32,17 +42,21 @@ import UIKit
         return String(format: "תוצאה צפויה: %.1f שניות", duration) + dimensions + " · SDR · 30fps"
     }
     @Published var saveFailed = false
+    @Published var photoPermissionDenied = false
     private let persistence = ProjectPersistence()
     private var saveTask: Task<Void, Never>?
     private var revision = 0
     private let engine = LocalEngine()
     private let continued = ContinuedProcessing.shared
     private var processingSucceeded = false
+    @Published private var backgroundFallback = false
     var backgroundDescription: String {
-        continued.enabled ? "עיבוד ברקע זמין בגרסה זו. iOS עשויה לעצור את הפעולה אם חסרים משאבים." : "לפעולות ארוכות השאירו את האפליקציה פתוחה; גרסה זו משתמשת בזמן רקע מוגבל."
+        continued.enabled && !backgroundFallback ? "עיבוד ברקע זמין בגרסה זו. iOS עשויה לעצור את הפעולה אם חסרים משאבים." : "לפעולות ארוכות השאירו את האפליקציה פתוחה; גרסה זו משתמשת בזמן רקע מוגבל."
     }
     private func launchProcessing(title: String, _ launch: @escaping () -> Void) {
-        if !continued.start(title: title, launch: {[weak self] in self?.endBackground(); launch()}, expire: {[weak self] in self?.operation?.cancel()}) {launch()}
+        let accepted = continued.start(title: title, launch: {[weak self] in self?.endBackground(); launch()}, expire: {[weak self] in self?.operation?.cancel()})
+        backgroundFallback = !accepted
+        if !accepted {launch()}
     }
     private var operation: Task<Void, Never>?
     private var suppressedEdit: Edit?
@@ -115,6 +129,20 @@ import UIKit
             }
         }
         if !value {continued.complete(success: processingSucceeded); operation = nil; endBackground()}
+    }
+    func importPickedVideo(_ item: PhotosPickerItem) {
+        guard !busy else {return}
+        setBusy(true); percent = 0; message = "האייפון מכין את הקובץ…"
+        operation = Task {
+            var staged: URL?
+            do {
+                guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
+                staged = picked.url; try Task.checkCancellation()
+                setBusy(false); await importVideo(picked.url)
+            } catch is CancellationError {setBusy(false); message = "ייבוא הסרטון בוטל"}
+            catch {setBusy(false); message = error.localizedDescription}
+            if let staged, staged.deletingLastPathComponent() == LocalStore.imports {try? FileManager.default.removeItem(at: staged)}
+        }
     }
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
@@ -201,6 +229,7 @@ import UIKit
     }
     func exportMovie() {
         guard !busy, let p = project, p.analyzed else {return}
+        if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit
         setBusy(true); percent = 0; message = "מייצאת באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
@@ -256,15 +285,17 @@ import UIKit
         guard await save() else {setBusy(false); return}
         p.edit = edit; p.exports.removeAll {$0.id == result.id}; revision += 1
         do {
-            try await persistence.deleteExport(result, from: p, revision: revision)
+            let warning = try await persistence.deleteExport(result, from: p, revision: revision)
             project = p; refreshLibrary(p)
             if movieURL?.lastPathComponent == result.file {movieURL = nil}
-            projectBytes = await persistence.bytes(p); message = "הסרט שנוצר נמחק מהאפליקציה"
+            projectBytes = await persistence.bytes(p)
+            message = warning.map {"הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: " + $0} ?? "הסרט שנוצר נמחק מהאפליקציה"
         } catch {message = error.localizedDescription}
         setBusy(false)
     }
     func preview() {
         guard !busy, let p = project, p.analyzed else {return}
+        if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit; setBusy(true); percent = 0
         launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
           operation = Task {
@@ -288,8 +319,11 @@ import UIKit
         setBusy(false)
     }
     func saveToPhotos(_ file: URL) async {
+        guard !busy else {return}
+        setBusy(true); defer {setBusy(false)}
         let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-        guard permission == .authorized || permission == .limited else {message = "אפשרו שמירה בתמונות בהגדרות האייפון"; return}
+        photoPermissionDenied = permission != .authorized && permission != .limited
+        guard !photoPermissionDenied else {message = "אפשרו שמירה בתמונות בהגדרות האייפון"; return}
         do {try await PHPhotoLibrary.shared().performChanges {PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file)}; message = "הסרט נשמר בתמונות"}
         catch {message = error.localizedDescription}
     }
