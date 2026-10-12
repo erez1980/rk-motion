@@ -59,7 +59,10 @@ add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("yt
 add("ytkit-build", f'isa = PBXBuildFile; productRef = {uid("ytkit-product")};')
 add("frameworks", f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({uid("ytkit-build")},); runOnlyForDeploymentPostprocessing = 0;')
 for kind in ("Debug", "Release"):
-    add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;}};')
+    # Packages build only the active architecture in Debug. The app must match,
+    # or its other slice cannot find YouTubeKit (Xcode's own Debug default).
+    debug_arch = " ONLY_ACTIVE_ARCH = YES;" if kind == "Debug" else ""
+    add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;{debug_arch}}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
         CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.15.0;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
