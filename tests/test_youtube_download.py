@@ -37,6 +37,7 @@ def test_youtube_download_falls_back_through_client_list(monkeypatch, tmp_path):
     monkeypatch.setattr(ui, "duration", lambda path: 12.3)
 
     handler = ui.RKMotionHandler.__new__(ui.RKMotionHandler)
+    handler.owner = "local"
     handler._read_json = lambda: {"id": "abc123ABC12", "title": "Test Song", "rights_confirmed": True}
     captured = {}
     handler._json = lambda status, data: captured.update(status=status, data=data)
@@ -60,6 +61,7 @@ def test_youtube_download_error_message_is_hebrew_and_actionable(monkeypatch, tm
     monkeypatch.setattr(ui.shutil, "which", lambda name: "/usr/bin/yt-dlp")
 
     handler = ui.RKMotionHandler.__new__(ui.RKMotionHandler)
+    handler.owner = "local"
     handler._read_json = lambda: {"id": "abc123ABC12", "rights_confirmed": True}
     captured = {}
     handler._json = lambda status, data: captured.update(status=status, data=data)
@@ -84,6 +86,7 @@ def test_youtube_download_tries_every_client_then_raises_last_error(monkeypatch,
     monkeypatch.setattr(ui.shutil, "which", lambda name: "/usr/bin/yt-dlp")
 
     handler = ui.RKMotionHandler.__new__(ui.RKMotionHandler)
+    handler.owner = "local"
     handler._read_json = lambda: {"id": "abc123ABC12", "rights_confirmed": True}
     captured = {}
     handler._json = lambda status, data: captured.update(status=status, data=data)

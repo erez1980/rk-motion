@@ -137,7 +137,7 @@ def test_export_9x16_crops_to_a_vertical_frame_for_stories(tmp_path):
     width, height = _frame_size(output)
     assert height > width, "vertical frame"
     assert abs(width / height - 9 / 16) < 0.01
-    assert height == 1080
+    assert height == 720  # selected quality is a cap, not an upscale target
 
     # The default aspect stays untouched (existing horizontal behaviour).
     landscape = str(tmp_path / "landscape.mp4")

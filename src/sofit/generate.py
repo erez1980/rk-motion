@@ -222,7 +222,7 @@ def call_claude_json(system: str, user: str, validate, model: str | None = None,
         text = transport(system, user, model)
         try:
             return validate(json.loads(_strip_fences(text)))
-        except (json.JSONDecodeError, GenerationError) as e:
+        except (json.JSONDecodeError, GenerationError, AttributeError, KeyError, TypeError, ValueError) as e:
             last_err = e
     raise GenerationError(f"Claude returned unusable output after retry: {last_err}")
 

@@ -15,6 +15,11 @@ import threading
 import time
 import uuid
 import webbrowser
+import copy
+import hashlib
+import io
+import math
+import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,8 +27,11 @@ from urllib.parse import unquote, urlparse
 
 from . import __version__
 from .action import (analyse_action, duration, export_edited_movie, h264_args,
-                     h264_encoder, run_encode)
+                     h264_encoder, run_encode, TRANSITIONS)
 from .lan_tls import certificate_for
+from .process import Worker, scope, StreamProcess, run as run_process
+from .security import Pairing
+from .storage import atomic_json, identifier, validate_clips
 
 ASSETS = Path(__file__).with_name("assets")
 INDEX = ASSETS / "index.html"
@@ -39,6 +47,54 @@ STATIC_ASSETS = {
 }
 FONT = Path(__file__).with_name("data") / "fonts" / "Rubik.ttf"
 JOBS: dict[str, dict] = {}
+PROJECT_ROOT: Path | None = None
+_JOB_LOCK = threading.RLock()
+
+
+def _job_lock(job):
+    with _JOB_LOCK:
+        return job.setdefault("_lock", threading.RLock())
+
+
+def _persist(job):
+    with _job_lock(job):
+        if job.get("_deleted"):
+            return
+        atomic_json(Path(job["folder"]) / "project.json",
+                    {k: v for k, v in job.items() if not k.startswith("_")})
+
+
+def _load_projects(root):
+    root.mkdir(parents=True, exist_ok=True)
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        try:
+            identifier(folder.name)
+            job = json.loads((folder / "project.json").read_text())
+            job["folder"] = folder
+            for key in ("analyse_status", "export_status"):
+                if job.get(key, {}).get("state") == "running":
+                    job[key] = {"state": "error", "message": "Mac restarted. Retry this operation."}
+            JOBS[folder.name] = job
+        except (OSError, ValueError, TypeError):
+            continue
+
+
+def _start_worker(job, callback, args):
+    worker = Worker()
+    job["_worker"] = worker
+    def work():
+        try:
+            with scope(worker):
+                callback(*args)
+        finally:
+            with _job_lock(job):
+                job.pop("_worker", None)
+                _persist(job)
+    thread = threading.Thread(target=work, daemon=True)
+    job["_thread"] = thread
+    thread.start()
 # Standalone YouTube downloads, keyed by a one-off token. Separate from JOBS:
 # grabbing a song or a clip needs no ride video and no edit.
 GRABS: dict[str, dict] = {}
@@ -148,11 +204,52 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def log_message(self, _format: str, *_args: object) -> None:
         return  # a desktop app should not fill the user's Terminal with HTTP logs
 
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(120)
+
+    def _authorize(self, mutation=False):
+        host = self.headers.get("Host", "")
+        allowed = {f"{self.server.server_address[0]}:{self.server.server_port}",
+                   f"localhost:{self.server.server_port}"}
+        if host not in allowed:
+            self.close_connection = True
+            self._json(HTTPStatus.FORBIDDEN, {"error": "Invalid Host."})
+            return False
+        origin = self.headers.get("Origin")
+        if mutation and origin:
+            parsed = urlparse(origin)
+            scheme = "https" if getattr(self.server, "require_pairing", False) else "http"
+            if parsed.netloc != host or parsed.scheme != scheme:
+                self.close_connection = True
+                self._json(HTTPStatus.FORBIDDEN, {"error": "Cross-origin requests are not allowed."})
+                return False
+        self.owner = "local"
+        if getattr(self.server, "require_pairing", False):
+            route = urlparse(self.path).path
+            if not route.startswith("/api/") or route == "/api/pair":
+                return True
+            self.owner = self.server.pairing.authenticate(self.headers)
+            if not self.owner:
+                self.close_connection = True
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "Pair this device using the link shown on the Mac."})
+                return False
+        return True
+
+    def _job(self, job_id):
+        job = JOBS.get(job_id)
+        if job and (self.owner == "local" or job.get("owner") == self.owner):
+            return job
+        return None
+
     def _json(self, status: int, data: dict) -> None:
         raw = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
+        self.send_header("Cache-Control", "no-store")
+        if getattr(self, "pair_cookie", None):
+            self.send_header("Set-Cookie", f"rk_session={self.pair_cookie}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=31536000")
         # Set by a handler that answered without reading the request body: the
         # client has to be told, or it will keep using a connection with those
         # bytes still queued on it.
@@ -234,7 +331,43 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
+        if not self._authorize():
+            return
         parts = [p for p in urlparse(self.path).path.split("/") if p]
+        if parts == ["api", "pairing"] or parts == ["api", "pairing", "qr"]:
+            if self.owner != "local" or getattr(self.server, "require_pairing", False):
+                return self._json(HTTPStatus.FORBIDDEN, {"error": "Open pairing on the Mac."})
+            pairing = getattr(self.server, "pairing", None)
+            url = getattr(self.server, "phone_url", None)
+            if not pairing or not url:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Start the Mac app with --lan to pair a phone."})
+            if time.time() > pairing.expires:
+                pairing.rotate()
+            link = f"{url}/#pair={pairing.code}&fingerprint={self.server.fingerprint}"
+            if parts[-1] == "qr":
+                import qrcode
+                import qrcode.image.svg
+                data = io.BytesIO()
+                qrcode.make(link, image_factory=qrcode.image.svg.SvgPathImage).save(data)
+                raw = data.getvalue()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/svg+xml")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(raw)
+                return
+            return self._json(200, {"url": link, "expires": pairing.expires})
+        if parts == ["api", "projects"]:
+            return self._json(200, {"projects": [
+                {"job_id": jid, "created": job.get("created"), "edit": job.get("edit"),
+                 "ready": bool(job.get("report"))}
+                for jid, job in list(JOBS.items()) if self.owner == "local" or job.get("owner") == self.owner]})
+        if len(parts) == 4 and parts[:2] == ["api", "uploads"]:
+            job = self._job(parts[2])
+            upload = job.get("uploads", {}).get(parts[3]) if job else None
+            return self._json(200 if upload else 404, upload or {"error": "Upload not found."})
         if not parts:
             return self._file(INDEX, "text/html; charset=utf-8")
         if len(parts) == 2 and parts[0] == "assets" and parts[1] in STATIC_ASSETS:
@@ -242,9 +375,9 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if parts == ["assets", "rubik.ttf"]:
             return self._file(FONT, "font/ttf")
         if len(parts) == 4 and parts[:2] == ["api", "export"]:
-            job = JOBS.get(parts[2])
+            job = self._job(parts[2])
             try:
-                entry = job["exports"][int(parts[3]) - 1] if job else None
+                entry = next((e for e in job.get("exports", []) if e["version"] == int(parts[3])), None) if job else None
             except (KeyError, IndexError, ValueError):
                 entry = None
             if not entry:
@@ -255,18 +388,18 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             # header turns every other way of opening it (a phone's share sheet,
             # a tab) into a blank page.
             return self._file(Path(entry["file"]), "video/mp4")
-        if len(parts) == 3 and parts[0] == "api" and parts[1] in {"video", "export"}:
-            job = JOBS.get(parts[2])
+        if len(parts) == 3 and parts[0] == "api" and parts[1] in {"video", "export", "proxy"}:
+            job = self._job(parts[2])
             if not job:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            path = job["source"] if parts[1] == "video" else job.get("export")
+            path = job.get("source") if parts[1] == "video" else job.get(parts[1])
             if not path:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             return self._file(Path(path), "video/mp4")
         if len(parts) == 3 and parts[1] in {"export-status", "analyse-status"} and parts[0] == "api":
-            job = JOBS.get(parts[2])
+            job = self._job(parts[2])
             key = parts[1].replace("-", "_")
             if not job or key not in job:
                 return self._json(HTTPStatus.NOT_FOUND, {"error": "Job not found."})
@@ -279,12 +412,12 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.OK, state)
         if len(parts) == 3 and parts[:2] == ["api", "grab-status"]:
             grab = GRABS.get(parts[2])
-            if not grab:
+            if not grab or (self.owner != "local" and grab.get("owner") != self.owner):
                 return self._json(HTTPStatus.NOT_FOUND, {"error": "Download not found."})
             return self._json(HTTPStatus.OK, grab["status"])
         if len(parts) == 3 and parts[:2] == ["api", "grab"]:
             grab = GRABS.get(parts[2])
-            if not grab or not grab.get("file"):
+            if not grab or not grab.get("file") or (self.owner != "local" and grab.get("owner") != self.owner):
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             # Inline, like the exported movie: a phone's share sheet and an
@@ -293,22 +426,24 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if parts == ["api", "capabilities"]:
             encoder = h264_encoder()
             return self._json(HTTPStatus.OK, {"youtube": bool(shutil.which("yt-dlp")),
+                                              "pairing": self.owner == "local" and hasattr(self.server, "phone_url"),
                                               "version": __version__, "encoder": encoder,
                                               "gpu": encoder != "libx264"})
         if len(parts) == 3 and parts[:2] == ["api", "session"]:
             # Lets a page that was closed mid-job rebuild its state on return.
-            job = JOBS.get(parts[2])
+            job = self._job(parts[2])
             if not job:
                 return self._json(HTTPStatus.NOT_FOUND, {"error": "Session not found."})
             return self._json(HTTPStatus.OK, {
+                "edit": job.get("edit"), "revision": job.get("revision", 0),
                 "music": job.get("music_meta", []),
                 "pending_music": job.get("pending_music_meta"),
-                "exporting": "export_status" in job,
+                "exporting": job.get("export_status", {}).get("state") == "running",
                 "exports": [{k: item[k] for k in ("version", "download", "clips", "duration", "quality", "aspect")}
                             for item in job.get("exports", [])],
             })
         if len(parts) == 3 and parts[:2] == ["api", "music-preview"]:
-            job = JOBS.get(parts[2])
+            job = self._job(parts[2])
             track = job.get("pending_music") if job else None
             if not track:
                 self.send_error(HTTPStatus.NOT_FOUND)
@@ -318,10 +453,43 @@ class RKMotionHandler(BaseHTTPRequestHandler):
 
     def _read_json(self) -> dict:
         size = int(self.headers.get("Content-Length", "0"))
-        return json.loads(self.rfile.read(size) or b"{}")
+        if not 0 <= size <= 4 * 1024 * 1024:
+            self.close_connection = True
+            raise ValueError("JSON request is too large.")
+        value = json.loads(self.rfile.read(size) or b"{}")
+        if not isinstance(value, dict):
+            raise ValueError("Expected a JSON object.")
+        return value
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._authorize(mutation=True):
+            return
+        try:
+            return self._dispatch_POST()
+        except (ValueError, KeyError, TypeError) as error:
+            self.close_connection = True
+            return self._json(400, {"error": str(error)})
+        except OSError as error:
+            self.close_connection = True
+            return self._json(422, {"error": str(error)})
+
+    def _dispatch_POST(self):
         route = urlparse(self.path).path
+        if route == "/api/pair":
+            if not getattr(self.server, "require_pairing", False):
+                raise ValueError("Use the HTTPS pairing address.")
+            token, _ = self.server.pairing.pair(self._read_json().get("code"), self.client_address[0])
+            self.pair_cookie = token
+            return self._json(200, {"token": token})
+        if route.startswith("/api/uploads/"):
+            return self._begin_upload(route.rsplit("/", 1)[-1])
+        if route.startswith("/api/chunk/"):
+            parts = route.split("/")
+            if len(parts) != 5:
+                raise ValueError("Invalid upload path.")
+            return self._upload_chunk(parts[3], parts[4])
+        if route.startswith("/api/edit/"):
+            return self._save_edit(route.rsplit("/", 1)[-1])
         if route == "/api/analyse":
             return self._analyse_upload()
         if route == "/api/prepare":
@@ -335,16 +503,27 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if route == "/api/youtube/grab":
             return self._youtube_grab()
         if route.startswith("/api/youtube/download/"):
-            return self._youtube_download(route.rsplit("/", 1)[-1])
+            return self._music_mutation(self._youtube_download, route.rsplit("/", 1)[-1])
         if route.startswith("/api/music/attach/"):
-            return self._attach_pending_music(route.rsplit("/", 1)[-1])
+            return self._music_mutation(self._attach_pending_music, route.rsplit("/", 1)[-1])
         if route.startswith("/api/music/"):
-            return self._upload_music(route.rsplit("/", 1)[-1])
+            return self._music_mutation(self._upload_music, route.rsplit("/", 1)[-1])
         if route.startswith("/api/video/"):
             return self._upload_video(route.rsplit("/", 1)[-1])
         if route.startswith("/api/analyse-batch/"):
             return self._analyse_batch(route.rsplit("/", 1)[-1])
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _music_mutation(self, callback, job_id):
+        job = self._job(job_id)
+        if not job:
+            self.close_connection = True
+            return self._json(404, {"error": "Project not found."})
+        with _job_lock(job):
+            if job.get("_worker"):
+                self.close_connection = True
+                return self._json(409, {"error": "Wait for the running operation before changing music."})
+            return callback(job_id)
 
     def _youtube_search(self) -> None:
         try:
@@ -353,7 +532,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 raise ValueError("Enter a search query.")
             if not shutil.which("yt-dlp"):
                 raise RuntimeError("YouTube search needs yt-dlp installed on this computer (https://github.com/yt-dlp/yt-dlp).")
-            result = subprocess.run(["yt-dlp", "--flat-playlist", "--dump-single-json", f"ytsearch5:{query}"],
+            result = run_process(["yt-dlp", "--flat-playlist", "--dump-single-json", f"ytsearch5:{query}"],
                                     capture_output=True, text=True, check=True, timeout=45)
             entries = json.loads(result.stdout).get("entries", [])
             items = [{"id": item.get("id"), "title": item.get("title", "Untitled"),
@@ -374,7 +553,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
 
     def _youtube_download(self, job_id: str) -> None:
         try:
-            job, request = JOBS.get(job_id), self._read_json()
+            job, request = self._job(job_id), self._read_json()
             if not job:
                 raise ValueError("Video session not found.")
             if not request.get("rights_confirmed"):
@@ -394,7 +573,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                     cmd.extend(["--extractor-args", f"youtube:player_client={clients}"])
                 cmd.append(url)
                 try:
-                    subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=180)
+                    run_process(cmd, capture_output=True, text=True, check=True, timeout=180)
                     last_error = None
                     break
                 except subprocess.CalledProcessError as exc:
@@ -411,6 +590,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             # Keep the display title so a reconnecting page can rebuild the list.
             job["pending_music_meta"] = {"name": str(request.get("title") or tracks[0].name),
                                          "duration": track_duration, "kind": "youtube"}
+            _persist(job)
             return self._json(HTTPStatus.OK, {"name": tracks[0].name, "duration": track_duration})
         except subprocess.CalledProcessError as exc:
             detail = exc.stderr.strip().splitlines()[-1] if exc.stderr.strip() else "yt-dlp failed"
@@ -426,30 +606,155 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
 
     def _attach_pending_music(self, job_id: str) -> None:
-        job = JOBS.get(job_id)
+        job = self._job(job_id)
         if not job or not job.get("pending_music"):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "No downloaded music is waiting to be added."})
         job.setdefault("music", []).append(job.pop("pending_music"))
         meta = job.pop("pending_music_meta", None)
         if meta:
             job.setdefault("music_meta", []).append(meta)
+        _persist(job)
         return self._json(HTTPStatus.OK, {"ok": True})
 
     def _reset(self, job_id: str) -> None:
         """Throw away an edit in progress, files and all."""
-        job = JOBS.pop(job_id, None)
+        job = self._job(job_id)
         if job:
-            shutil.rmtree(job.get("folder", ""), ignore_errors=True)
+            with _job_lock(job):
+                job["_deleted"] = True
+                worker, thread = job.get("_worker"), job.get("_thread")
+                if worker:
+                    worker.cancel()
+            if thread:
+                thread.join(timeout=10)
+                if thread.is_alive():
+                    job["_deleted"] = False
+                    return self._json(409, {"error": "Cancellation is still finishing. Retry shortly."})
+            with _job_lock(job):
+                JOBS.pop(job_id, None)
+                shutil.rmtree(job["folder"], ignore_errors=True)
         return self._json(HTTPStatus.OK, {"ok": True})
 
     def _prepare_batch(self) -> None:
+        if sum(job.get("owner") == self.owner for job in list(JOBS.values())) >= 12:
+            return self._json(429, {"error": "Delete an unused project before starting another (maximum 12)."})
         job_id = uuid.uuid4().hex
-        folder = Path(tempfile.mkdtemp(prefix="rk-motion-"))
-        JOBS[job_id] = {"folder": folder, "inputs": []}
+        folder = PROJECT_ROOT / job_id if PROJECT_ROOT else Path(tempfile.mkdtemp(prefix="rk-motion-"))
+        folder.mkdir(parents=True, exist_ok=True)
+        JOBS[job_id] = {"folder": folder, "inputs": [], "owner": self.owner,
+                        "created": time.time(), "revision": 0}
+        _persist(JOBS[job_id])
         return self._json(HTTPStatus.OK, {"job_id": job_id})
 
+    def _begin_upload(self, job_id):
+        job = self._job(job_id)
+        if not job:
+            return self._json(404, {"error": "Project not found."})
+        data = self._read_json()
+        name = Path(str(data.get("name", "ride.mp4"))).name
+        size = int(data["size"])
+        suffix = Path(name).suffix.lower()
+        kind = data.get("kind", "video")
+        extensions = {"video": {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"},
+                      "music": {".mp3", ".m4a", ".aac", ".wav", ".ogg"}}
+        if kind not in extensions or suffix not in extensions[kind] or not 0 < size <= (30 if kind == "video" else 2) * 1024**3:
+            raise ValueError("Invalid file type or size.")
+        with _job_lock(job):
+            if job.get("_worker"):
+                return self._json(409, {"error": "Wait for the running operation."})
+            reserved = sum(u["size"] - u["offset"] for j in list(JOBS.values())
+                           for u in j.get("uploads", {}).values() if not u["complete"])
+            if size + reserved + 512 * 1024**2 > shutil.disk_usage(job["folder"]).free:
+                raise ValueError("Not enough free space on the Mac for this upload.")
+            upload_id = uuid.uuid4().hex
+            job.setdefault("uploads", {})[upload_id] = {"name": name, "size": size, "offset": 0,
+                    "kind": kind, "complete": False, "file": str(Path(job["folder"]) / (upload_id + suffix))}
+            _persist(job)
+            return self._json(201, {"upload_id": upload_id, "offset": 0})
+
+    def _upload_chunk(self, job_id, upload_id):
+        job = self._job(job_id)
+        upload = job.get("uploads", {}).get(upload_id) if job else None
+        if not upload:
+            self.close_connection = True
+            return self._json(404, {"error": "Upload not found."})
+        size = int(self.headers.get("Content-Length", "0"))
+        offset = int(self.headers.get("Upload-Offset", "-1"))
+        if not 0 < size <= 8 * 1024**2:
+            self.close_connection = True
+            raise ValueError("Send chunks of at most 8MB.")
+        with _job_lock(job):
+            if job.get("_worker") or job.get("_deleted") or upload["complete"] or offset != upload["offset"]:
+                self.close_connection = True
+                return self._json(409, {"error": "Upload offset changed.", "offset": upload["offset"]})
+            if offset + size > upload["size"]:
+                raise ValueError("Chunk exceeds the declared file size.")
+            target = Path(upload["file"])
+            # A crash may leave bytes beyond the committed offset; overwrite
+            # those bytes on retry instead of trusting the partial write.
+            with target.open("r+b" if target.exists() else "w+b") as handle:
+                handle.seek(offset)
+                remaining = size
+                while remaining:
+                    chunk = self.rfile.read(min(1024**2, remaining))
+                    if not chunk:
+                        self.close_connection = True
+                        handle.truncate(offset)
+                        raise ValueError("Upload interrupted. Retry this chunk.")
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+                handle.truncate(offset + size)
+                handle.flush()
+                os.fsync(handle.fileno())
+            music_seconds = None
+            if offset + size == upload["size"] and upload["kind"] == "music":
+                try:
+                    music_seconds = duration(str(target))
+                except Exception as exc:
+                    raise ValueError("The uploaded audio could not be decoded. Retry or choose another file.") from exc
+            upload["offset"] = offset + size
+            if upload["offset"] == upload["size"]:
+                upload["complete"] = True
+                if upload["kind"] == "video":
+                    job["inputs"].append(str(target))
+                else:
+                    job.setdefault("music", []).append(str(target))
+                    job.setdefault("music_meta", []).append({"name": upload["name"], "duration": music_seconds, "kind": "file"})
+            _persist(job)
+            return self._json(200, {"offset": upload["offset"], "complete": upload["complete"]})
+
+    def _save_edit(self, job_id):
+        job = self._job(job_id)
+        if not job or not job.get("report"):
+            return self._json(404, {"error": "Analyzed project not found."})
+        data = self._read_json()
+        edit = data["edit"]
+        if not isinstance(edit, dict) or not isinstance(edit.get("clips"), list):
+            raise ValueError("Invalid edit document.")
+        if edit["clips"]:
+            validate_clips(edit["clips"], job["report"]["duration"])
+        # The saved document intentionally excludes scores and thumbnails.
+        with _job_lock(job):
+            if int(data.get("revision", -1)) != job.get("revision", 0):
+                return self._json(409, {"error": "Another client saved this project. Reload before editing.", "revision": job.get("revision", 0)})
+            job["edit"] = copy.deepcopy(edit)
+            job["revision"] = job.get("revision", 0) + 1
+            _persist(job)
+            return self._json(200, {"revision": job["revision"]})
+
     def _upload_video(self, job_id: str) -> None:
-        job = JOBS.get(job_id)
+        job = self._job(job_id)
+        if job:
+            with _job_lock(job):
+                if job.get("_worker"):
+                    self.close_connection = True
+                    return self._json(409, {"error": "A job is running. Wait before uploading."})
+                return self._upload_video_locked(job_id)
+        self.close_connection = True
+        return self._json(404, {"error": "Video session not found."})
+
+    def _upload_video_locked(self, job_id):
+        job = self._job(job_id)
         size = int(self.headers.get("Content-Length", "0"))
         # Bailing out leaves the upload's body unread. On a kept-alive
         # connection those bytes would be read as the next request, so this
@@ -457,7 +762,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         if not job:
             self.close_connection = True
             return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
-        if not size or size > 30 * 1024 * 1024 * 1024:
+        if size <= 0 or size > 30 * 1024 * 1024 * 1024:
             self.close_connection = True
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose video files smaller than 30GB."})
         suffix = Path(unquote(self.headers.get("X-Filename", "ride.mp4"))).suffix or ".mp4"
@@ -472,15 +777,29 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 handle.write(chunk)
                 remaining -= len(chunk)
         job["inputs"].append(target)
+        _persist(job)
         return self._json(HTTPStatus.OK, {"index": len(job["inputs"])})
 
     def _analyse_batch(self, job_id: str) -> None:
         """Start analysis in the background; the client polls /api/analyse-status."""
-        job = JOBS.get(job_id)
+        job = self._job(job_id)
+        if job:
+            with _job_lock(job):
+                if job.get("_worker"):
+                    return self._json(409, {"error": "A job is already running for this project."})
+                return self._analyse_batch_locked(job_id)
+        return self._json(404, {"error": "Project not found."})
+
+    def _analyse_batch_locked(self, job_id):
+        job = self._job(job_id)
         if not job or not job.get("inputs"):
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Add at least one video first."})
+        if any(not u["complete"] and u["kind"] == "video" for u in job.get("uploads", {}).values()):
+            return self._json(409, {"error": "Finish uploading all videos before analysis."})
         raw_max = self.headers.get("X-Max-Scene-Length", "").strip()
         max_duration = float(raw_max) if raw_max else None
+        if max_duration is not None and (not math.isfinite(max_duration) or max_duration < 1):
+            raise ValueError("Scene length must be at least one second.")
         # "Already edited, just add music": keep the footage whole and skip the
         # motion/sound scan entirely, which is most of the wait.
         whole = self.headers.get("X-Whole-Video", "").strip() == "1"
@@ -497,7 +816,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 _, width, height = self._video_meta(item)
                 work += duration(str(item)) * (width * height / 1e6)
             except Exception:
-                work += item.stat().st_size / 3e6  # rough fallback when probing fails
+                work += Path(item).stat().st_size / 3e6  # rough fallback when probing fails
         rates = _perf_rates()
         scan = 0.0 if whole else work / rates["fast"]
         estimate = max(8, round(work / rates[kind] + 4)) if not whole else max(6, round(
@@ -510,8 +829,10 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                                  "estimated_seconds": estimate, "percent": 0,
                                  "phase_weights": [prepare, scan],
                                  "message": "מכינה את הסרטונים…"}
-        threading.Thread(target=self._run_analyse,
-                         args=(job, job_id, max_duration, whole), daemon=True).start()
+        with _job_lock(job):
+            if job.get("_worker"):
+                return self._json(409, {"error": "A job is already running for this project."})
+            _start_worker(job, self._run_analyse, (job, job_id, max_duration, whole))
         return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/analyse-status/{job_id}"})
 
     @classmethod
@@ -525,8 +846,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 phases.note(message)
                 phases.update(fraction)
 
-            source = cls._prepare_source(job["inputs"], Path(job["folder"]), prepared)
+            source = cls._prepare_source([Path(p) for p in job["inputs"]], Path(job["folder"]), prepared)
             job["source"] = source
+            # A small H.264/AAC file makes timeline preview practical on phones.
+            proxy = Path(job["folder"]) / "preview.mp4"
+            prepared("מכינה תצוגה מקדימה לאייפון…")
+            run_encode(["ffmpeg", "-y", "-i", str(source), "-vf",
+                        r"scale=w=trunc(iw*min(1\,720/ih)/2)*2:h=trunc(ih*min(1\,720/ih)/2)*2,setsar=1",
+                        "-r", "30", *h264_args(), "-c:a", "aac", "-b:a", "96k",
+                        "-movflags", "+faststart", str(proxy)], cls._safe_duration(source))
+            job["proxy"] = str(proxy)
             if whole:
                 report = cls._whole_video_report(source)
             else:
@@ -570,7 +899,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _video_meta(path: Path) -> tuple[str, int, int]:
         """(codec, width, height) of the first video stream."""
-        result = subprocess.run(
+        result = run_process(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=codec_name,width,height", "-of", "json", str(path)],
             capture_output=True, text=True, check=True)
@@ -581,7 +910,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     def _video_bitrate(path: Path) -> int:
         """Bits per second of the video stream, 0 when the container hides it."""
         try:
-            result = subprocess.run(
+            result = run_process(
                 ["ffprobe", "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=bit_rate", "-of",
                  "default=noprint_wrappers=1:nokey=1", str(path)],
@@ -614,8 +943,19 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         from .action import _has_audio
         codec, width, height = cls._video_meta(inputs[0])
         if len(inputs) == 1:
-            if codec == "h264":
+            details = run_process(["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(inputs[0])],
+                                  capture_output=True, text=True, check=True)
+            streams = json.loads(details.stdout)["streams"]
+            videos = [s for s in streams if s["codec_type"] == "video"]
+            audios = [s for s in streams if s["codec_type"] == "audio"]
+            compatible = codec == "h264" and videos[0].get("pix_fmt") == "yuv420p" and all(s["codec_name"] == "aac" for s in audios)
+            if compatible and inputs[0].suffix.lower() == ".mp4":
                 return inputs[0]
+            if compatible:
+                target = folder / "source.mp4"
+                run_process(["ffmpeg", "-y", "-v", "error", "-i", str(inputs[0]), "-map", "0:v:0", "-map", "0:a?",
+                             "-c", "copy", "-movflags", "+faststart", str(target)], capture_output=True, check=True)
+                return target
             label = "ממירה את הסרטון לפורמט תואם, באיכות מלאה…"
             if progress:
                 progress(label, 0.0)
@@ -650,7 +990,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         listing = folder / "videos.txt"
         listing.write_text("".join("file '" + str(item).replace("'", "'\\''") + "'\n" for item in normalised))
         output = folder / "source.mp4"
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
+        run_process(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
                         "-c", "copy", "-movflags", "+faststart", str(output)], check=True, capture_output=True)
         return output
 
@@ -678,8 +1018,11 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                 raise RuntimeError("Downloading needs yt-dlp installed on this computer "
                                    "(https://github.com/yt-dlp/yt-dlp).")
             token = uuid.uuid4().hex
+            if len(GRABS) >= 20:
+                raise ValueError("Too many downloads. Restart the Mac app to clear temporary downloads.")
             GRABS[token] = {"status": {"state": "running", "percent": 0,
                                        "message": "מורידה מיוטיוב…"},
+                            "owner": self.owner,
                             "title": str(request.get("title") or video_id)}
             threading.Thread(target=self._run_grab, args=(token, video_id, kind),
                              daemon=True).start()
@@ -723,29 +1066,28 @@ class RKMotionHandler(BaseHTTPRequestHandler):
     @staticmethod
     def _watch_grab(cmd: list[str], status: dict) -> None:
         """Run yt-dlp, turning its byte counts into the same bar as everything else."""
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        assert proc.stdout
-        for line in proc.stdout:
-            if not line.startswith("rk:"):
-                continue
-            done, _, total = line[3:].strip().partition("/")
-            if done.isdigit() and total.isdigit() and int(total) > 0:
-                # 97% at most: merging and converting happen after the bytes land.
-                status["percent"] = min(97, round(int(done) / int(total) * 100))
-        stderr = proc.stderr.read() if proc.stderr else ""
-        if proc.wait() != 0:
-            raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=stderr)
+        with StreamProcess(cmd, text=True, timeout=600) as proc:
+            assert proc.stdout
+            for line in proc.stdout:
+                if not line.startswith("rk:"):
+                    continue
+                done, _, total = line[3:].strip().partition("/")
+                if done.isdigit() and total.isdigit() and int(total) > 0:
+                    status["percent"] = min(97, round(int(done) / int(total) * 100))
+            code = proc.wait()
+            if code != 0:
+                raise subprocess.CalledProcessError(code, cmd, stderr=proc.stderr.read())
         status["message"] = "ממירה לקובץ…"
 
     def _upload_music(self, job_id: str) -> None:
-        job = JOBS.get(job_id)
+        job = self._job(job_id)
         size = int(self.headers.get("Content-Length", "0"))
         # As in _upload_video: an unread body would be read as the next
         # request on a kept-alive connection.
         if not job:
             self.close_connection = True
             return self._json(HTTPStatus.NOT_FOUND, {"error": "Video session not found."})
-        if not size or size > 2 * 1024 * 1024 * 1024:
+        if size <= 0 or size > 2 * 1024 * 1024 * 1024:
             self.close_connection = True
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose an audio file smaller than 2GB."})
         name = Path(unquote(self.headers.get("X-Filename", "music.mp3"))).name
@@ -763,15 +1105,16 @@ class RKMotionHandler(BaseHTTPRequestHandler):
                     return self._json(HTTPStatus.BAD_REQUEST, {"error": "Music upload ended early."})
                 handle.write(chunk)
                 remaining -= len(chunk)
-        job.setdefault("music", []).append(target)
         track_duration = duration(str(target))
+        job.setdefault("music", []).append(target)
         job.setdefault("music_meta", []).append({"name": name, "duration": track_duration, "kind": "file"})
+        _persist(job)
         return self._json(HTTPStatus.OK, {"name": name, "duration": track_duration})
 
     def _analyse_upload(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
         name = Path(unquote(self.headers.get("X-Filename", "ride.mp4"))).name
-        if not length or length > 30 * 1024 * 1024 * 1024:
+        if length <= 0 or length > 30 * 1024 * 1024 * 1024:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": "Choose a video smaller than 30GB."})
         suffix = Path(name).suffix or ".mp4"
         job_id = uuid.uuid4().hex
@@ -792,15 +1135,30 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         except Exception as exc:  # keep UI errors actionable, never crash its server
             shutil.rmtree(folder, ignore_errors=True)
             return self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
-        JOBS[job_id] = {"folder": folder, "source": source, "report": report}
+        JOBS[job_id] = {"folder": folder, "source": source, "report": report,
+                        "owner": self.owner, "created": time.time(), "revision": 0,
+                        "analyse_status": {"state": "done", "report": report}}
         report["job_id"] = job_id
+        _persist(JOBS[job_id])
         return self._json(HTTPStatus.OK, report)
 
     def _export(self) -> None:
+        request = self._read_json()
+        job = self._job(request.get("job_id"))
+        if not job or not job.get("report"):
+            return self._json(404, {"error": "Analyzed project not found."})
+        with _job_lock(job):
+            key = self.headers.get("Idempotency-Key", "")
+            if key and key == job.get("export_key"):
+                return self._json(202, {"status_url": f"/api/export-status/{request['job_id']}"})
+            if job.get("_worker"):
+                return self._json(409, {"error": "A job is already running for this project."})
+            return self._export_locked(job, request, key)
+
+    def _export_locked(self, job, request, key):
         try:
-            request = self._read_json()
-            job = JOBS[request["job_id"]]
-            clips = request["clips"]
+            clips = copy.deepcopy(request["clips"])
+            validate_clips(clips, job["report"]["duration"])
             if not clips:
                 raise ValueError("select at least one clip before exporting")
             # Work-based estimate at this machine's learned encode speed;
@@ -808,6 +1166,17 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             edit_seconds = sum(float(clip["end"]) - float(clip["start"]) for clip in clips)
             quality = str(request.get("quality", "1080"))
             aspect = str(request.get("aspect", "16:9"))
+            transition = request.get("transition", "cut")
+            transition_seconds = float(request.get("transition_duration", .5))
+            music_start = float(request.get("music_start", 0))
+            speed = float(request.get("speed", 1))
+            volume = float(request.get("music_volume", .65))
+            if quality not in {"720", "1080", "whatsapp", "original"} or aspect not in {"16:9", "9:16"}:
+                raise ValueError("Invalid output quality or aspect ratio.")
+            if transition not in TRANSITIONS or not .1 <= transition_seconds <= 3:
+                raise ValueError("Invalid transition settings.")
+            if speed not in {1., 1.25, 1.5, 2.} or not 0 < volume <= 2 or not math.isfinite(music_start) or music_start < 0:
+                raise ValueError("Invalid speed or music settings.")
             try:
                 _, width, height = self._video_meta(Path(job["source"]))
                 cap = {"720": 720, "1080": 1080, "whatsapp": 720}.get(quality)
@@ -823,12 +1192,15 @@ class RKMotionHandler(BaseHTTPRequestHandler):
             job["export_status"] = {"state": "running", "started": time.monotonic(),
                                     "estimated_seconds": estimate, "percent": 0,
                                     "message": "מכינה את קטעי הווידאו…"}
-            threading.Thread(target=self._run_export,
-                             args=(job, clips, request.get("transition", "cut"),
-                                   float(request.get("transition_duration", .5)),
-                                   bool(request.get("use_music")), float(request.get("music_start", 0)),
-                                   float(request.get("speed", 1)), bool(request.get("remove_original_audio")),
-                                   quality, float(request.get("music_volume", .65)), aspect), daemon=True).start()
+            # Reserve before starting a worker so no second request can select
+            # the same filename, including after a failed previous export.
+            job["export_version"] = job.get("export_version", len(job.get("exports", []))) + 1
+            job["export_key"] = key
+            _start_worker(job, self._run_export,
+                             (job, clips, transition, transition_seconds,
+                                   bool(request.get("use_music")), music_start,
+                                   speed, bool(request.get("remove_original_audio")),
+                                   quality, volume, aspect))
             return self._json(HTTPStatus.ACCEPTED, {"status_url": f"/api/export-status/{request['job_id']}"})
         except (KeyError, ValueError, TypeError) as exc:
             return self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -851,7 +1223,7 @@ class RKMotionHandler(BaseHTTPRequestHandler):
         try:
             status["message"] = "מייצאת את הסרט הערוך…"
             phases = _Phases(status, [1.0])
-            version = len(job.get("exports", [])) + 1
+            version = job.get("export_version", len(job.get("exports", [])) + 1)
             output = Path(job["folder"]) / f"RK-Motion-edit-{version:02d}.mp4"
             export_edited_movie(str(job["source"]), clips, str(output),
                                 transition=transition, transition_duration=transition_duration,
@@ -934,6 +1306,9 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
     # their own HTTPS listener on the network address — same port, different
     # interface — because only a secure connection may open the share sheet
     # that saves a finished movie to the camera roll.
+    global PROJECT_ROOT
+    PROJECT_ROOT = Path(os.environ.get("RK_MOTION_PROJECTS", str(Path.home() / ".rk-motion" / "projects")))
+    _load_projects(PROJECT_ROOT)
     server = ThreadingHTTPServer(("127.0.0.1", port), RKMotionHandler)
     url = f"http://127.0.0.1:{port}"
     encoder = h264_encoder()
@@ -941,6 +1316,10 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
     print(f"RK Motion v{__version__} is running at {url} (Ctrl+C to stop)")
     print(f"Video encoding: {encoder} ({hardware})")
     phone = _serve_to_phones(port) if lan else None
+    if phone:
+        server.pairing = phone.pairing
+        server.phone_url = phone.phone_url
+        server.fingerprint = phone.fingerprint
     threading.Timer(.3, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
@@ -951,8 +1330,13 @@ def launch_ui(port: int = 8787, lan: bool = False) -> int:
         if phone:
             phone.shutdown()
             phone.server_close()
-        for job in JOBS.values():
-            shutil.rmtree(job["folder"], ignore_errors=True)
+        for job in list(JOBS.values()):
+            if job.get("_worker"):
+                job["_worker"].cancel()
+            thread = job.get("_thread")
+            if thread:
+                thread.join(timeout=10)
+            _persist(job)
         if _GRAB_ROOT:
             shutil.rmtree(_GRAB_ROOT, ignore_errors=True)
 
@@ -977,9 +1361,14 @@ def _serve_to_phones(port: int) -> ThreadingHTTPServer | None:
         print(f"\nCould not open {ip}:{port} for phone access ({error}).\n")
         return None
     phone.socket = context.wrap_socket(phone.socket, server_side=True)
+    phone.require_pairing = True
+    phone.pairing = Pairing(Path(pair[0]).parent / "clients.json")
+    der = ssl.PEM_cert_to_DER_cert(Path(pair[0]).read_text())
+    phone.fingerprint = hashlib.sha256(der).hexdigest()
+    phone.phone_url = f"https://{ip}:{port}"
     threading.Thread(target=phone.serve_forever, daemon=True).start()
 
-    lan_url = f"https://{ip}:{port}"
+    lan_url = f"https://{ip}:{port}/#pair={phone.pairing.code}&fingerprint={phone.fingerprint}"
     print(f"\nOn your phone (same Wi-Fi), open: {lan_url}")
     print("Scan this QR code to open it directly:\n")
     if not _print_qr(lan_url):
@@ -988,5 +1377,5 @@ def _serve_to_phones(port: int) -> ThreadingHTTPServer | None:
     print("private: the certificate is this computer's own, not one a company signed.")
     print("Tap Show Details, then Visit This Website. That warning is what buys you")
     print("saving the finished movie straight to the phone's camera roll.")
-    print("\nAnyone on this Wi-Fi can reach the app while it runs.\n")
+    print("\nThis private pairing link expires in 10 minutes. Open phone pairing on the Mac for a new link.\n")
     return phone
