@@ -29,7 +29,7 @@ private struct ProjectCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(project.name).lineLimit(2).foregroundStyle(.primary)
                 Text(project.created.formatted(date: .abbreviated, time: .omitted)).font(.caption).foregroundStyle(.secondary)
-                Text(project.analyzed ? "\(Int(project.duration)) שניות · \(project.exports.count) סרטים שנוצרו" : "מוכן לניתוח")
+                Text(project.analyzed ? String(format: NSLocalizedString("%@ שניות · %@ סרטים שנוצרו", comment: "Project summary"), "\(Int(project.duration))", "\(project.exports.count)") : NSLocalizedString("מוכן לניתוח", comment: "Project awaiting analysis"))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }.task(id: project.source) {

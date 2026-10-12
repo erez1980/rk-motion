@@ -63,7 +63,11 @@ authorized. No Apple credentials are currently available.
 - [x] Clarify resolution-only original option and actual SDR/30fps output.
 - [x] Split navigation into projects/editor/settings; improve trimming/preview.
 - [x] Hebrew String Catalog foundation, trim/progress accessibility labels and permission Settings action.
-- [ ] Full VoiceOver/Dynamic Type/rotation validation and English localization (not claimed complete).
+- [x] English localization: all interface text, every status and failure
+      message, and the iOS Photos permission prompt. Enforced by the store
+      check, so untranslated text cannot ship.
+- [ ] Full VoiceOver/Dynamic Type/rotation validation (needs a device; code
+      carries accessibility labels but nothing was seen on a screen).
 - [x] Add focused native tests for new behavior; export CI logs/xcresult on failure.
 - [ ] Track real on-device HEVC/HDR/long-clip/storage/background validation.
 
@@ -109,6 +113,24 @@ authorized. No Apple credentials are currently available.
   Desktop empty-analysis typo and cross-project upload reservation race fixed.
   Checkpoint 2 CI 38206639216 PASSED native compile/tests/device IPA; Python
   CI 38206639230 PASSED. No performance speedup or physical testing claimed.
+
+- Checkpoint 4 (localization, Claude): the catalog held Hebrew only, so an
+  English device read Hebrew everywhere, and the Photos prompt stayed Hebrew in
+  every language because iOS reads it from Info.plist, which Localizable
+  never covers. Added `InfoPlist.xcstrings` and wired it into the build.
+  Status and failure messages were plain Swift strings; `AppError` now resolves
+  its own description and the status line resolves on display, which covers
+  every throw site and assignment without touching them. Assembled messages
+  resolve their prefix separately. Interpolated text was rewritten as explicit
+  format keys so the catalog key does not depend on how SwiftUI spells an
+  interpolation. `"סיום"` was one key serving both the End label and the Done
+  buttons, which no single English word can do, so the buttons read `"בוצע"` —
+  the only Hebrew wording change, and Erez was told. Catalog: 76 -> 169 keys.
+  `check-ios-store.py` now fails on a catalog key missing Hebrew or English, on
+  a usage description with no catalog entry, and on any Hebrew literal in the
+  Swift sources that is not a catalog key; all three were confirmed to fail on
+  deliberately broken input. Native and Python CI passed on 6da47a9 and
+  a29977c. No device, VoiceOver or Dynamic Type validation was performed.
 
 ## Current release limits and next steps
 

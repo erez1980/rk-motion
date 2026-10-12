@@ -385,19 +385,19 @@ final class CompositionCheck: NSObject, AVVideoCompositionValidationHandling {
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidValueForKey key: String) -> Bool {
-        note("ערך לא תקין: \(key)")
+        note(String(format: NSLocalizedString("ערך לא תקין: %@", comment: "Invalid composition value"), key))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingEmptyTimeRange timeRange: CMTimeRange) -> Bool {
-        note("פער ללא הוראה: \(seconds(timeRange))")
+        note(String(format: NSLocalizedString("פער ללא הוראה: %@", comment: "Uncovered composition range"), seconds(timeRange)))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTimeRangeIn instruction: any AVVideoCompositionInstructionProtocol) -> Bool {
-        note("טווח זמן לא תקין: \(seconds(instruction.timeRange))")
+        note(String(format: NSLocalizedString("טווח זמן לא תקין: %@", comment: "Invalid instruction range"), seconds(instruction.timeRange)))
     }
     func videoComposition(_ videoComposition: AVVideoComposition,
                           shouldContinueValidatingAfterFindingInvalidTrackIDIn instruction: any AVVideoCompositionInstructionProtocol,
                           layerInstruction: AVVideoCompositionLayerInstruction, asset: AVAsset) -> Bool {
-        note("ערוץ לא תקין \(layerInstruction.trackID) בטווח \(seconds(instruction.timeRange))")
+        note(String(format: NSLocalizedString("ערוץ לא תקין %@ בטווח %@", comment: "Invalid composition track"), "\(layerInstruction.trackID)", seconds(instruction.timeRange)))
     }
 }

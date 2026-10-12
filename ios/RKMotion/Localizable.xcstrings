@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "he",
   "strings": {
+    "%@ אחוז": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ percent"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ אחוז"
+          }
+        }
+      }
+    },
     "%@ שניות": {
       "localizations": {
         "en": {
@@ -13,6 +29,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ שניות"
+          }
+        }
+      }
+    },
+    "%@ שניות · %@ סרטים שנוצרו": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ seconds · %@ movies created"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ שניות · %@ סרטים שנוצרו"
           }
         }
       }
@@ -1009,6 +1041,22 @@
         }
       }
     },
+    "התחלה: %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start: %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התחלה: %@ שניות"
+          }
+        }
+      }
+    },
     "התצוגה המקדימה בוטלה": {
       "localizations": {
         "en": {
@@ -1149,6 +1197,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "חיתוך קטע"
+          }
+        }
+      }
+    },
+    "טווח זמן לא תקין: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid time range: %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "טווח זמן לא תקין: %@"
           }
         }
       }
@@ -1745,6 +1809,38 @@
         }
       }
     },
+    "משך המקור: %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source length: %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משך המקור: %@ שניות"
+          }
+        }
+      }
+    },
+    "משך הקטע: %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip length: %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משך הקטע: %@ שניות"
+          }
+        }
+      }
+    },
     "ניגון המקור": {
       "localizations": {
         "en": {
@@ -1953,6 +2049,22 @@
         }
       }
     },
+    "סיום: %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End: %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיום: %@ שניות"
+          }
+        }
+      }
+    },
     "סרט מ־": {
       "localizations": {
         "en": {
@@ -2081,6 +2193,38 @@
         }
       }
     },
+    "ערוץ לא תקין %@ בטווח %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid track %@ in range %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערוץ לא תקין %@ בטווח %@"
+          }
+        }
+      }
+    },
+    "ערך לא תקין: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid value: %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערך לא תקין: %@"
+          }
+        }
+      }
+    },
     "פענוח השמע הופסק.": {
       "localizations": {
         "en": {
@@ -2093,6 +2237,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "פענוח השמע הופסק."
+          }
+        }
+      }
+    },
+    "פער ללא הוראה: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Range with no instruction: %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פער ללא הוראה: %@"
           }
         }
       }
@@ -2145,6 +2305,22 @@
         }
       }
     },
+    "ציון פעילות: %@%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity score: %@%%"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ציון פעילות: %@%%"
+          }
+        }
+      }
+    },
     "קובץ המוזיקה אינו מכיל שמע.": {
       "localizations": {
         "en": {
@@ -2157,6 +2333,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "קובץ המוזיקה אינו מכיל שמע."
+          }
+        }
+      }
+    },
+    "קטע %@–%@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip %@–%@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטע %@–%@ שניות"
           }
         }
       }
@@ -2445,6 +2637,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "תצוגה וחיתוך הקטע"
+          }
+        }
+      }
+    },
+    "תצוגה וחיתוך קטע שמתחיל ב־%@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview and trim the clip starting at %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תצוגה וחיתוך קטע שמתחיל ב־%@ שניות"
           }
         }
       }

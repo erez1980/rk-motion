@@ -2,6 +2,7 @@
 """Fail early for Store metadata mistakes, including generated resource drift."""
 import json
 import plistlib
+import re
 import struct
 from pathlib import Path
 
@@ -40,9 +41,18 @@ def catalog(name):
     return data
 
 
-catalog('Localizable.xcstrings')
 # iOS reads the permission prompt from Info.plist, which Localizable.xcstrings
 # never covers, so every usage description needs its own catalog entry.
+# A Hebrew sentence that is not a catalog key reaches an English reader in
+# Hebrew, which no translation pass can catch after the fact.
+keys = set(catalog('Localizable.xcstrings')['strings'])
+literal = re.compile(r'"((?:[^"\\]|\\.)*)"')
+hebrew = re.compile(r'[\u0590-\u05FF]')
+untranslated = sorted({text for source in sorted(app.glob('*.swift'))
+                       for match in literal.finditer(source.read_text())
+                       if hebrew.search(text := match.group(1)) and text not in keys})
+assert not untranslated, ('Hebrew text without a Localizable.xcstrings key: '
+                          f'{untranslated[:5]}')
 prompts = catalog('InfoPlist.xcstrings')['strings']
 unlocalized = sorted(k for k in info if k.endswith('UsageDescription') and k not in prompts)
 assert not unlocalized, f'permission prompts without InfoPlist.xcstrings entries: {unlocalized}'

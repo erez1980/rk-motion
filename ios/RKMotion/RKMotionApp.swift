@@ -38,7 +38,7 @@ struct EditorView: View {
                     Section("עיבוד מקומי באייפון") {
                         ProgressView(value: model.percent, total: 100)
                             .accessibilityLabel("התקדמות העיבוד")
-                            .accessibilityValue("\(Int(model.percent)) אחוז")
+                            .accessibilityValue(String(format: NSLocalizedString("%@ אחוז", comment: "Progress percent"), "\(Int(model.percent))"))
                         Text(LocalizedStringKey(model.message)).font(.footnote)
                         Button("ביטול הפעולה") {model.cancel()}.disabled(!model.canCancel)
                     }
@@ -52,7 +52,7 @@ struct EditorView: View {
                                 .disabled(model.busy || model.edit.clips.allSatisfy {$0.selected == false} || model.editValidationMessage != nil)
                             Text("התצוגה כוללת חיתוכים, סדר, מהירות ומוזיקה ללא ייצוא קובץ.").font(.caption)
                         }
-                        if project.duration > 0 {Text("משך המקור: \(Int(project.duration)) שניות").font(.caption)}
+                        if project.duration > 0 {Text(String(format: NSLocalizedString("משך המקור: %@ שניות", comment: "Source length"), "\(Int(project.duration))")).font(.caption)}
                         if !project.analyzed {Button("ניתוח הסרטון באייפון") {model.analyze()}.disabled(model.busy)}
                     }
                     .disabled(model.busy)
@@ -163,10 +163,10 @@ struct EditorView: View {
         Section("קטעי הסרט — גררו לשינוי סדר") {
             ForEach($model.edit.clips) {$clip in
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("קטע \(Int(clip.start.isFinite ? clip.start : 0))–\(Int(clip.end.isFinite ? clip.end : 0)) שניות", isOn: Binding(get: {clip.selected != false}, set: {clip.selected = $0}))
+                    Toggle(String(format: NSLocalizedString("קטע %@–%@ שניות", comment: "Clip range toggle"), "\(Int(clip.start.isFinite ? clip.start : 0))", "\(Int(clip.end.isFinite ? clip.end : 0))"), isOn: Binding(get: {clip.selected != false}, set: {clip.selected = $0}))
                     if (model.project?.duration ?? 0) > 0.01 {
                         Button("תצוגה וחיתוך הקטע") {trimming = TrimSelection(id: clip.id)}
-                            .accessibilityLabel("תצוגה וחיתוך קטע שמתחיל ב־\(Int(clip.start.isFinite ? clip.start : 0)) שניות")
+                            .accessibilityLabel(String(format: NSLocalizedString("תצוגה וחיתוך קטע שמתחיל ב־%@ שניות", comment: "Trim button label"), "\(Int(clip.start.isFinite ? clip.start : 0))"))
                     }
                     DisclosureGroup("הזנת זמנים מדויקת") {
                       HStack {
@@ -176,7 +176,7 @@ struct EditorView: View {
                         TextField("שניות", value: $clip.end, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityLabel("סיום הקטע בשניות")
                       }.font(.footnote)
                     }
-                    if let score = clip.score {Text("ציון פעילות: \(Int(score * 100))%").font(.caption).foregroundStyle(.secondary)}
+                    if let score = clip.score {Text(String(format: NSLocalizedString("ציון פעילות: %@%%", comment: "Activity score"), "\(Int(score * 100))")).font(.caption).foregroundStyle(.secondary)}
                 }.disabled(model.busy)
             }.onMove {if !model.busy {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}}
              .onDelete {if !model.busy {model.edit.clips.remove(atOffsets: $0)}}
@@ -203,7 +203,7 @@ struct EditorView: View {
             Picker("מעבר", selection: setting("transition", fallback: "cut")) {
                 Text("חיתוך").tag("cut"); Text("המסה").tag("dissolve")
             }
-            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text("\($0) שניות").tag($0)}}
+            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0)).tag($0)}}
             Toggle("הסרת שמע הרכיבה", isOn: Binding(get: {model.edit.settings["muteOriginal"]?.bool ?? false}, set: {model.edit.settings["muteOriginal"] = .flag($0)}))
             Button("הוספת מוזיקה מקבצים") {importingMusic = true; showImporter = true}
             if let songs = model.project?.music, !songs.isEmpty {
