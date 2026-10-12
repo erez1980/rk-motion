@@ -133,3 +133,8 @@ authorized. No Apple credentials are currently available.
   marking this checkpoint verified. `scripts/check-ios-store.py`, shell syntax,
   Python compile and whitespace checks pass locally. Local pytest unavailable;
   Python CI owns execution. No local Xcode/device runtime is available.
+
+- CI follow-up: 38207300070 passed simulator tests for UI/background/storage,
+  then its device archive was cancelled by the newer commit (not a code failure).
+  5303d9a / 38207757193 failed compiling EditorModel because PhotosPickerItem
+  needs SwiftUI imported alongside PhotosUI. Added SwiftUI; rerun latest head.

@@ -4,6 +4,7 @@ import Combine
 import Photos
 import UIKit
 import PhotosUI
+import SwiftUI
 
 @MainActor final class EditorModel: ObservableObject {
     @Published var projects: [LocalProject] = []
