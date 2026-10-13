@@ -2912,6 +2912,1030 @@
           }
         }
       }
+    },
+    "%@ מתוך %@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of %2$@ · %3$@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ מתוך %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@ סרטים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ movies"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ סרטים"
+          }
+        }
+      }
+    },
+    "%@ קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ קטעים"
+          }
+        }
+      }
+    },
+    "%@ שירים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ songs"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ שירים"
+          }
+        }
+      }
+    },
+    "אורך הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie length"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך הסרט"
+          }
+        }
+      }
+    },
+    "איכות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quality"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איכות"
+          }
+        }
+      }
+    },
+    "אפשרויות הפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project options"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשרויות הפרויקט"
+          }
+        }
+      }
+    },
+    "בחירת סרטון מהתמונות או מהקבצים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a video from Photos or Files"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירת סרטון מהתמונות או מהקבצים"
+          }
+        }
+      }
+    },
+    "בחרו את הסרטון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו את הסרטון"
+          }
+        }
+      }
+    },
+    "ביטול ההורדה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel download"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול ההורדה"
+          }
+        }
+      }
+    },
+    "ביטול הייצוא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel export"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול הייצוא"
+          }
+        }
+      }
+    },
+    "ביטול הניתוח": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel analysis"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול הניתוח"
+          }
+        }
+      }
+    },
+    "בינונית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "medium"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בינונית"
+          }
+        }
+      }
+    },
+    "בעריכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בעריכה"
+          }
+        }
+      }
+    },
+    "גבוהה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "high"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גבוהה"
+          }
+        }
+      }
+    },
+    "גרף הפעילות לאורך הרכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity graph across the ride"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גרף הפעילות לאורך הרכיבה"
+          }
+        }
+      }
+    },
+    "הוספה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספה"
+          }
+        }
+      }
+    },
+    "הוספת הקטע לסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add the clip to the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת הקטע לסרט"
+          }
+        }
+      }
+    },
+    "החזיקו וגררו קטע לשינוי הסדר, החליקו למחיקה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touch and hold a clip to reorder it; swipe to delete."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החזיקו וגררו קטע לשינוי הסדר, החליקו למחיקה."
+          }
+        }
+      }
+    },
+    "המקור": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המקור"
+          }
+        }
+      }
+    },
+    "המשך לייצוא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue to export"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך לייצוא"
+          }
+        }
+      }
+    },
+    "המשך למוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue to music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך למוזיקה"
+          }
+        }
+      }
+    },
+    "המשך לעריכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue to editing"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך לעריכה"
+          }
+        }
+      }
+    },
+    "הניתוח רץ באייפון. הסרטון לא יוצא מהמכשיר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis runs on the iPhone. The video never leaves the device."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניתוח רץ באייפון. הסרטון לא יוצא מהמכשיר."
+          }
+        }
+      }
+    },
+    "הסרט מוכן": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your movie is ready"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט מוכן"
+          }
+        }
+      }
+    },
+    "הסרטון כבר ערוך": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video is already edited"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטון כבר ערוך"
+          }
+        }
+      }
+    },
+    "הסרת הקטע מהסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the clip from the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרת הקטע מהסרט"
+          }
+        }
+      }
+    },
+    "הסרת השיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the song"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרת השיר"
+          }
+        }
+      }
+    },
+    "העריכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "העריכה"
+          }
+        }
+      }
+    },
+    "הפרויקטים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקטים"
+          }
+        }
+      }
+    },
+    "השאירו את האפליקציה פתוחה עד שהפעולה תסתיים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the app open until this finishes."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השאירו את האפליקציה פתוחה עד שהפעולה תסתיים."
+          }
+        }
+      }
+    },
+    "השירים בפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Songs in this project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השירים בפרויקט"
+          }
+        }
+      }
+    },
+    "השתקת שמע הרכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute the ride's sound"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השתקת שמע הרכיבה"
+          }
+        }
+      }
+    },
+    "חזרה לעריכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to editing"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזרה לעריכה"
+          }
+        }
+      }
+    },
+    "חזרה לפרויקט הפעיל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to the active project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזרה לפרויקט הפעיל"
+          }
+        }
+      }
+    },
+    "ידני": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ידני"
+          }
+        }
+      }
+    },
+    "יותר קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יותר קטעים"
+          }
+        }
+      }
+    },
+    "ייצוא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא"
+          }
+        }
+      }
+    },
+    "ייצוא הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא הסרט"
+          }
+        }
+      }
+    },
+    "ללא מוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ללא מוזיקה"
+          }
+        }
+      }
+    },
+    "לסרט האחרון שנוצר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לסרט האחרון שנוצר"
+          }
+        }
+      }
+    },
+    "מ־YouTube": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From YouTube"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מ־YouTube"
+          }
+        }
+      }
+    },
+    "מהקבצים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From Files"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהקבצים"
+          }
+        }
+      }
+    },
+    "מהתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהתמונות"
+          }
+        }
+      }
+    },
+    "ממתין לניתוח": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Awaiting analysis"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ממתין לניתוח"
+          }
+        }
+      }
+    },
+    "מעבר בין קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transition between clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מעבר בין קטעים"
+          }
+        }
+      }
+    },
+    "ניתוח הסרטון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze the video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח הסרטון"
+          }
+        }
+      }
+    },
+    "נמוכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "low"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נמוכה"
+          }
+        }
+      }
+    },
+    "נפח הפרויקט: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project size: %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נפח הפרויקט: %@"
+          }
+        }
+      }
+    },
+    "סגירת ההודעה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss message"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סגירת ההודעה"
+          }
+        }
+      }
+    },
+    "סרטון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטון"
+          }
+        }
+      }
+    },
+    "סרטים קודמים בפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier movies in this project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטים קודמים בפרויקט"
+          }
+        }
+      }
+    },
+    "עוד אין מוזיקה בפרויקט. הוסיפו שיר מהקבצים או מ־YouTube.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No music in this project yet. Add a song from Files or YouTube."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עוד אין מוזיקה בפרויקט. הוסיפו שיר מהקבצים או מ־YouTube."
+          }
+        }
+      }
+    },
+    "עוצמת המוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music volume"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עוצמת המוזיקה"
+          }
+        }
+      }
+    },
+    "עריכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עריכה"
+          }
+        }
+      }
+    },
+    "פחות קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fewer clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פחות קטעים"
+          }
+        }
+      }
+    },
+    "פעילות לאורך הרכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity across the ride"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פעילות לאורך הרכיבה"
+          }
+        }
+      }
+    },
+    "קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטעים"
+          }
+        }
+      }
+    },
+    "קישור לסרטון ב־YouTube": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube video link"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קישור לסרטון ב־YouTube"
+          }
+        }
+      }
+    },
+    "רגישות · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensitivity · %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רגישות · %@"
+          }
+        }
+      }
+    },
+    "רכיבה חדשה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New ride"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רכיבה חדשה"
+          }
+        }
+      }
+    },
+    "שומרים אותו שלם ומוסיפים רק מוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it whole and only add music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שומרים אותו שלם ומוסיפים רק מוזיקה"
+          }
+        }
+      }
+    },
+    "שיתוף": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיתוף"
+          }
+        }
+      }
+    },
+    "שמירה בתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירה בתמונות"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
