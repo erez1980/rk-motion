@@ -158,6 +158,21 @@ authorized. No Apple credentials are currently available.
   can, and a YouTube change can break it until YouTubeKit is updated. A
   store-only build split was tried and then removed at Erez's direction.
 
+- Checkpoint 6 (versions and redesign, Claude): every CI build now shows which
+  build it is. `MARKETING_VERSION` is set in the generator, the run number
+  becomes `CFBundleVersion`, and the commit becomes `RKCommit`. All three
+  appear on the home screen, the done screen and About, and they name the IPA.
+  Music moved out of the export options, which only appeared after analysis
+  and so hid the YouTube button. The interface was then rebuilt to a mockup
+  Erez approved. It opens on a projects home (`HomeView.swift`), and each ride
+  runs through the steps video, edit, music, export, done
+  (`ProjectFlowView.swift`). Analysis and export show a full-screen progress
+  ring. Colours and Rubik come from the web app's tokens, in night and day
+  (`Theme.swift`; `Fonts/Rubik.ttf` with `UIAppFonts`). `EditorModel.work`
+  says which operation is running, so each screen shows the right progress.
+  `close()` clears the current project for a new ride. Version 0.17.0. Not
+  verified: how it looks on a device, Dynamic Type and VoiceOver.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.
