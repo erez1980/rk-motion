@@ -26,6 +26,7 @@ struct EditorView: View {
                     Text("מהרכיבה לרגעים הטובים").font(.title2.bold())
                     Text("ניתוח, עריכה וייצוא — הכול באייפון שלכם.").foregroundStyle(.secondary)
                     Text(model.backgroundDescription).font(.caption).foregroundStyle(.secondary)
+                    Text(AppVersion.line).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
                 }
                 Section("בחירת סרטון") {
                     Toggle("הסרטון כבר ערוך — להשאיר אותו שלם", isOn: $model.wholeVideo)
@@ -58,6 +59,7 @@ struct EditorView: View {
                         if !project.analyzed {Button("ניתוח הסרטון באייפון") {model.analyze()}.disabled(model.busy)}
                     }
                     .disabled(model.busy)
+                    musicSection
                     if project.analyzed {
                         if !project.scores.isEmpty {
                             Section("רגישות זיהוי הפעילות") {
@@ -194,19 +196,10 @@ struct EditorView: View {
     private func setting(_ key: String, fallback: String) -> Binding<String> {
         Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
     }
-    private var optionsSection: some View {
-        Section("אפשרויות ייצוא") {
-            Picker("איכות מרבית", selection: setting("quality", fallback: "1080")) {
-                Text("1080p").tag("1080"); Text("720p").tag("720"); Text("רזולוציית מקור").tag("original"); Text("WhatsApp").tag("whatsapp")
-            }
-            Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(.caption).foregroundStyle(.secondary)
-            Picker("מסגרת", selection: setting("aspect", fallback: "source")) {Text("מקור").tag("source"); Text("סטורי 9:16").tag("9:16")}
-            Picker("מהירות", selection: setting("speed", fallback: "1")) {ForEach(["1", "1.25", "1.5", "2"], id: \.self) {Text($0 + "×").tag($0)}}
-            Picker("מעבר", selection: setting("transition", fallback: "cut")) {
-                Text("חיתוך").tag("cut"); Text("המסה").tag("dissolve")
-            }
-            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0)).tag($0)}}
-            Toggle("הסרת שמע הרכיבה", isOn: Binding(get: {model.edit.settings["muteOriginal"]?.bool ?? false}, set: {model.edit.settings["muteOriginal"] = .flag($0)}))
+    /// Music belongs to the project, not to the analysis: it was buried in the
+    /// export options, which only appear after analysis, so it went unseen.
+    private var musicSection: some View {
+        Section("מוזיקה") {
             Button("הוספת מוזיקה מקבצים") {importingMusic = true; showImporter = true}
             Button("הורדת מוזיקה מ־YouTube") {youTubeLink = ""; askingYouTube = true}
                 .alert("הורדת מוזיקה מ־YouTube", isPresented: $askingYouTube) {
@@ -222,6 +215,21 @@ struct EditorView: View {
                 TextField("התחלה במוזיקה — שניות", text: setting("musicStart", fallback: "0")).keyboardType(.decimalPad)
                 Picker("עוצמת מוזיקה", selection: setting("musicVolume", fallback: "0.65")) {Text("רקע").tag("0.35"); Text("מאוזן").tag("0.65"); Text("חזק").tag("1")}
             }
+        }.disabled(model.busy)
+    }
+    private var optionsSection: some View {
+        Section("אפשרויות ייצוא") {
+            Picker("איכות מרבית", selection: setting("quality", fallback: "1080")) {
+                Text("1080p").tag("1080"); Text("720p").tag("720"); Text("רזולוציית מקור").tag("original"); Text("WhatsApp").tag("whatsapp")
+            }
+            Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(.caption).foregroundStyle(.secondary)
+            Picker("מסגרת", selection: setting("aspect", fallback: "source")) {Text("מקור").tag("source"); Text("סטורי 9:16").tag("9:16")}
+            Picker("מהירות", selection: setting("speed", fallback: "1")) {ForEach(["1", "1.25", "1.5", "2"], id: \.self) {Text($0 + "×").tag($0)}}
+            Picker("מעבר", selection: setting("transition", fallback: "cut")) {
+                Text("חיתוך").tag("cut"); Text("המסה").tag("dissolve")
+            }
+            Picker("משך המעבר", selection: setting("transitionDuration", fallback: "0.5")) {ForEach(["0.3", "0.5", "1"], id: \.self) {Text(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0)).tag($0)}}
+            Toggle("הסרת שמע הרכיבה", isOn: Binding(get: {model.edit.settings["muteOriginal"]?.bool ?? false}, set: {model.edit.settings["muteOriginal"] = .flag($0)}))
         }.disabled(model.busy)
     }
 }

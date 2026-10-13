@@ -16,7 +16,7 @@ struct AboutView: View {
                 Text("דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי.").font(.caption)
             }
             Section("גרסה") {
-                Text("RK Motion \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                Text("RK Motion " + AppVersion.label)
             }
         }.navigationTitle("אודות ועזרה")
     }

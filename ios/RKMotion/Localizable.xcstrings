@@ -417,6 +417,22 @@
         }
       }
     },
+    "גרסה %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גרסה %@"
+          }
+        }
+      }
+    },
     "דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי.": {
       "localizations": {
         "en": {
@@ -1645,6 +1661,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "מהרכיבה לרגעים הטובים"
+          }
+        }
+      }
+    },
+    "מוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוזיקה"
           }
         }
       }

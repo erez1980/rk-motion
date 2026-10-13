@@ -30,11 +30,14 @@ jobs:
           rk_sim=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for vs in d["devices"].values() for v in vs if v["name"].startswith("iPhone")))')
           xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Debug -destination "platform=iOS Simulator,id=$rk_sim" -derivedDataPath build/ios/Tests -resultBundlePath build/ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO test
       - name: Build unsigned iPhone IPA
+        env:
+          RK_BUILD_NUMBER: ${{ github.run_number }}
+          RK_COMMIT: ${{ github.sha }}
         run: bash scripts/build-ios.sh unsigned
       - uses: actions/upload-artifact@v4
         with:
           name: RK-Motion-unsigned-IPA
-          path: build/ios/RK-Motion-unsigned.ipa
+          path: build/ios/RK-Motion-*.ipa
           if-no-files-found: error
 
       - name: Preserve native test diagnostics
