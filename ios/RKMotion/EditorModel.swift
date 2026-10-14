@@ -221,7 +221,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     func autoPick(seconds: Double) {
         guard !busy, !edit.clips.isEmpty else {return}
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds * (speed.isFinite && speed > 0 ? speed : 1))
+        let overlap = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
     }
     func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; updateUndo(); scheduleSave()}
     func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; updateUndo(); scheduleSave()}

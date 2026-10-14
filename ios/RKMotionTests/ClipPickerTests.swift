@@ -20,6 +20,19 @@ final class ClipPickerTests: XCTestCase {
         let clips = [clip(0, 100, 0.4), clip(100, 200, 0.6)]
         XCTAssertEqual(ClipPicker.autoPick(clips, seconds: 30).map {$0.selected != false}, [false, true])
     }
+    func testAutoPickMeasuresTheMovieWithItsTransitions() {
+        // Each one-second dissolve takes a second off the movie, so eight
+        // 4-second clips would make 25 seconds, not the 30 asked for.
+        let clips = (0..<12).map {clip(Double($0) * 10, Double($0) * 10 + 4, 1 - Double($0) / 100)}
+        let picked = ClipPicker.autoPick(clips, seconds: 30, speed: 1, transition: 1).filter {$0.selected != false}
+        let length = LocalEngine.timeline(clips: picked, speed: 1, transition: 1).last?.end ?? 0
+        XCTAssertEqual(picked.count, 10)
+        XCTAssertGreaterThanOrEqual(length, 30)
+        XCTAssertLessThanOrEqual(length, 36)
+        // Speed shortens the movie the same way: at double speed twice the footage is needed.
+        let fast = ClipPicker.autoPick(clips, seconds: 12, speed: 2, transition: 0).filter {$0.selected != false}
+        XCTAssertEqual(fast.count, 6)
+    }
     func testShuffleAlwaysChangesTheOrderAndKeepsEveryClip() {
         var generator = SystemRandomNumberGenerator()
         let clips = [clip(0, 1, nil), clip(2, 3, nil)]
