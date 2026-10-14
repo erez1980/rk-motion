@@ -374,6 +374,8 @@ actor LocalEngine {
     /// under it, low on the frame over a shade so it reads on any footage.
     static func titleLayers(title: String, subtitle: String, size: CGSize, length: Double) -> (parent: CALayer, video: CALayer)? {
         guard !(title.isEmpty && subtitle.isEmpty), length > 0.5, size.width > 0, size.height > 0 else {return nil}
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        defer {CATransaction.commit()}
         let frame = CGRect(origin: .zero, size: size)
         let parent = CALayer(), video = CALayer(), card = CALayer()
         parent.frame = frame; video.frame = frame; card.frame = frame
@@ -430,8 +432,12 @@ actor LocalEngine {
         try LocalStore.checkSpace(required: Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
         guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
         session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
-        let opening = edit.openingTitle
-        if let layers = Self.titleLayers(title: opening.title, subtitle: opening.subtitle, size: size, length: prepared.length) {
+        let opening = edit.openingTitle, length = prepared.length
+        // Layers built off the main thread sit in a Core Animation transaction
+        // nobody commits, and the export then waits on it for good. Build them
+        // where a run loop commits them.
+        let title = await MainActor.run {Self.titleLayers(title: opening.title, subtitle: opening.subtitle, size: size, length: length)}
+        if let layers = title {
             // Core Animation can only be drawn into an export, never into
             // playback, so the title is added here rather than in prepare.
             prepared.video.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: layers.video, in: layers.parent)
