@@ -188,6 +188,14 @@ authorized. No Apple credentials are currently available.
   since CI and this sandbox cannot reach YouTube. Only a device can confirm
   it.
 
+- Checkpoint 8 (edit tools, Claude): Erez found no shuffle after analysis,
+  and transitions only appeared at export. The edit step now has the web
+  app's clip tools: shuffle order (never the same order, with an undo chip)
+  and an automatic choice for a 30-second, 1-minute or 2-minute movie. The
+  choice is scaled by playback speed, so the target is the finished
+  movie's length (`ClipPicker`). The cut or dissolve choice moved from export
+  to the edit step. Version 0.19.0.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.

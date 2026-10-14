@@ -4352,6 +4352,102 @@
           }
         }
       }
+    },
+    "ערבוב סדר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle order"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערבוב סדר"
+          }
+        }
+      }
+    },
+    "ביטול ערבוב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo shuffle"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול ערבוב"
+          }
+        }
+      }
+    },
+    "בחירה אוטומטית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-pick"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירה אוטומטית"
+          }
+        }
+      }
+    },
+    "סרט של 30 שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A 30-second movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של 30 שניות"
+          }
+        }
+      }
+    },
+    "סרט של דקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A one-minute movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של דקה"
+          }
+        }
+      }
+    },
+    "סרט של 2 דקות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A 2-minute movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של 2 דקות"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
