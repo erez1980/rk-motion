@@ -121,7 +121,8 @@ actor LocalEngine {
         var peaks = [Double](repeating: 0, count: bins)
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: 4000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
+            // AVFoundation refuses anything under 8 kHz.
+            AVSampleRateKey: 8000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false])
         guard reader.canAdd(output) else {return []}
         reader.add(output)
@@ -136,7 +137,7 @@ actor LocalEngine {
             guard data.withUnsafeMutableBytes({CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: size, destination: $0.baseAddress!)}) == kCMBlockBufferNoErr else {continue}
             data.withUnsafeBytes {bytes in
                 for (index, value) in bytes.bindMemory(to: Float.self).enumerated() where value.isFinite {
-                    let bin = min(bins - 1, max(0, Int((start + Double(index) / 4000) / duration * Double(bins))))
+                    let bin = min(bins - 1, max(0, Int((start + Double(index) / 8000) / duration * Double(bins))))
                     peaks[bin] = max(peaks[bin], Double(abs(value)))
                 }
             }
