@@ -4416,6 +4416,22 @@
           }
         }
       }
+    },
+    "מוסיפה את הכותרת…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding the title…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוסיפה את הכותרת…"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

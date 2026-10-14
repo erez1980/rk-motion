@@ -189,11 +189,15 @@ authorized. No Apple credentials are currently available.
   it.
 - Opening title (0.19.0): the export step takes a title and a smaller line
   under it (`titleText`, `subtitleText` in the edit's settings, 60
-  characters each). `LocalEngine.titleLayers` draws them low on the frame
-  over a shade, right-aligned when the text starts in Hebrew, faded in and
-  out over the first seconds (`titleTimes`). Core Animation cannot draw into
-  playback, so the title is added only to the export, not the preview. The
-  waveform reads at 8 kHz, the lowest rate `AVAssetReader` accepts.
+  characters each). `LocalEngine.titleCard` draws them once into a
+  transparent picture, low on the frame over a shade, right-aligned when the
+  text starts in Hebrew. A second Core Image pass lays it over the finished
+  movie, faded in and out over the first seconds (`titleTimes`,
+  `titleOpacity`), so a titled export takes about twice as long and needs
+  twice the room for a moment. `AVVideoCompositionCoreAnimationTool` was
+  tried first and brought the simulator's test run down, so it could not be
+  verified. The preview shows no title. The waveform reads at 8 kHz, the
+  lowest rate `AVAssetReader` accepts.
 
 ## Current release limits and next steps
 

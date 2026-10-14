@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import CoreMedia
-import QuartzCore
+import CoreImage
 import UIKit
 import OSLog
 
@@ -370,53 +370,45 @@ actor LocalEngine {
         let start = min(0.4, length * 0.1)
         return (start, min(length - start, max(start + 1, min(4, length * 0.6))))
     }
-    /// The opening title drawn over the video: the title and a smaller line
-    /// under it, low on the frame over a shade so it reads on any footage.
-    static func titleLayers(title: String, subtitle: String, size: CGSize, length: Double) -> (parent: CALayer, video: CALayer)? {
-        guard !(title.isEmpty && subtitle.isEmpty), length > 0.5, size.width > 0, size.height > 0 else {return nil}
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        defer {CATransaction.commit()}
-        let frame = CGRect(origin: .zero, size: size)
-        let parent = CALayer(), video = CALayer(), card = CALayer()
-        parent.frame = frame; video.frame = frame; card.frame = frame
-        parent.addSublayer(video); parent.addSublayer(card)
-        // The export draws with the origin at the bottom left.
-        let shade = CAGradientLayer()
-        shade.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height * 0.42)
-        shade.colors = [UIColor(white: 0, alpha: 0.62).cgColor, UIColor(white: 0, alpha: 0).cgColor]
-        shade.startPoint = CGPoint(x: 0.5, y: 0); shade.endPoint = CGPoint(x: 0.5, y: 1)
-        card.addSublayer(shade)
-        let short = min(size.width, size.height), margin = short * 0.07
-        let big = (short * 0.085).rounded(), small = (short * 0.05).rounded()
-        var y = margin
-        func line(_ text: String, size points: CGFloat, weight: CGFloat, color: UIColor) {
-            guard !text.isEmpty else {return}
-            let font = RK.uiFont(points, weight).withSize(points)
-            let rtl = text.unicodeScalars.first {CharacterSet.letters.contains($0)}.map {(0x0590...0x08FF).contains($0.value)} ?? false
-            let style = NSMutableParagraphStyle()
-            style.alignment = rtl ? .right : .left; style.lineBreakMode = .byTruncatingTail
-            style.baseWritingDirection = rtl ? .rightToLeft : .leftToRight
-            let layer = CATextLayer()
-            layer.string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
-            layer.frame = CGRect(x: margin, y: y, width: size.width - margin * 2, height: ceil(font.lineHeight * 1.15))
-            layer.isWrapped = false; layer.truncationMode = .end
-            layer.alignmentMode = rtl ? .right : .left
-            layer.shadowColor = UIColor.black.cgColor; layer.shadowOpacity = 0.45; layer.shadowRadius = points * 0.08; layer.shadowOffset = .zero
-            card.addSublayer(layer)
-            y += layer.frame.height + points * 0.1
-        }
-        let night = UITraitCollection(userInterfaceStyle: .dark)
-        // Drawn bottom up: the smaller line sits under the title.
-        line(subtitle, size: small, weight: 500, color: RK.UI.accent.resolvedColor(with: night))
-        line(title, size: big, weight: 700, color: .white)
+    /// How visible the opening title is at a moment of the movie, 0 to 1.
+    static func titleOpacity(at time: Double, length: Double) -> Double {
         let (start, end) = titleTimes(length: length), fade = min(0.5, (end - start) / 3)
-        let appear = CAKeyframeAnimation(keyPath: "opacity")
-        appear.values = [0, 0, 1, 1, 0, 0]
-        appear.keyTimes = [0, start, start + fade, end - fade, end, length].map {NSNumber(value: $0 / length)}
-        appear.duration = length; appear.beginTime = AVCoreAnimationBeginTimeAtZero
-        appear.isRemovedOnCompletion = false; appear.fillMode = .both
-        card.opacity = 0; card.add(appear, forKey: "appear")
-        return (parent, video)
+        guard time.isFinite, time > start, time < end else {return 0}
+        return min(1, (time - start) / fade, (end - time) / fade)
+    }
+    /// The opening title as one transparent picture the size of the frame: the
+    /// title and a smaller line under it, low on the frame over a shade so it
+    /// reads on any footage, right-aligned when it starts in Hebrew.
+    static func titleCard(title: String, subtitle: String, size: CGSize) -> CGImage? {
+        guard !(title.isEmpty && subtitle.isEmpty), size.width >= 2, size.height >= 2 else {return nil}
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = false
+        let image = UIGraphicsImageRenderer(size: size, format: format).image {context in
+            let shadeHeight = size.height * 0.42
+            let colors = [UIColor(white: 0, alpha: 0).cgColor, UIColor(white: 0, alpha: 0.62).cgColor] as CFArray
+            if let shade = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                context.cgContext.drawLinearGradient(shade, start: CGPoint(x: 0, y: size.height - shadeHeight), end: CGPoint(x: 0, y: size.height), options: [])
+            }
+            let short = min(size.width, size.height), margin = short * 0.07
+            var bottom = size.height - margin
+            func line(_ text: String, points: CGFloat, weight: CGFloat, color: UIColor) {
+                guard !text.isEmpty else {return}
+                let font = RK.uiFont(points, weight).withSize(points)
+                let rtl = text.unicodeScalars.first {CharacterSet.letters.contains($0)}.map {(0x0590...0x08FF).contains($0.value)} ?? false
+                let style = NSMutableParagraphStyle()
+                style.alignment = rtl ? .right : .left; style.lineBreakMode = .byTruncatingTail
+                style.baseWritingDirection = rtl ? .rightToLeft : .leftToRight
+                let shadow = NSShadow(); shadow.shadowColor = UIColor(white: 0, alpha: 0.45); shadow.shadowBlurRadius = points * 0.15
+                let height = ceil(font.lineHeight * 1.15)
+                (text as NSString).draw(with: CGRect(x: margin, y: bottom - height, width: size.width - margin * 2, height: height),
+                    options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+                    attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style, .shadow: shadow], context: nil)
+                bottom -= height + points * 0.1
+            }
+            // Drawn bottom up: the smaller line sits under the title.
+            line(subtitle, points: (short * 0.05).rounded(), weight: 500, color: RK.UI.accent.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)))
+            line(title, points: (short * 0.085).rounded(), weight: 700, color: .white)
+        }
+        return image.cgImage
     }
     func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
         let prepared = try await prepare(project, edit: edit) {_, _ in}
@@ -429,22 +421,46 @@ actor LocalEngine {
         let started = Date()
         let prepared = try await prepare(project, edit: edit, progress: progress)
         let size = prepared.video.renderSize
-        try LocalStore.checkSpace(required: Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
-        guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
-        session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
-        let opening = edit.openingTitle, length = prepared.length
-        // Layers built off the main thread sit in a Core Animation transaction
-        // nobody commits, and the export then waits on it for good. Build them
-        // where a run loop commits them.
-        let title = await MainActor.run {Self.titleLayers(title: opening.title, subtitle: opening.subtitle, size: size, length: length)}
-        if let layers = title {
-            // Core Animation can only be drawn into an export, never into
-            // playback, so the title is added here rather than in prepare.
-            prepared.video.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: layers.video, in: layers.parent)
+        let opening = edit.openingTitle
+        let card = Self.titleCard(title: opening.title, subtitle: opening.subtitle, size: size)
+        // A title needs a second file for a moment, so twice the room.
+        let movieBytes = Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8)
+        try LocalStore.checkSpace(required: movieBytes * (card == nil ? 1 : 2) + 256 * 1024 * 1024)
+        guard let card else {
+            try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, to: output) {await progress(0.1 + $0 * 0.9, "מייצאת את הסרט באייפון…")}
+            return await finish(prepared.length, started: started, progress: progress)
         }
-        session.videoComposition = prepared.video; session.audioMix = prepared.audio
+        // The title is laid over the finished movie in a second pass. Core
+        // Animation, the usual way, brings the simulator's export down, so
+        // nothing could show the title works; Core Image is checked by tests.
+        let untitled = output.deletingLastPathComponent().appendingPathComponent("untitled-\(UUID().uuidString).mp4")
+        defer {try? FileManager.default.removeItem(at: untitled)}
+        try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, to: untitled) {await progress(0.1 + $0 * 0.6, "מייצאת את הסרט באייפון…")}
+        let movie = AVURLAsset(url: untitled), length = prepared.length
+        let overlay = CIImage(cgImage: card)
+        let titled = try await AVMutableVideoComposition.videoComposition(with: movie) {request in
+            let alpha = Self.titleOpacity(at: request.compositionTime.seconds, length: length)
+            guard alpha > 0 else {request.finish(with: request.sourceImage, context: nil); return}
+            let faded = overlay.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(alpha))])
+            request.finish(with: faded.composited(over: request.sourceImage).cropped(to: request.sourceImage.extent), context: nil)
+        }
+        titled.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
+        titled.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
+        titled.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
+        try await run(movie, video: titled, audio: nil, preset: prepared.preset, to: output) {await progress(0.7 + $0 * 0.3, "מוסיפה את הכותרת…")}
+        return await finish(prepared.length, started: started, progress: progress)
+    }
+    private func finish(_ length: Double, started: Date, progress: Progress) async -> Double {
+        await progress(1, "הסרט מוכן באייפון")
+        logger.info("Export completed: outputSeconds=\(length, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(started), privacy: .public), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue, privacy: .public)")
+        return length
+    }
+    private func run(_ asset: AVAsset, video: AVVideoComposition, audio: AVAudioMix?, preset: String, to output: URL, progress: @escaping @Sendable (Double) async -> Void) async throws {
+        guard let session = AVAssetExportSession(asset: asset, presetName: preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
+        session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
+        session.videoComposition = video; session.audioMix = audio
         let observer = Task {
-            while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}
+            while !Task.isCancelled {await progress(Double(session.progress)); try? await Task.sleep(for: .milliseconds(250))}
         }
         defer {observer.cancel()}
         try Task.checkCancellation()
@@ -462,9 +478,6 @@ actor LocalEngine {
         case .cancelled: throw CancellationError()
         default: throw session.error ?? AppError(message: "הייצוא נכשל באייפון.")
         }
-        await progress(1, "הסרט מוכן באייפון")
-        logger.info("Export completed: outputSeconds=\(prepared.length, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(started), privacy: .public), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue, privacy: .public)")
-        return prepared.length
     }
 }
 
