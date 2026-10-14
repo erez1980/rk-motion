@@ -4352,6 +4352,70 @@
           }
         }
       }
+    },
+    "כותרת פתיחה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening title"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כותרת פתיחה"
+          }
+        }
+      }
+    },
+    "שם הרוכב או הרכיבה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rider or ride name"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שם הרוכב או הרכיבה"
+          }
+        }
+      }
+    },
+    "מקום ותאריך": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place and date"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מקום ותאריך"
+          }
+        }
+      }
+    },
+    "מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown over the first seconds of the movie. Leave it empty for no title."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

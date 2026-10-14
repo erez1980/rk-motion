@@ -187,6 +187,13 @@ authorized. No Apple credentials are currently available.
   first song. Version 0.18.0. Not verified: search against YouTube today,
   since CI and this sandbox cannot reach YouTube. Only a device can confirm
   it.
+- Opening title (0.19.0): the export step takes a title and a smaller line
+  under it (`titleText`, `subtitleText` in the edit's settings, 60
+  characters each). `LocalEngine.titleLayers` draws them low on the frame
+  over a shade, right-aligned when the text starts in Hebrew, faded in and
+  out over the first seconds (`titleTimes`). Core Animation cannot draw into
+  playback, so the title is added only to the export, not the preview. The
+  waveform reads at 8 kHz, the lowest rate `AVAssetReader` accepts.
 
 ## Current release limits and next steps
 

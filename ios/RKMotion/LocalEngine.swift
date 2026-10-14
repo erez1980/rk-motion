@@ -2,6 +2,8 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import CoreMedia
+import QuartzCore
+import UIKit
 import OSLog
 
 // Only native Apple frameworks: source files never leave the device.
@@ -362,6 +364,58 @@ actor LocalEngine {
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
         return PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
     }
+    /// When the opening title shows: in after a beat, held, then out, all
+    /// inside the movie even when it is only a few seconds long.
+    static func titleTimes(length: Double) -> (start: Double, end: Double) {
+        let start = min(0.4, length * 0.1)
+        return (start, min(length - start, max(start + 1, min(4, length * 0.6))))
+    }
+    /// The opening title drawn over the video: the title and a smaller line
+    /// under it, low on the frame over a shade so it reads on any footage.
+    static func titleLayers(title: String, subtitle: String, size: CGSize, length: Double) -> (parent: CALayer, video: CALayer)? {
+        guard !(title.isEmpty && subtitle.isEmpty), length > 0.5, size.width > 0, size.height > 0 else {return nil}
+        let frame = CGRect(origin: .zero, size: size)
+        let parent = CALayer(), video = CALayer(), card = CALayer()
+        parent.frame = frame; video.frame = frame; card.frame = frame
+        parent.addSublayer(video); parent.addSublayer(card)
+        // The export draws with the origin at the bottom left.
+        let shade = CAGradientLayer()
+        shade.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height * 0.42)
+        shade.colors = [UIColor(white: 0, alpha: 0.62).cgColor, UIColor(white: 0, alpha: 0).cgColor]
+        shade.startPoint = CGPoint(x: 0.5, y: 0); shade.endPoint = CGPoint(x: 0.5, y: 1)
+        card.addSublayer(shade)
+        let short = min(size.width, size.height), margin = short * 0.07
+        let big = (short * 0.085).rounded(), small = (short * 0.05).rounded()
+        var y = margin
+        func line(_ text: String, size points: CGFloat, weight: CGFloat, color: UIColor) {
+            guard !text.isEmpty else {return}
+            let font = RK.uiFont(points, weight).withSize(points)
+            let rtl = text.unicodeScalars.first {CharacterSet.letters.contains($0)}.map {(0x0590...0x08FF).contains($0.value)} ?? false
+            let style = NSMutableParagraphStyle()
+            style.alignment = rtl ? .right : .left; style.lineBreakMode = .byTruncatingTail
+            style.baseWritingDirection = rtl ? .rightToLeft : .leftToRight
+            let layer = CATextLayer()
+            layer.string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
+            layer.frame = CGRect(x: margin, y: y, width: size.width - margin * 2, height: ceil(font.lineHeight * 1.15))
+            layer.isWrapped = false; layer.truncationMode = .end
+            layer.alignmentMode = rtl ? .right : .left
+            layer.shadowColor = UIColor.black.cgColor; layer.shadowOpacity = 0.45; layer.shadowRadius = points * 0.08; layer.shadowOffset = .zero
+            card.addSublayer(layer)
+            y += layer.frame.height + points * 0.1
+        }
+        let night = UITraitCollection(userInterfaceStyle: .dark)
+        // Drawn bottom up: the smaller line sits under the title.
+        line(subtitle, size: small, weight: 500, color: RK.UI.accent.resolvedColor(with: night))
+        line(title, size: big, weight: 700, color: .white)
+        let (start, end) = titleTimes(length: length), fade = min(0.5, (end - start) / 3)
+        let appear = CAKeyframeAnimation(keyPath: "opacity")
+        appear.values = [0, 0, 1, 1, 0, 0]
+        appear.keyTimes = [0, start, start + fade, end - fade, end, length].map {NSNumber(value: $0 / length)}
+        appear.duration = length; appear.beginTime = AVCoreAnimationBeginTimeAtZero
+        appear.isRemovedOnCompletion = false; appear.fillMode = .both
+        card.opacity = 0; card.add(appear, forKey: "appear")
+        return (parent, video)
+    }
     func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
         let prepared = try await prepare(project, edit: edit) {_, _ in}
         try Task.checkCancellation()
@@ -376,6 +430,12 @@ actor LocalEngine {
         try LocalStore.checkSpace(required: Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8) + 256 * 1024 * 1024)
         guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
         session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
+        let opening = edit.openingTitle
+        if let layers = Self.titleLayers(title: opening.title, subtitle: opening.subtitle, size: size, length: prepared.length) {
+            // Core Animation can only be drawn into an export, never into
+            // playback, so the title is added here rather than in prepare.
+            prepared.video.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: layers.video, in: layers.parent)
+        }
         session.videoComposition = prepared.video; session.audioMix = prepared.audio
         let observer = Task {
             while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}

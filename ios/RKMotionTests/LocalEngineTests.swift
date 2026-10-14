@@ -125,6 +125,25 @@ final class LocalEngineTests: XCTestCase {
         _ = try await engine.export(project, edit: muted, output: silentOutput) {_, _ in}
         let silentTracks = try await AVURLAsset(url: silentOutput).loadTracks(withMediaType: .audio)
         XCTAssertTrue(silentTracks.isEmpty)
+        // The opening title is drawn into the frame: the same edit with and
+        // without it differs low on the picture while the title shows, and
+        // not once it has faded.
+        var plain = Edit(clips: [Clip(start: 0, end: 2.5)])
+        plain.settings["useMusic"] = .flag(false)
+        var titled = plain
+        titled.settings["titleText"] = .text("  רכיבת בוקר  ")
+        titled.settings["subtitleText"] = .text("Ben Shemen · 14.10")
+        XCTAssertEqual(titled.openingTitle.title, "רכיבת בוקר")
+        let plainOutput = folder.appendingPathComponent("plain.mp4"), titledOutput = folder.appendingPathComponent("titled.mp4")
+        let titledLength = try await engine.export(project, edit: titled, output: titledOutput) {_, _ in}
+        _ = try await engine.export(project, edit: plain, output: plainOutput) {_, _ in}
+        let shown = LocalEngine.titleTimes(length: titledLength)
+        let during = (shown.start + shown.end) / 2
+        let withTitle = try await lowerGray(titledOutput, at: during), without = try await lowerGray(plainOutput, at: during)
+        XCTAssertGreaterThan(zip(withTitle, without).map {abs(Double($0) - Double($1))}.reduce(0, +) / Double(withTitle.count), 12, "The title should show over the opening")
+        let after = min(titledLength - 0.1, shown.end + 0.2)
+        let laterWith = try await lowerGray(titledOutput, at: after), laterWithout = try await lowerGray(plainOutput, at: after)
+        XCTAssertLessThan(zip(laterWith, laterWithout).map {abs(Double($0) - Double($1))}.reduce(0, +) / Double(laterWith.count), 6, "The title should be gone after the opening")
         let canceled = Task {try await engine.analyze(source, whole: true) {_, _ in}}
         canceled.cancel()
         do {_ = try await canceled.value; XCTFail("Canceled analysis was accepted")} catch is CancellationError {} catch {XCTFail("Unexpected cancellation error: \(error)")}
@@ -149,6 +168,20 @@ final class LocalEngineTests: XCTestCase {
         // The fixture is quiet, loud, then medium; the drawing must say so.
         XCTAssertGreaterThan(levels[15], levels[5] * 3)
         XCTAssertGreaterThan(levels[15], levels[25] * 2)
+    }
+    /// The lower 40% of one frame, shrunk to a 16×8 grid of gray levels.
+    private func lowerGray(_ url: URL, at seconds: Double) async throws -> [UInt8] {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.requestedTimeToleranceBefore = .zero; generator.requestedTimeToleranceAfter = .zero
+        let (image, _) = try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600))
+        let lower = try XCTUnwrap(image.cropping(to: CGRect(x: 0, y: Int(Double(image.height) * 0.6), width: image.width, height: Int(Double(image.height) * 0.4))))
+        var gray = [UInt8](repeating: 0, count: 128)
+        gray.withUnsafeMutableBytes {bytes in
+            let context = CGContext(data: bytes.baseAddress, width: 16, height: 8, bitsPerComponent: 8, bytesPerRow: 16,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+            context.draw(lower, in: CGRect(x: 0, y: 0, width: 16, height: 8))
+        }
+        return gray
     }
     private func makeVideo(_ url: URL) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
