@@ -700,6 +700,10 @@ private struct DoneStep: View {
                     ShareLink(item: movie) {Label("שיתוף", systemImage: "square.and.arrow.up")}.buttonStyle(SecondaryButtonStyle())
                     Button(action: backToEdit) {Label("חזרה לעריכה", systemImage: "slider.horizontal.3")}.buttonStyle(SecondaryButtonStyle())
                 }.disabled(model.busy).rkRow()
+                if let current {
+                    Button(role: .destructive) {Task {await model.deleteExport(current)}} label: {Label("מחיקת הסרט", systemImage: "trash")}
+                        .buttonStyle(SecondaryButtonStyle()).disabled(model.busy).rkRow()
+                }
             }
             if model.busy {ProgressCard(model: model).rkRow()}
             MessageCard(model: model).rkRow()

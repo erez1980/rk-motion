@@ -38,12 +38,12 @@ struct MusicStartView: View {
                         }
                     }
                     HStack(spacing: 22) {
-                        Button {move(-5)} label: {Image(systemName: "gobackward.5")}.buttonStyle(IconButtonStyle()).accessibilityLabel("חמש שניות אחורה")
+                        Button {skip(-5)} label: {Image(systemName: "gobackward.5")}.buttonStyle(IconButtonStyle()).accessibilityLabel("חמש שניות אחורה")
                         Button(action: toggle) {
                             Image(systemName: playing ? "pause.fill" : "play.fill").font(.system(size: 28, weight: .bold)).foregroundStyle(RK.accentInk)
                                 .frame(width: 72, height: 72).background(RK.accent, in: Circle())
                         }.buttonStyle(.plain).accessibilityLabel(playing ? "עצירה" : "ניגון")
-                        Button {move(5)} label: {Image(systemName: "goforward.5")}.buttonStyle(IconButtonStyle()).accessibilityLabel("חמש שניות קדימה")
+                        Button {skip(5)} label: {Image(systemName: "goforward.5")}.buttonStyle(IconButtonStyle()).accessibilityLabel("חמש שניות קדימה")
                     }
                     .frame(maxWidth: .infinity)
                     .environment(\.layoutDirection, .leftToRight)
@@ -150,6 +150,12 @@ struct MusicStartView: View {
         player.play(); playing = true
     }
     private func move(_ seconds: Double) {setStart(start + seconds)}
+    /// The skip buttons move what is heard, from wherever it is playing; the
+    /// start moves only when the rider sets it.
+    private func skip(_ seconds: Double) {
+        position = min(max(0, position + seconds), max(0, song.duration - 0.25))
+        player?.seek(to: time(position), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
     private func setStart(_ value: Double) {
         start = min(max(0, value.isFinite ? value : 0), max(0, song.duration - 1))
         position = start
