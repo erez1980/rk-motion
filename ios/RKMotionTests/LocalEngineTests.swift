@@ -68,6 +68,8 @@ final class LocalEngineTests: XCTestCase {
         edit.settings["transition"] = .text("dissolve")
         edit.settings["transitionDuration"] = .text("0.3")
         edit.settings["aspect"] = .text("9:16")
+        // The song starts a second in, through its own start point.
+        edit.setMusicStart(1, for: project.music[0].id)
         let output = folder.appendingPathComponent("result.mp4")
         let expected: Double
         do {
@@ -126,6 +128,20 @@ final class LocalEngineTests: XCTestCase {
             _ = try await engine.export(project, edit: edit, output: folder.appendingPathComponent("invalid.mp4")) {_, _ in}
             XCTFail("Out-of-range edit accepted")
         } catch {XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("invalid.mp4").path))}
+    }
+    func testWaveformOfASong() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer {try? FileManager.default.removeItem(at: folder)}
+        let wave = folder.appendingPathComponent("song.wav")
+        try makeAudio(wave)
+        let levels = try await LocalEngine.waveform(wave, bins: 30)
+        XCTAssertEqual(levels.count, 30)
+        XCTAssertEqual(levels.max() ?? 0, 1, accuracy: 0.0001)
+        XCTAssertTrue(levels.allSatisfy {$0.isFinite && (0...1).contains($0)})
+        // The fixture is quiet, loud, then medium; the drawing must say so.
+        XCTAssertGreaterThan(levels[15], levels[5] * 3)
+        XCTAssertGreaterThan(levels[15], levels[25] * 2)
     }
     private func makeVideo(_ url: URL) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)

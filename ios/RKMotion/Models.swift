@@ -31,6 +31,18 @@ struct Edit: Codable, Equatable {
         "transition": .text("cut"), "transitionDuration": .text("0.5"), "musicStart": .text("0"),
         "musicVolume": .text("0.65"), "muteOriginal": .flag(false), "useMusic": .flag(true)]
 }
+extension Edit {
+    /// Where in a song the movie starts playing it. Each song keeps its own
+    /// point; an older project's single start still applies to its first song.
+    func musicStart(for song: String, first: Bool) -> Double {
+        let own = settings["musicStart:" + song].flatMap {Double($0.string)}
+        let value = own ?? (first ? Double(settings["musicStart"]?.string ?? "0") ?? 0 : 0)
+        return value.isFinite ? max(0, value) : 0
+    }
+    mutating func setMusicStart(_ seconds: Double, for song: String) {
+        settings["musicStart:" + song] = .text(String(format: "%.2f", max(0, seconds)))
+    }
+}
 struct LocalExport: Codable, Identifiable {
     var id = UUID().uuidString
     var file: String

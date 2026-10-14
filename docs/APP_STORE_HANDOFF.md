@@ -173,6 +173,21 @@ authorized. No Apple credentials are currently available.
   `close()` clears the current project for a new ride. Version 0.17.0. Not
   verified: how it looks on a device, Dynamic Type and VoiceOver.
 
+- Checkpoint 7 (song search and start point, Claude): Erez confirmed the
+  redesign and the link download work on his iPhone. The music step now
+  searches YouTube by name (`YouTubeSearch.swift`). YouTubeKit has no
+  working search, so the app posts to the endpoint YouTube's own web page
+  uses and falls back to reading `ytInitialData` from the results page.
+  Videos are found by the shape of each entry, not by a fixed path, and live
+  streams are skipped. After any song is added, `MusicStartView` opens. It
+  plays the song over a waveform (`LocalEngine.waveform`), lights the part the
+  movie will use, and saves the chosen moment as that song's own start
+  (`Edit.musicStart(for:first:)`, stored as `musicStart:<song id>`, so undo
+  covers it). An older project's single `musicStart` still applies to its
+  first song. Version 0.18.0. Not verified: search against YouTube today,
+  since CI and this sandbox cannot reach YouTube. Only a device can confirm
+  it.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.

@@ -3936,6 +3936,422 @@
           }
         }
       }
+    },
+    "האזנה לשיר ובחירת המקום שממנו יתחיל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen to the song and choose where it starts"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "האזנה לשיר ובחירת המקום שממנו יתחיל"
+          }
+        }
+      }
+    },
+    "הוספת %@ לפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add %@ to the project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת %@ לפרויקט"
+          }
+        }
+      }
+    },
+    "הורדת השמע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the audio"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הורדת השמע"
+          }
+        }
+      }
+    },
+    "החיפוש ב־YouTube נכשל. בדקו את החיבור ונסו שוב.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The YouTube search failed. Check your connection and try again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החיפוש ב־YouTube נכשל. בדקו את החיבור ונסו שוב."
+          }
+        }
+      }
+    },
+    "הסרט (%1$@) ישמיע את השיר מ־%2$@ עד %3$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie (%1$@) plays the song from %2$@ to %3$@."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט (%1$@) ישמיע את השיר מ־%2$@ עד %3$@."
+          }
+        }
+      }
+    },
+    "הסרט (%@) ארוך מהשיר מהנקודה הזאת; אחרי סוף השיר המוזיקה תמשיך.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie (%@) runs longer than the song from this point; after the song ends, the music carries on."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט (%@) ארוך מהשיר מהנקודה הזאת; אחרי סוף השיר המוזיקה תמשיך."
+          }
+        }
+      }
+    },
+    "השיר נוסף לפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The song was added to the project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השיר נוסף לפרויקט"
+          }
+        }
+      }
+    },
+    "השמע יורד ישירות לאייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio downloads straight to your iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השמע יורד ישירות לאייפון."
+          }
+        }
+      }
+    },
+    "התחלה בסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts in the movie at"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התחלה בסרט"
+          }
+        }
+      }
+    },
+    "התחלה מהרגע הזה — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start from this moment — %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התחלה מהרגע הזה — %@"
+          }
+        }
+      }
+    },
+    "חיפוש": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיפוש"
+          }
+        }
+      }
+    },
+    "חיפוש שיר ב־YouTube": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search YouTube for a song"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיפוש שיר ב־YouTube"
+          }
+        }
+      }
+    },
+    "חיפוש שיר לפי שם, או הדבקת קישור": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search for a song by name, or paste a link"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיפוש שיר לפי שם, או הדבקת קישור"
+          }
+        }
+      }
+    },
+    "חמש שניות אחורה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Five seconds earlier"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חמש שניות אחורה"
+          }
+        }
+      }
+    },
+    "חמש שניות קדימה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Five seconds later"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חמש שניות קדימה"
+          }
+        }
+      }
+    },
+    "לא נמצאו תוצאות. נסו שם אחר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No results. Try another name."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נמצאו תוצאות. נסו שם אחר."
+          }
+        }
+      }
+    },
+    "מאיפה השיר יתחיל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where the song starts"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מאיפה השיר יתחיל"
+          }
+        }
+      }
+    },
+    "מיקום הנגינה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing at"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מיקום הנגינה"
+          }
+        }
+      }
+    },
+    "מתחיל ב־%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "starts at %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מתחיל ב־%@"
+          }
+        }
+      }
+    },
+    "נגנו, ועצרו ברגע שממנו הסרט יתחיל. אפשר גם לגרור על הגל.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play, and stop at the moment the movie should start from. You can also drag along the waveform."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נגנו, ועצרו ברגע שממנו הסרט יתחיל. אפשר גם לגרור על הגל."
+          }
+        }
+      }
+    },
+    "ניגון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניגון"
+          }
+        }
+      }
+    },
+    "ניקוי החיפוש": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear search"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניקוי החיפוש"
+          }
+        }
+      }
+    },
+    "נקודת ההתחלה בשיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start point in the song"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נקודת ההתחלה בשיר"
+          }
+        }
+      }
+    },
+    "עצירה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עצירה"
+          }
+        }
+      }
+    },
+    "שימוש בשיר מ־%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the song from %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שימוש בשיר מ־%@"
+          }
+        }
+      }
+    },
+    "שם השיר והאמן": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Song and artist"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שם השיר והאמן"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

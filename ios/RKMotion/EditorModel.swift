@@ -48,6 +48,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let size = LocalEngine.frame(source: sourceDimensions, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
         return (sourceDimensions.width > 0 ? "\(Int(size.width))×\(Int(size.height)) · " : "") + "SDR · 30fps"
     }
+    /// The song just added, so the music step can offer to choose its start.
+    @Published var addedSong: String?
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
     private let persistence = ProjectPersistence()
@@ -227,16 +229,20 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             let asset = AVURLAsset(url: url)
             let duration = try await asset.load(.duration).seconds
             guard duration.isFinite, duration > 0, !(try await asset.loadTracks(withMediaType: .audio)).isEmpty else {throw AppError(message: "בחרו קובץ שמע תקין.")}
-            p.music.append(LocalMusic(file: name, name: file.lastPathComponent, duration: duration))
-            project = p; if await save() {message = "המוזיקה נשמרה באייפון"}
+            let song = LocalMusic(file: name, name: file.deletingPathExtension().lastPathComponent, duration: duration)
+            p.music.append(song)
+            project = p; if await save() {message = "המוזיקה נשמרה באייפון"; addedSong = song.id}
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
     /// Downloads a song's audio from a YouTube link, then adds it exactly as a
     /// song picked from Files would be added.
     func importYouTube(_ text: String) {
-        guard !busy, project != nil else {return}
         guard let link = YouTubeMusic.link(in: text) else {message = "הדביקו קישור לסרטון YouTube."; return}
+        importYouTube(link: link)
+    }
+    func importYouTube(link: URL) {
+        guard !busy, project != nil else {return}
         setBusy(true, .downloading); percent = 0; message = "מורידה את השמע מ־YouTube…"
         operation = Task {
             do {

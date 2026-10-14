@@ -437,15 +437,24 @@ private struct MusicStep: View {
     let next: () -> Void
     @State private var showImporter = false
     @State private var showYouTube = false
-    @State private var link = ""
+    @State private var query = ""
+    @State private var results: [YouTubeSearch.Result] = []
+    @State private var searching = false
+    @State private var searchNote: String?
+    @State private var searchTask: Task<Void, Never>?
+    @State private var fetching: String?
+    @State private var added: Set<String> = []
+    @State private var choosing: LocalMusic?
     var body: some View {
         List {
             HStack(spacing: 10) {
                 Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
             }.buttonStyle(.plain).disabled(model.busy).rkRow(top: 0)
-            if showYouTube || model.work == .downloading {youTube.rkRow()}
-            else if model.busy {ProgressCard(model: model).rkRow()}
+            if showYouTube || model.work == .downloading {
+                youTube.rkRow()
+                ForEach(results) {result in resultRow(result).rkRow(top: 4, bottom: 4)}
+            } else if model.busy {ProgressCard(model: model).rkRow()}
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("השירים בפרויקט").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                 Text(verbatim: "\(songs.count)").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
@@ -453,34 +462,11 @@ private struct MusicStep: View {
             if songs.isEmpty {
                 Text("עוד אין מוזיקה בפרויקט. הוסיפו שיר מהקבצים או מ־YouTube.").font(RK.font(14)).foregroundStyle(RK.soft).rkCard().rkRow()
             }
-            ForEach(songs) {song in
-                HStack(spacing: 12) {
-                    Image(systemName: "music.note").font(.system(size: 18, weight: .medium)).foregroundStyle(RK.accent)
-                        .frame(width: 40, height: 40).background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: song.name).font(RK.font(15, 500)).foregroundStyle(RK.ink).lineLimit(1).truncationMode(.middle)
-                        Text(verbatim: RK.clock(song.duration)).font(RK.font(12, 400, style: .caption1)).monospacedDigit().foregroundStyle(RK.soft)
-                    }
-                    Spacer(minLength: 0)
-                    Button {Task {await model.removeMusic(song.id)}} label: {
-                        Image(systemName: "trash").font(.system(size: 16)).foregroundStyle(RK.faint).frame(width: 40, height: 40).contentShape(Rectangle())
-                    }.buttonStyle(.plain).disabled(model.busy).accessibilityLabel("הסרת השיר")
-                }
-                .padding(.vertical, 8).padding(.horizontal, 12)
-                .background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).rkRow(top: 4, bottom: 4)
-            }
+            ForEach(songs) {song in songRow(song).rkRow(top: 4, bottom: 4)}
             VStack(alignment: .leading, spacing: 14) {
                 if !songs.isEmpty {
                     ToggleRow(title: "שימוש במוזיקה", isOn: flag("useMusic", fallback: true))
                     ChoiceGroup(title: "עוצמת המוזיקה", options: [(NSLocalizedString("רקע", comment: "Quiet music"), "0.35"), (NSLocalizedString("מאוזן", comment: "Balanced music"), "0.65"), (NSLocalizedString("חזק", comment: "Loud music"), "1")], selection: setting("musicVolume", fallback: "0.65"))
-                    HStack {
-                        Text("התחלה במוזיקה — שניות").font(RK.font(15)).foregroundStyle(RK.ink)
-                        Spacer()
-                        TextField("0", text: setting("musicStart", fallback: "0")).keyboardType(.decimalPad).multilineTextAlignment(.center)
-                            .font(RK.font(15)).monospacedDigit().frame(width: 72, height: 40)
-                            .background(RK.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .accessibilityLabel("התחלה במוזיקה — שניות")
-                    }
                 }
                 ToggleRow(title: "השתקת שמע הרכיבה", isOn: flag("muteOriginal", fallback: false))
             }.rkCard().disabled(model.busy).rkRow(top: 12)
@@ -494,24 +480,41 @@ private struct MusicStep: View {
             case .failure(let error): model.message = error.localizedDescription
             }
         }
-        .onChange(of: songs.count) {old, new in if new > old {link = ""; showYouTube = false}}
+        // A new song is offered for listening at once, to choose where it starts.
+        .onChange(of: model.addedSong) {_, id in
+            guard let id else {return}
+            if let fetching {added.insert(fetching)}
+            fetching = nil; model.addedSong = nil
+            if YouTubeMusic.link(in: query) != nil {query = ""}
+            choosing = songs.first {$0.id == id}
+        }
+        .onChange(of: model.busy) {_, busy in if !busy && model.addedSong == nil {fetching = nil}}
+        .sheet(item: $choosing) {song in MusicStartView(model: model, song: song)}
+        .onDisappear {searchTask?.cancel()}
     }
     private var songs: [LocalMusic] {model.project?.music ?? []}
+    private var isLink: Bool {YouTubeMusic.link(in: query) != nil}
     private var youTube: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("קישור לסרטון ב־YouTube").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+            Text("חיפוש שיר לפי שם, או הדבקת קישור").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
             HStack(spacing: 8) {
-                TextField("https://youtu.be/…", text: $link)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).submitLabel(.go)
-                    .onSubmit {model.importYouTube(link)}
-                    .font(RK.font(14)).foregroundStyle(RK.ink)
-                    .padding(.horizontal, 12).frame(minHeight: 44)
-                    .background(RK.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(RK.line))
-                    .environment(\.layoutDirection, .leftToRight)
-                    .accessibilityLabel("קישור ל־YouTube")
-                PasteButton(payloadType: String.self) {strings in link = strings.first ?? link}
-                    .labelStyle(.titleOnly).buttonBorderShape(.roundedRectangle(radius: 12)).tint(RK.raised).foregroundStyle(RK.ink)
+                HStack(spacing: 8) {
+                    Image(systemName: isLink ? "link" : "magnifyingglass").foregroundStyle(RK.faint)
+                    TextField("שם השיר והאמן", text: $query)
+                        .autocorrectionDisabled().submitLabel(isLink ? .go : .search)
+                        .onSubmit(go)
+                        .font(RK.font(15)).foregroundStyle(RK.ink)
+                        .accessibilityLabel("חיפוש שיר ב־YouTube")
+                    if !query.isEmpty {
+                        Button {query = ""; results = []; searchNote = nil} label: {Image(systemName: "xmark.circle.fill").foregroundStyle(RK.faint)}
+                            .buttonStyle(.plain).accessibilityLabel("ניקוי החיפוש")
+                    }
+                }
+                .padding(.horizontal, 12).frame(minHeight: 44)
+                .background(RK.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(RK.line))
+                PasteButton(payloadType: String.self) {strings in query = strings.first ?? query}
+                    .labelStyle(.iconOnly).buttonBorderShape(.roundedRectangle(radius: 12)).tint(RK.raised).foregroundStyle(RK.ink)
             }.disabled(model.busy)
             if model.work == .downloading {
                 ProgressView(value: min(100, max(0, model.percent)), total: 100).tint(RK.accent)
@@ -522,11 +525,83 @@ private struct MusicStep: View {
                 }
                 Button("ביטול ההורדה") {model.cancel()}.font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.soft).buttonStyle(.plain)
             } else {
-                Button("הורדה") {model.importYouTube(link)}.buttonStyle(PrimaryButtonStyle())
-                    .disabled(model.busy || link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Text("הדביקו קישור לסרטון. השמע יורד ישירות לאייפון.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)
+                Button(action: go) {
+                    if searching {ProgressView().tint(RK.accentInk)}
+                    else {Label(isLink ? LocalizedStringKey("הורדת השמע") : LocalizedStringKey("חיפוש"), systemImage: isLink ? "arrow.down" : "magnifyingglass")}
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(model.busy || searching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let searchNote {Text(verbatim: searchNote).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)}
+                else {Text("השמע יורד ישירות לאייפון.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)}
             }
         }.rkCard()
+    }
+    private func go() {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !model.busy else {return}
+        if isLink {model.importYouTube(text); return}
+        searchTask?.cancel(); searching = true; searchNote = nil
+        searchTask = Task {
+            do {
+                let found = try await YouTubeSearch.search(text)
+                try Task.checkCancellation()
+                results = found
+                if found.isEmpty {searchNote = NSLocalizedString("לא נמצאו תוצאות. נסו שם אחר.", comment: "YouTube search found nothing")}
+            } catch is CancellationError {return}
+            catch {searchNote = error.localizedDescription}
+            searching = false
+        }
+    }
+    private func resultRow(_ result: YouTubeSearch.Result) -> some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: result.thumbnail) {image in image.resizable().scaledToFill()} placeholder: {RK.raised}
+                .frame(width: 72, height: 48).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous)).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: result.title).font(RK.font(14, 500)).foregroundStyle(RK.ink).lineLimit(2)
+                Text(verbatim: [result.channel, RK.clock(result.duration)].filter {!$0.isEmpty}.joined(separator: " · "))
+                    .font(RK.font(12, 400, style: .caption1)).monospacedDigit().foregroundStyle(RK.soft).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if fetching == result.id {
+                ProgressView().tint(RK.accent).frame(width: 40, height: 40)
+            } else if added.contains(result.id) {
+                Image(systemName: "checkmark").font(.system(size: 16, weight: .bold)).foregroundStyle(RK.accent).frame(width: 40, height: 40)
+                    .accessibilityLabel("השיר נוסף לפרויקט")
+            } else {
+                Button {fetching = result.id; model.importYouTube(link: result.link)} label: {
+                    Image(systemName: "plus").font(.system(size: 17, weight: .bold)).foregroundStyle(RK.accentSoftInk)
+                        .frame(width: 40, height: 40).background(RK.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain).disabled(model.busy)
+                .accessibilityLabel(String(format: NSLocalizedString("הוספת %@ לפרויקט", comment: "Add a found song"), result.title))
+            }
+        }
+        .padding(8).background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    private func songRow(_ song: LocalMusic) -> some View {
+        let start = model.edit.musicStart(for: song.id, first: songs.first?.id == song.id)
+        return HStack(spacing: 12) {
+            Button {choosing = song} label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform").font(.system(size: 18, weight: .medium)).foregroundStyle(RK.accent)
+                        .frame(width: 40, height: 40).background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: song.name).font(RK.font(15, 500)).foregroundStyle(RK.ink).lineLimit(1).truncationMode(.middle)
+                        Text(verbatim: RK.clock(song.duration) + " · " + String(format: NSLocalizedString("מתחיל ב־%@", comment: "Where a song starts"), RK.clock(start)))
+                            .font(RK.font(12, 400, style: .caption1)).monospacedDigit().foregroundStyle(RK.soft)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
+                }.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("האזנה לשיר ובחירת המקום שממנו יתחיל")
+            Button {Task {await model.removeMusic(song.id)}} label: {
+                Image(systemName: "trash").font(.system(size: 16)).foregroundStyle(RK.faint).frame(width: 40, height: 40).contentShape(Rectangle())
+            }.buttonStyle(.plain).disabled(model.busy).accessibilityLabel("הסרת השיר")
+        }
+        .padding(.vertical, 8).padding(.horizontal, 12)
+        .background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     private func setting(_ key: String, fallback: String) -> Binding<String> {
         Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})

@@ -112,6 +112,38 @@ actor LocalEngine {
         }
         return bytes
     }
+    /// A song's loudness in even slices, to draw it while choosing its start.
+    static func waveform(_ file: URL, bins: Int = 120) async throws -> [Double] {
+        let asset = AVURLAsset(url: file)
+        let duration = try await asset.load(.duration).seconds
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        guard duration.isFinite, duration > 0, !tracks.isEmpty, bins > 0 else {return []}
+        var peaks = [Double](repeating: 0, count: bins)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 4000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false])
+        guard reader.canAdd(output) else {return []}
+        reader.add(output)
+        guard reader.startReading() else {throw reader.error ?? AppError(message: "קריאת השמע נכשלה.")}
+        defer {reader.cancelReading()}
+        while let sample = output.copyNextSampleBuffer() {
+            try Task.checkCancellation()
+            let start = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            guard start.isFinite, let block = CMSampleBufferGetDataBuffer(sample) else {continue}
+            let size = CMBlockBufferGetDataLength(block)
+            var data = [UInt8](repeating: 0, count: size)
+            guard data.withUnsafeMutableBytes({CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: size, destination: $0.baseAddress!)}) == kCMBlockBufferNoErr else {continue}
+            data.withUnsafeBytes {bytes in
+                for (index, value) in bytes.bindMemory(to: Float.self).enumerated() where value.isFinite {
+                    let bin = min(bins - 1, max(0, Int((start + Double(index) / 4000) / duration * Double(bins))))
+                    peaks[bin] = max(peaks[bin], Double(abs(value)))
+                }
+            }
+        }
+        let loudest = peaks.max() ?? 0
+        return loudest > 0 ? peaks.map {$0 / loudest} : peaks
+    }
     private func loudness(_ asset: AVAsset, duration: Double, progress: Progress) async throws -> [Double] {
         let count = max(1, Int(ceil(duration)))
         var sums = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
@@ -270,8 +302,7 @@ actor LocalEngine {
             let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
             let params = AVMutableAudioMixInputParameters(track: track)
             let volume = Float(edit.settings["musicVolume"]?.string ?? "0.65") ?? 0.65
-            let start = Double(edit.settings["musicStart"]?.string ?? "0") ?? 0
-            guard volume.isFinite, 0 < volume && volume <= 2, start.isFinite, start >= 0 else {throw AppError(message: "הגדרות מוזיקה לא תקינות.")}
+            guard volume.isFinite, 0 < volume && volume <= 2 else {throw AppError(message: "הגדרות מוזיקה לא תקינות.")}
             var cursor = 0.0, item = 0
             while cursor < length - 0.001 {
                 try Task.checkCancellation()
@@ -279,7 +310,7 @@ actor LocalEngine {
                 let musicAsset = AVURLAsset(url: LocalStore.file(music.file, project: project.id))
                 guard let audio = try await musicAsset.loadTracks(withMediaType: .audio).first else {throw AppError(message: "קובץ המוזיקה אינו מכיל שמע.")}
                 let audioRange = try await audio.load(.timeRange)
-                let offset = item == 0 ? start : 0
+                let offset = edit.musicStart(for: music.id, first: item == 0)
                 let available = audioRange.duration.seconds - offset
                 guard available > 0.01 else {throw AppError(message: "זמן התחלת המוזיקה נמצא מעבר לסוף הקובץ.")}
                 let take = min(length - cursor, available)
