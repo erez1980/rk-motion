@@ -311,7 +311,7 @@ actor LocalEngine {
                 let musicAsset = AVURLAsset(url: LocalStore.file(music.file, project: project.id))
                 guard let audio = try await musicAsset.loadTracks(withMediaType: .audio).first else {throw AppError(message: "קובץ המוזיקה אינו מכיל שמע.")}
                 let audioRange = try await audio.load(.timeRange)
-                let offset = edit.musicStart(for: music.id, first: item == 0)
+                let offset = edit.musicStart(for: music.id, first: item % project.music.count == 0)
                 let available = audioRange.duration.seconds - offset
                 guard available > 0.01 else {throw AppError(message: "זמן התחלת המוזיקה נמצא מעבר לסוף הקובץ.")}
                 let take = min(length - cursor, available)

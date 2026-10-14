@@ -86,6 +86,13 @@ final class LocalEngineTests: XCTestCase {
         XCTAssertEqual(previewDuration, expected, accuracy: 0.1)
         XCTAssertEqual(preview.videoComposition?.renderSize, CGSize(width: 134, height: 240))
         XCTAssertNotNil(preview.audioMix)
+        // The music track takes the song from the chosen second, not from its beginning.
+        let previewAudio = try await preview.asset.loadTracks(withMediaType: .audio)
+        let songSegments = previewAudio.compactMap {$0 as? AVCompositionTrack}.flatMap {$0.segments}
+            .filter {!$0.isEmpty && $0.sourceURL?.lastPathComponent == "music.wav"}
+        let firstSong = try XCTUnwrap(songSegments.min {$0.timeMapping.target.start < $1.timeMapping.target.start})
+        XCTAssertEqual(firstSong.timeMapping.target.start.seconds, 0, accuracy: 0.01)
+        XCTAssertEqual(firstSong.timeMapping.source.start.seconds, 1, accuracy: 0.01)
         let result = AVURLAsset(url: output)
         let actual = try await result.load(.duration).seconds
         XCTAssertEqual(actual, expected, accuracy: 0.1)
