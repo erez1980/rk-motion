@@ -33,11 +33,13 @@ final class BeatsTests: XCTestCase {
         defer {try? FileManager.default.removeItem(at: folder)}
         let file = folder.appendingPathComponent("clicks.wav")
         try clickTrack(file, seconds: 12, period: 0.5, phase: 0.25)
-        let grid = try XCTUnwrap(Beats.grid(try await Beats.envelope(file, from: 0, length: 12)))
+        let whole = try await Beats.envelope(file, from: 0, length: 12)
+        let grid = try XCTUnwrap(Beats.grid(whole))
         XCTAssertEqual(grid.period, 0.5, accuracy: 0.02)
         XCTAssertEqual(try XCTUnwrap(grid.times.first), 0.25, accuracy: 0.03)
         // Read from a song's chosen start, beats count from that start.
-        let later = try XCTUnwrap(Beats.grid(try await Beats.envelope(file, from: 1.1, length: 10)))
+        let tail = try await Beats.envelope(file, from: 1.1, length: 10)
+        let later = try XCTUnwrap(Beats.grid(tail))
         XCTAssertEqual(try XCTUnwrap(later.times.first), 0.15, accuracy: 0.03)
     }
     /// 8 kHz mono, a short 1 kHz burst on every beat and silence between.
