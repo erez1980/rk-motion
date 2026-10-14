@@ -196,6 +196,23 @@ authorized. No Apple credentials are currently available.
   movie's length (`ClipPicker`). The cut or dissolve choice moved from export
   to the edit step. Version 0.19.0.
 
+- Checkpoint 9 (beat sync and transitions, Claude): cuts now land on the
+  song's beat (`Beats.swift`). An onset envelope of the first song's playing
+  stretch is read at 100 frames a second. Autocorrelation over 70 to 180 BPM,
+  weighted towards 120, gives the tempo, then the phase that collects the
+  most onsets. In `prepare` each selected clip's end moves to the nearest
+  beat. The move is a trim, or an extension only where the source has room,
+  and leaves at least 1 s on screen. With an overlapping transition, the
+  midpoint of the overlap is what lands on the beat. It is on by default
+  (`beatSync`) and applies to preview and export alike. The edit itself is
+  not rewritten, so changing the song or its start re-syncs. Four
+  transitions joined cut and dissolve: dip to black, flash to white, push
+  and zoom, all made from layer opacity and transform ramps.
+  `LocalEngine.transitions` is the allowed list. Version 0.20.0. Not
+  verified: how the beat finder does on real songs, as opposed to the
+  synthetic and click-track tests, and how the new transitions look on a
+  device.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.

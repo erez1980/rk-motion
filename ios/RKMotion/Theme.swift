@@ -143,10 +143,12 @@ struct ChoiceGroup: View {
     /// Each option is its shown label and its stored value.
     let options: [(String, String)]
     @Binding var selection: String
+    /// Options per row; all in one row unless there are too many to read.
+    var columns: Int?
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
-            HStack(spacing: 0) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: max(1, columns ?? options.count)), spacing: 3) {
                 ForEach(options, id: \.1) {option in
                     let (label, value) = option
                     let picked = value == selection

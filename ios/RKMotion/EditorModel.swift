@@ -38,7 +38,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The finished movie's length, or nil while nothing exportable is chosen.
     var expectedDuration: Double? {
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        let fade = edit.settings["transition"]?.string == "dissolve" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         return LocalEngine.timeline(clips: selectedClips, speed: speed, transition: fade).last?.end ?? 0
     }

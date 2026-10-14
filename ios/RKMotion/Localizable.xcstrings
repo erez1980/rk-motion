@@ -4448,6 +4448,102 @@
           }
         }
       }
+    },
+    "דעיכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fade"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דעיכה"
+          }
+        }
+      }
+    },
+    "הבזק": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flash"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הבזק"
+          }
+        }
+      }
+    },
+    "החלקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החלקה"
+          }
+        }
+      }
+    },
+    "זום": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זום"
+          }
+        }
+      }
+    },
+    "חיתוך לפי קצב השיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cut to the beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיתוך לפי קצב השיר"
+          }
+        }
+      }
+    },
+    "כל מעבר בין קטעים נופל על הביט של השיר הראשון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every cut between clips lands on the first song's beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל מעבר בין קטעים נופל על הביט של השיר הראשון"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

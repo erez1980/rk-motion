@@ -228,9 +228,21 @@ private struct EditStep: View {
                     .disabled(model.busy).rkRow()
             }
             VStack(alignment: .leading, spacing: 12) {
-                ChoiceGroup(title: "מעבר בין קטעים", options: [(NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"), (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve")], selection: setting("transition", fallback: "cut"))
-                if model.edit.settings["transition"]?.string == "dissolve" {
+                ChoiceGroup(title: "מעבר בין קטעים", options: [
+                    (NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"),
+                    (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve"),
+                    (NSLocalizedString("דעיכה", comment: "Dip-to-black transition"), "fade"),
+                    (NSLocalizedString("הבזק", comment: "Flash-to-white transition"), "flash"),
+                    (NSLocalizedString("החלקה", comment: "Push transition"), "slide"),
+                    (NSLocalizedString("זום", comment: "Zoom transition"), "zoom"),
+                ], selection: setting("transition", fallback: "cut"), columns: 3)
+                if (model.edit.settings["transition"]?.string ?? "cut") != "cut" {
                     ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
+                }
+                if model.project?.music.isEmpty == false, model.edit.settings["useMusic"]?.bool != false {
+                    Toggle(isOn: Binding(get: {model.edit.settings["beatSync"]?.bool ?? true}, set: {model.edit.settings["beatSync"] = .flag($0)})) {
+                        Label("חיתוך לפי קצב השיר", systemImage: "metronome").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                    }.tint(RK.accent)
                 }
             }.disabled(model.busy).rkRow(top: 10)
             clipsHeader.rkRow(top: 12)
@@ -502,6 +514,7 @@ private struct MusicStep: View {
                 if !songs.isEmpty {
                     ToggleRow(title: "שימוש במוזיקה", isOn: flag("useMusic", fallback: true))
                     ChoiceGroup(title: "עוצמת המוזיקה", options: [(NSLocalizedString("רקע", comment: "Quiet music"), "0.35"), (NSLocalizedString("מאוזן", comment: "Balanced music"), "0.65"), (NSLocalizedString("חזק", comment: "Loud music"), "1")], selection: setting("musicVolume", fallback: "0.65"))
+                    ToggleRow(title: "חיתוך לפי קצב השיר", detail: "כל מעבר בין קטעים נופל על הביט של השיר הראשון", isOn: flag("beatSync", fallback: true))
                 }
                 ToggleRow(title: "השתקת שמע הרכיבה", isOn: flag("muteOriginal", fallback: false))
             }.rkCard().disabled(model.busy).rkRow(top: 12)
