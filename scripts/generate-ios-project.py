@@ -28,6 +28,11 @@ refs.append(add("info", 'isa = PBXFileReference; lastKnownFileType = text.plist.
 refs.append(add("privacy", 'isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>";'))
 refs.append(add("strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>";'))
 refs.append(add("info-strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>";'))
+# Rubik, the web app's typeface, so both read as one product.
+refs.append(add("font", 'isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Rubik.ttf; sourceTree = "<group>";'))
+refs.append(add("font-license", 'isa = PBXFileReference; lastKnownFileType = text; path = Fonts/OFL.txt; sourceTree = "<group>";'))
+add("font-build", f'isa = PBXBuildFile; fileRef = {uid("font")};')
+add("font-license-build", f'isa = PBXBuildFile; fileRef = {uid("font-license")};')
 add("strings-build", f'isa = PBXBuildFile; fileRef = {uid("strings")};')
 add("info-strings-build", f'isa = PBXBuildFile; fileRef = {uid("info-strings")};')
 add("privacy-build", f'isa = PBXBuildFile; fileRef = {uid("privacy")};')
@@ -52,7 +57,7 @@ add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")}
 add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RKMotion; sourceTree = "<group>";')
 add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
-add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},); runOnlyForDeploymentPostprocessing = 0;')
+add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},{uid("font-build")},{uid("font-license-build")},); runOnlyForDeploymentPostprocessing = 0;')
 # YouTubeKit fetches a song's audio from a YouTube link, on the device.
 add("ytkit-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git"; requirement = {kind = exactVersion; version = 0.4.9;};')
 add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("ytkit-package")}; productName = YouTubeKit;')
@@ -64,7 +69,7 @@ for kind in ("Debug", "Release"):
     debug_arch = " ONLY_ACTIVE_ARCH = YES;" if kind == "Debug" else ""
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;{debug_arch}}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.15.0;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.20.0; RK_COMMIT = local;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;

@@ -158,6 +158,61 @@ authorized. No Apple credentials are currently available.
   can, and a YouTube change can break it until YouTubeKit is updated. A
   store-only build split was tried and then removed at Erez's direction.
 
+- Checkpoint 6 (versions and redesign, Claude): every CI build now shows which
+  build it is. `MARKETING_VERSION` is set in the generator, the run number
+  becomes `CFBundleVersion`, and the commit becomes `RKCommit`. All three
+  appear on the home screen, the done screen and About, and they name the IPA.
+  Music moved out of the export options, which only appeared after analysis
+  and so hid the YouTube button. The interface was then rebuilt to a mockup
+  Erez approved. It opens on a projects home (`HomeView.swift`), and each ride
+  runs through the steps video, edit, music, export, done
+  (`ProjectFlowView.swift`). Analysis and export show a full-screen progress
+  ring. Colours and Rubik come from the web app's tokens, in night and day
+  (`Theme.swift`; `Fonts/Rubik.ttf` with `UIAppFonts`). `EditorModel.work`
+  says which operation is running, so each screen shows the right progress.
+  `close()` clears the current project for a new ride. Version 0.17.0. Not
+  verified: how it looks on a device, Dynamic Type and VoiceOver.
+
+- Checkpoint 7 (song search and start point, Claude): Erez confirmed the
+  redesign and the link download work on his iPhone. The music step now
+  searches YouTube by name (`YouTubeSearch.swift`). YouTubeKit has no
+  working search, so the app posts to the endpoint YouTube's own web page
+  uses and falls back to reading `ytInitialData` from the results page.
+  Videos are found by the shape of each entry, not by a fixed path, and live
+  streams are skipped. After any song is added, `MusicStartView` opens. It
+  plays the song over a waveform (`LocalEngine.waveform`), lights the part the
+  movie will use, and saves the chosen moment as that song's own start
+  (`Edit.musicStart(for:first:)`, stored as `musicStart:<song id>`, so undo
+  covers it). An older project's single `musicStart` still applies to its
+  first song. Version 0.18.0. Not verified: search against YouTube today,
+  since CI and this sandbox cannot reach YouTube. Only a device can confirm
+  it.
+
+- Checkpoint 8 (edit tools, Claude): Erez found no shuffle after analysis,
+  and transitions only appeared at export. The edit step now has the web
+  app's clip tools: shuffle order (never the same order, with an undo chip)
+  and an automatic choice for a 30-second, 1-minute or 2-minute movie. The
+  choice is scaled by playback speed, so the target is the finished
+  movie's length (`ClipPicker`). The cut or dissolve choice moved from export
+  to the edit step. Version 0.19.0.
+
+- Checkpoint 9 (beat sync and transitions, Claude): cuts now land on the
+  song's beat (`Beats.swift`). An onset envelope of the first song's playing
+  stretch is read at 100 frames a second. Autocorrelation over 70 to 180 BPM,
+  weighted towards 120, gives the tempo, then the phase that collects the
+  most onsets. In `prepare` each selected clip's end moves to the nearest
+  beat. The move is a trim, or an extension only where the source has room,
+  and leaves at least 1 s on screen. With an overlapping transition, the
+  midpoint of the overlap is what lands on the beat. It is on by default
+  (`beatSync`) and applies to preview and export alike. The edit itself is
+  not rewritten, so changing the song or its start re-syncs. Four
+  transitions joined cut and dissolve: dip to black, flash to white, push
+  and zoom, all made from layer opacity and transform ramps.
+  `LocalEngine.transitions` is the allowed list. Version 0.20.0. Not
+  verified: how the beat finder does on real songs, as opposed to the
+  synthetic and click-track tests, and how the new transitions look on a
+  device.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.

@@ -23,7 +23,12 @@ case "$rk_mode" in
     echo "Standalone simulator app: $rk_output/DerivedData/Build/Products/Release-iphonesimulator/RKMotion.app"
     ;;
   unsigned)
-    xcodebuild "${rk_args[@]}" -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$rk_output/RKMotion.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+    # Every build must be told apart on the phone: CI supplies a rising build
+    # number and the commit; a local build keeps the project's defaults.
+    rk_stamp=()
+    [ -n "${RK_BUILD_NUMBER:-}" ] && rk_stamp+=(CURRENT_PROJECT_VERSION="$RK_BUILD_NUMBER")
+    [ -n "${RK_COMMIT:-}" ] && rk_stamp+=(RK_COMMIT="${RK_COMMIT:0:7}")
+    xcodebuild "${rk_args[@]}" "${rk_stamp[@]}" -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$rk_output/RKMotion.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
     rk_app="$rk_output/RKMotion.xcarchive/Products/Applications/RKMotion.app"
     test -d "$rk_app"
     rk_stage="$(mktemp -d "$rk_output/package.XXXXXX")"
@@ -31,8 +36,11 @@ case "$rk_mode" in
     mkdir "$rk_stage/Payload"
     ditto "$rk_app" "$rk_stage/Payload/RKMotion.app"
     plutil -lint "$rk_stage/Payload/RKMotion.app/Info.plist"
-    ditto -c -k --keepParent "$rk_stage/Payload" "$rk_output/RK-Motion-unsigned.ipa"
-    echo "IPA: $rk_output/RK-Motion-unsigned.ipa"
+    rk_info="$rk_stage/Payload/RKMotion.app/Info.plist"
+    rk_name="RK-Motion-$(plutil -extract CFBundleShortVersionString raw "$rk_info")-build$(plutil -extract CFBundleVersion raw "$rk_info")-$(plutil -extract RKCommit raw "$rk_info").ipa"
+    rm -f "$rk_output"/RK-Motion-*.ipa
+    ditto -c -k --keepParent "$rk_stage/Payload" "$rk_output/$rk_name"
+    echo "IPA: $rk_output/$rk_name"
     echo "This IPA must be signed before it can run on a standard iPhone. Use Xcode Personal Team or re-sign with Sideloadly."
     ;;
   store)

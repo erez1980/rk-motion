@@ -24,12 +24,18 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>RKCommit</key>
+	<string>$(RK_COMMIT)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>שמירת הסרט שייצאתם בספריית התמונות באייפון.</string>
 	<key>RKBackgroundGPUEnabled</key>
 	<string>$(RK_BACKGROUND_GPU_ENABLED)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Rubik.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

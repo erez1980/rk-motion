@@ -6,7 +6,11 @@ import UIKit
 import PhotosUI
 import SwiftUI
 
+/// What the app is busy with, so each screen can show the right progress.
+enum Work {case importing, analyzing, exporting, previewing, downloading, other}
+
 @MainActor final class EditorModel: ObservableObject {
+    @Published private(set) var work: Work?
     @Published var projects: [LocalProject] = []
     @Published var project: LocalProject?
     @Published var edit = Edit(clips: [])
@@ -30,18 +34,22 @@ import SwiftUI
         }
         return nil
     }
-    var exportSummary: String {
-        let selected = edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}
+    var selectedClips: [Clip] {edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}}
+    /// The finished movie's length, or nil while nothing exportable is chosen.
+    var expectedDuration: Double? {
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        let fade = edit.settings["transition"]?.string == "dissolve" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
-        guard !selected.isEmpty, speed > 0 else {return "בחרו קטעים לייצוא"}
-        let duration = LocalEngine.timeline(clips: selected, speed: speed, transition: fade).last?.end ?? 0
+        let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        guard !selectedClips.isEmpty, speed > 0 else {return nil}
+        return LocalEngine.timeline(clips: selectedClips, speed: speed, transition: fade).last?.end ?? 0
+    }
+    var expectedFormat: String {
         let quality = edit.settings["quality"]?.string ?? "1080"
         let cap: Double? = quality == "original" ? nil : ["720", "whatsapp"].contains(quality) ? 720 : 1080
         let size = LocalEngine.frame(source: sourceDimensions, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
-        let dimensions = sourceDimensions.width > 0 ? " · \(Int(size.width))×\(Int(size.height))" : ""
-        return String(format: NSLocalizedString("תוצאה צפויה: %.1f שניות", comment: "Expected output duration"), duration) + dimensions + " · SDR · 30fps"
+        return (sourceDimensions.width > 0 ? "\(Int(size.width))×\(Int(size.height)) · " : "") + "SDR · 30fps"
     }
+    /// The song just added, so the music step can offer to choose its start.
+    @Published var addedSong: String?
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
     private let persistence = ProjectPersistence()
@@ -84,6 +92,16 @@ import SwiftUI
         previewItem = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
+    /// Puts the current project away so a new ride starts from an empty screen.
+    func close() async {
+        guard !busy, project != nil else {return}
+        setBusy(true)
+        guard await save() else {setBusy(false); return}
+        project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewItem = nil; projectBytes = 0
+        sourceDimensions = .zero; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
+        UserDefaults.standard.removeObject(forKey: "localProject")
+        setBusy(false)
+    }
     func changed(from previous: Edit) {
         guard project != nil else {return}
         if let suppressed = suppressedEdit {suppressedEdit = nil; if suppressed == edit {return}}
@@ -121,8 +139,8 @@ import SwiftUI
         } catch {saveFailed = true; message = NSLocalizedString("שמירת הפרויקט נכשלה: ", comment: "Project save failure prefix") + error.localizedDescription; return false}
     }
     private func refreshLibrary(_ p: LocalProject) {projects.removeAll {$0.id == p.id}; projects.insert(p, at: 0)}
-    private func setBusy(_ value: Bool) {
-        busy = value; UIApplication.shared.isIdleTimerDisabled = value
+    private func setBusy(_ value: Bool, _ kind: Work = .other) {
+        busy = value; work = value ? kind : nil; UIApplication.shared.isIdleTimerDisabled = value
         if value {processingSucceeded = false}
         if value && backgroundID == .invalid {
             backgroundID = UIApplication.shared.beginBackgroundTask(withName: "Finish local processing") {[weak self] in
@@ -133,7 +151,7 @@ import SwiftUI
     }
     func importPickedVideo(_ item: PhotosPickerItem) {
         guard !busy else {return}
-        setBusy(true); percent = 0; message = "האייפון מכין את הקובץ…"
+        setBusy(true, .importing); percent = 0; message = "האייפון מכין את הקובץ…"
         operation = Task {
             var staged: URL?
             do {
@@ -147,7 +165,7 @@ import SwiftUI
     }
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
-        setBusy(true)
+        setBusy(true, .importing)
         guard await save() else {setBusy(false); return}
         percent = 0; message = "מעתיקה את הסרטון לאחסון המקומי…"
         let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("רכיבה ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
@@ -166,7 +184,7 @@ import SwiftUI
     func analyze() {
         guard !busy, var p = project else {return}
         p.wholeVideo = wholeVideo; project = p
-        setBusy(true); percent = 0; message = "מנתחת באייפון…"
+        setBusy(true, .analyzing); percent = 0; message = "מנתחת באייפון…"
         let whole = wholeVideo
         launchProcessing(title: "ניתוח סרטון רכיבה") { [self] in
           operation = Task {
@@ -194,6 +212,18 @@ import SwiftUI
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
     }
+    func shuffleClips() {
+        guard !busy, edit.clips.count > 1 else {return}
+        var generator = SystemRandomNumberGenerator()
+        edit.clips = ClipPicker.shuffled(edit.clips, using: &generator)
+    }
+    /// `seconds` is the finished movie's length, so playback speed counts.
+    func autoPick(seconds: Double) {
+        guard !busy, !edit.clips.isEmpty else {return}
+        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let overlap = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
+    }
     func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; updateUndo(); scheduleSave()}
     func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; updateUndo(); scheduleSave()}
     private func updateUndo() {undoAvailable = !undoStack.isEmpty; redoAvailable = !redoStack.isEmpty}
@@ -211,17 +241,21 @@ import SwiftUI
             let asset = AVURLAsset(url: url)
             let duration = try await asset.load(.duration).seconds
             guard duration.isFinite, duration > 0, !(try await asset.loadTracks(withMediaType: .audio)).isEmpty else {throw AppError(message: "בחרו קובץ שמע תקין.")}
-            p.music.append(LocalMusic(file: name, name: file.lastPathComponent, duration: duration))
-            project = p; if await save() {message = "המוזיקה נשמרה באייפון"}
+            let song = LocalMusic(file: name, name: file.deletingPathExtension().lastPathComponent, duration: duration)
+            p.music.append(song)
+            project = p; if await save() {message = "המוזיקה נשמרה באייפון"; addedSong = song.id}
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
     /// Downloads a song's audio from a YouTube link, then adds it exactly as a
     /// song picked from Files would be added.
     func importYouTube(_ text: String) {
-        guard !busy, project != nil else {return}
         guard let link = YouTubeMusic.link(in: text) else {message = "הדביקו קישור לסרטון YouTube."; return}
-        setBusy(true); percent = 0; message = "מורידה את השמע מ־YouTube…"
+        importYouTube(link: link)
+    }
+    func importYouTube(link: URL) {
+        guard !busy, project != nil else {return}
+        setBusy(true, .downloading); percent = 0; message = "מורידה את השמע מ־YouTube…"
         operation = Task {
             do {
                 let file = try await YouTubeMusic.download(link, into: LocalStore.imports) {[weak self] fraction in
@@ -251,7 +285,7 @@ import SwiftUI
         guard !busy, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit
-        setBusy(true); percent = 0; message = "מייצאת באייפון…"
+        setBusy(true, .exporting); percent = 0; message = "מייצאת באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
         launchProcessing(title: "ייצוא סרטון רכיבה") { [self] in
           operation = Task {
@@ -316,7 +350,7 @@ import SwiftUI
     func preview() {
         guard !busy, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
-        let snapshot = edit; setBusy(true); percent = 0
+        let snapshot = edit; setBusy(true, .previewing); percent = 0
         launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}

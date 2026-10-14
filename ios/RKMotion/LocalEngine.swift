@@ -7,6 +7,18 @@ import OSLog
 // Only native Apple frameworks: source files never leave the device.
 actor LocalEngine {
     private let logger = Logger(subsystem: "com.rkmotion", category: "MediaPerformance")
+    /// The transitions an edit may name, each drawn below in `prepare`.
+    static let transitions = ["cut", "dissolve", "fade", "flash", "slide", "zoom"]
+    private var beatCache: [String: [Double]] = [:]
+    /// Beats of the song's playing stretch, in movie seconds, worked out once.
+    private func songBeats(_ file: URL, start: Double, length: Double) async -> [Double]? {
+        let key = "\(file.path)|\(start)|\(length)"
+        if let cached = beatCache[key] {return cached}
+        guard length > 3, let onsets = try? await Beats.envelope(file, from: start, length: length),
+              let grid = Beats.grid(onsets) else {return nil}
+        beatCache[key] = grid.times
+        return grid.times
+    }
     typealias Progress = @Sendable (Double, String) async -> Void
     private func time(_ seconds: Double) -> CMTime {CMTime(seconds: seconds, preferredTimescale: 60000)}
     static func normalized(_ values: [Double]) -> [Double] {
@@ -112,6 +124,39 @@ actor LocalEngine {
         }
         return bytes
     }
+    /// A song's loudness in even slices, to draw it while choosing its start.
+    static func waveform(_ file: URL, bins: Int = 120) async throws -> [Double] {
+        let asset = AVURLAsset(url: file)
+        let duration = try await asset.load(.duration).seconds
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        guard duration.isFinite, duration > 0, !tracks.isEmpty, bins > 0 else {return []}
+        var peaks = [Double](repeating: 0, count: bins)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
+            // AVFoundation refuses anything under 8 kHz.
+            AVSampleRateKey: 8000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false])
+        guard reader.canAdd(output) else {return []}
+        reader.add(output)
+        guard reader.startReading() else {throw reader.error ?? AppError(message: "קריאת השמע נכשלה.")}
+        defer {reader.cancelReading()}
+        while let sample = output.copyNextSampleBuffer() {
+            try Task.checkCancellation()
+            let start = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            guard start.isFinite, let block = CMSampleBufferGetDataBuffer(sample) else {continue}
+            let size = CMBlockBufferGetDataLength(block)
+            var data = [UInt8](repeating: 0, count: size)
+            guard data.withUnsafeMutableBytes({CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: size, destination: $0.baseAddress!)}) == kCMBlockBufferNoErr else {continue}
+            data.withUnsafeBytes {bytes in
+                for (index, value) in bytes.bindMemory(to: Float.self).enumerated() where value.isFinite {
+                    let bin = min(bins - 1, max(0, Int((start + Double(index) / 8000) / duration * Double(bins))))
+                    peaks[bin] = max(peaks[bin], Double(abs(value)))
+                }
+            }
+        }
+        let loudest = peaks.max() ?? 0
+        return loudest > 0 ? peaks.map {$0 / loudest} : peaks
+    }
     private func loudness(_ asset: AVAsset, duration: Double, progress: Progress) async throws -> [Double] {
         let count = max(1, Int(ceil(duration)))
         var sums = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
@@ -187,12 +232,12 @@ actor LocalEngine {
         let source = LocalStore.file(project.source, project: project.id)
         let asset = AVURLAsset(url: source)
         let total = try await asset.load(.duration).seconds
-        let clips = edit.clips.filter {$0.selected != false}
+        var clips = edit.clips.filter {$0.selected != false}
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
         guard !clips.isEmpty, clips.count <= 500, [1.0, 1.25, 1.5, 2.0].contains(speed),
-              ["cut", "dissolve"].contains(transition), fade.isFinite, 0.1...3 ~= fade,
+              Self.transitions.contains(transition), fade.isFinite, 0.1...3 ~= fade,
               clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= total}) else {
             throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")
         }
@@ -206,7 +251,20 @@ actor LocalEngine {
               ["720", "1080", "original", "whatsapp"].contains(quality) else {throw AppError(message: "ממדי הסרטון או איכות הייצוא אינם תקינים.")}
         let cap: Double? = ["720", "whatsapp"].contains(quality) ? 720 : quality == "original" ? nil : 1080
         let size = Self.frame(source: displayed, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
-        let segments = Self.timeline(clips: clips, speed: speed, transition: transition == "cut" ? 0 : fade)
+        let overlap = transition == "cut" ? 0 : fade
+        // Cuts land on the song's beat. Only the first song is measured, since
+        // it is the one playing from the movie's first frame.
+        if edit.settings["beatSync"]?.bool != false, edit.settings["useMusic"]?.bool != false, let song = project.music.first {
+            let start = edit.musicStart(for: song.id, first: true)
+            let estimate = Self.timeline(clips: clips, speed: speed, transition: overlap).last?.end ?? 0
+            // Rounded up to half minutes, so small edits reuse the same beats.
+            let window = min(max(0, song.duration - start), ceil((estimate + 15) / 30) * 30)
+            if let beats = await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window) {
+                clips = Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total)
+            }
+            try Task.checkCancellation()
+        }
+        let segments = Self.timeline(clips: clips, speed: speed, transition: overlap)
         let length = segments.last!.end
         guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
         let composition = AVMutableComposition()
@@ -261,7 +319,29 @@ actor LocalEngine {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing))
                 let front = layer(segment.track), back = layer(segments[index + 1].track)
-                front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: instruction.timeRange)
+                let range = instruction.timeRange
+                let middle = time(segment.end - segment.outgoing / 2)
+                switch transition {
+                case "fade", "flash":
+                    // Out to a colour, then in from it.
+                    if transition == "flash" {instruction.backgroundColor = CGColor(red: 1, green: 1, blue: 1, alpha: 1)}
+                    front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: range.start, end: middle))
+                    back.setOpacity(0, at: range.start)
+                    back.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: CMTimeRange(start: middle, end: range.end))
+                case "slide":
+                    // The next clip pushes the current one off to the side.
+                    front.setTransformRamp(fromStart: transform, toEnd: transform.concatenating(CGAffineTransform(translationX: -size.width, y: 0)), timeRange: range)
+                    back.setTransformRamp(fromStart: transform.concatenating(CGAffineTransform(translationX: size.width, y: 0)), toEnd: transform, timeRange: range)
+                case "zoom":
+                    // The current clip rushes towards the viewer as it fades.
+                    let grow = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+                        .concatenating(CGAffineTransform(scaleX: 1.35, y: 1.35))
+                        .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2))
+                    front.setTransformRamp(fromStart: transform, toEnd: transform.concatenating(grow), timeRange: range)
+                    front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: range)
+                default:
+                    front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: range)
+                }
                 instruction.layerInstructions = [front, back]; instructions.append(instruction)
             }
         }
@@ -270,8 +350,7 @@ actor LocalEngine {
             let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
             let params = AVMutableAudioMixInputParameters(track: track)
             let volume = Float(edit.settings["musicVolume"]?.string ?? "0.65") ?? 0.65
-            let start = Double(edit.settings["musicStart"]?.string ?? "0") ?? 0
-            guard volume.isFinite, 0 < volume && volume <= 2, start.isFinite, start >= 0 else {throw AppError(message: "הגדרות מוזיקה לא תקינות.")}
+            guard volume.isFinite, 0 < volume && volume <= 2 else {throw AppError(message: "הגדרות מוזיקה לא תקינות.")}
             var cursor = 0.0, item = 0
             while cursor < length - 0.001 {
                 try Task.checkCancellation()
@@ -279,7 +358,7 @@ actor LocalEngine {
                 let musicAsset = AVURLAsset(url: LocalStore.file(music.file, project: project.id))
                 guard let audio = try await musicAsset.loadTracks(withMediaType: .audio).first else {throw AppError(message: "קובץ המוזיקה אינו מכיל שמע.")}
                 let audioRange = try await audio.load(.timeRange)
-                let offset = item == 0 ? start : 0
+                let offset = edit.musicStart(for: music.id, first: item == 0)
                 let available = audioRange.duration.seconds - offset
                 guard available > 0.01 else {throw AppError(message: "זמן התחלת המוזיקה נמצא מעבר לסוף הקובץ.")}
                 let take = min(length - cursor, available)

@@ -31,6 +31,47 @@ struct Edit: Codable, Equatable {
         "transition": .text("cut"), "transitionDuration": .text("0.5"), "musicStart": .text("0"),
         "musicVolume": .text("0.65"), "muteOriginal": .flag(false), "useMusic": .flag(true)]
 }
+extension Edit {
+    /// Where in a song the movie starts playing it. Each song keeps its own
+    /// point; an older project's single start still applies to its first song.
+    func musicStart(for song: String, first: Bool) -> Double {
+        let own = settings["musicStart:" + song].flatMap {Double($0.string)}
+        let value = own ?? (first ? Double(settings["musicStart"]?.string ?? "0") ?? 0 : 0)
+        return value.isFinite ? max(0, value) : 0
+    }
+    mutating func setMusicStart(_ seconds: Double, for song: String) {
+        settings["musicStart:" + song] = .text(String(format: "%.2f", max(0, seconds)))
+    }
+}
+/// One-tap clip choices, the same ones the web app's clip panel offers.
+enum ClipPicker {
+    /// Selects the strongest clips until the finished movie runs `seconds`,
+    /// allowing a fifth over rather than stopping short. The order is kept.
+    /// The length is measured on the real timeline, so speed and the overlap
+    /// of every transition count.
+    static func autoPick(_ clips: [Clip], seconds: Double, speed: Double = 1, transition: Double = 0) -> [Clip] {
+        let usable = clips.indices.filter {clips[$0].duration.isFinite && clips[$0].duration > 0}
+        let ranked = usable.sorted {(clips[$0].score ?? 1) > (clips[$1].score ?? 1)}
+        func length(_ picked: Set<Int>) -> Double {
+            LocalEngine.timeline(clips: picked.sorted().map {clips[$0]}, speed: speed, transition: transition).last?.end ?? 0
+        }
+        var chosen = Set<Int>(), total = 0.0
+        for index in ranked {
+            if total >= seconds {break}
+            let trial = length(chosen.union([index]))
+            if trial <= seconds * 1.2 {chosen.insert(index); total = trial}
+        }
+        if chosen.isEmpty, let best = ranked.first {chosen.insert(best)}
+        return clips.indices.map {index in var clip = clips[index]; clip.selected = chosen.contains(index); return clip}
+    }
+    /// A new order, never the same one: a shuffle that changes nothing reads as broken.
+    static func shuffled<G: RandomNumberGenerator>(_ clips: [Clip], using generator: inout G) -> [Clip] {
+        guard clips.count > 1 else {return clips}
+        var result = clips
+        repeat {result.shuffle(using: &generator)} while result == clips
+        return result
+    }
+}
 struct LocalExport: Codable, Identifiable {
     var id = UUID().uuidString
     var file: String
