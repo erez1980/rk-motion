@@ -4608,6 +4608,38 @@
           }
         }
       }
+    },
+    "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The YouTube download arrived broken and was stopped. Try again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב."
+          }
+        }
+      }
+    },
+    "קובץ השמע גדול מדי לשיר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio file is too large for a song."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קובץ השמע גדול מדי לשיר."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

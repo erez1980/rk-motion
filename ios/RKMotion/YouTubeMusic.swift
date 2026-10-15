@@ -33,6 +33,25 @@ enum YouTubeMusic {
         return received < requested
     }
 
+    /// The most a song may weigh. An hour of the best audio YouTube offers is
+    /// well under this; anything larger is not a song.
+    static let sizeLimit = 512 << 20
+
+    /// "bytes 0-1023/4096" (the size may be "*"), as the server's own account
+    /// of which bytes a 206 carries.
+    static func contentRange(_ header: String?) -> (first: Int, last: Int, total: Int?)? {
+        guard let header, header.lowercased().hasPrefix("bytes ") else {return nil}
+        let parts = header.dropFirst(6).split(separator: "/", maxSplits: 1)
+        guard parts.count == 2 else {return nil}
+        let span = parts[0].split(separator: "-", maxSplits: 1)
+        guard span.count == 2, let first = Int(span[0].trimmingCharacters(in: .whitespaces)), let last = Int(span[1].trimmingCharacters(in: .whitespaces)),
+              first >= 0, last >= first else {return nil}
+        let size = parts[1].trimmingCharacters(in: .whitespaces)
+        if size == "*" {return (first, last, nil)}
+        guard let total = Int(size), total > last else {return nil}
+        return (first, last, total)
+    }
+
     /// Extracts on this iPhone and downloads the best audio stream AVFoundation
     /// can read. Extraction stays local: the library can also fall back to a
     /// remote server, which would hand the video to a third party.
@@ -45,6 +64,18 @@ enum YouTubeMusic {
         let title = (try? await video.metadata)?.title ?? ""
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(fileName(for: title))
+        try await fetch(stream.url, to: target, progress: progress)
+        return target
+    }
+
+    /// Downloads `url` into `target` in ranged pieces. Each response streams
+    /// to disk, so memory stays small whatever the server sends; every 206
+    /// must carry exactly the bytes asked for, at the offset asked for, of a
+    /// file whose size does not change; a 200 means the server ignored the
+    /// range and is sending the whole file from its first byte, so the file
+    /// starts over from that body. Nothing larger than `limit` is accepted.
+    /// On any failure the partial file is removed.
+    static func fetch(_ url: URL, to target: URL, session: URLSession = .shared, chunk: Int = 4 << 20, limit: Int = sizeLimit, progress: Progress) async throws {
         try? FileManager.default.removeItem(at: target)
         guard FileManager.default.createFile(atPath: target.path, contents: nil) else {throw AppError(message: "לא ניתן לשמור את השמע באייפון.")}
         do {
@@ -52,30 +83,64 @@ enum YouTubeMusic {
             defer {try? handle.close()}
             // YouTube slows one long request on an adaptive stream down to
             // playback speed, so the file is fetched in ranged pieces.
-            let chunk = 4 << 20
             var offset = 0, total: Int?
             while true {
                 try Task.checkCancellation()
-                var request = URLRequest(url: stream.url)
+                var request = URLRequest(url: url)
                 request.setValue("bytes=\(offset)-\(offset + chunk - 1)", forHTTPHeaderField: "Range")
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let http = response as? HTTPURLResponse, [200, 206].contains(http.statusCode), !data.isEmpty else {
-                    throw AppError(message: "YouTube סירב להוריד את השמע. נסו שוב מאוחר יותר.")
+                let (body, response) = try await session.bytes(for: request)
+                guard let http = response as? HTTPURLResponse else {throw refused}
+                switch http.statusCode {
+                case 206:
+                    guard let range = contentRange(http.value(forHTTPHeaderField: "Content-Range")),
+                          range.first == offset, range.last < offset + chunk else {throw damaged}
+                    if let size = range.total {
+                        if let total, total != size {throw damaged}
+                        if total == nil {
+                            guard size <= limit else {throw tooLarge}
+                            // The file is moved into the project, which skips the import's
+                            // space check, so hold the app's usual reserve here instead.
+                            try LocalStore.checkSpace(required: Int64(size - offset) + 256 * 1024 * 1024)
+                        }
+                        total = size
+                    }
+                    let expected = range.last - range.first + 1
+                    guard offset + expected <= limit else {throw tooLarge}
+                    let written = try await stream(body, into: handle, atMost: expected, overflow: damaged)
+                    guard written == expected else {throw damaged}
+                    offset += written
+                    await progress(min(1, Double(offset) / Double(max(1, total ?? offset))))
+                    if finished(status: 206, received: written, requested: chunk, offset: offset, total: total) {return}
+                case 200:
+                    if http.expectedContentLength > Int64(limit) {throw tooLarge}
+                    try handle.truncate(atOffset: 0)
+                    let written = try await stream(body, into: handle, atMost: limit, overflow: tooLarge)
+                    guard written > 0, http.expectedContentLength < 0 || Int64(written) == http.expectedContentLength else {throw damaged}
+                    await progress(1)
+                    return
+                default:
+                    throw refused
                 }
-                try handle.write(contentsOf: data); offset += data.count
-                if total == nil, http.statusCode == 206, let range = http.value(forHTTPHeaderField: "Content-Range"),
-                   let size = Int(range.split(separator: "/").last ?? "") {
-                    total = size
-                    // The file is moved into the project, which skips the import's
-                    // space check, so hold the app's usual reserve here instead.
-                    try LocalStore.checkSpace(required: Int64(max(0, size - offset)) + 256 * 1024 * 1024)
-                }
-                await progress(min(1, Double(offset) / Double(max(1, total ?? offset))))
-                if finished(status: http.statusCode, received: data.count, requested: chunk, offset: offset, total: total) {break}
             }
         } catch {
             try? FileManager.default.removeItem(at: target); throw error
         }
-        return target
     }
+    /// Writes a response body to disk in 64 KB pieces and returns its size,
+    /// failing with `overflow` as soon as it runs past `atMost` bytes.
+    private static func stream(_ body: URLSession.AsyncBytes, into handle: FileHandle, atMost: Int, overflow: AppError) async throws -> Int {
+        var buffer = Data(); buffer.reserveCapacity(1 << 16)
+        var count = 0
+        for try await byte in body {
+            count += 1
+            guard count <= atMost else {throw overflow}
+            buffer.append(byte)
+            if buffer.count == 1 << 16 {try handle.write(contentsOf: buffer); buffer.removeAll(keepingCapacity: true)}
+        }
+        if !buffer.isEmpty {try handle.write(contentsOf: buffer)}
+        return count
+    }
+    private static var refused: AppError {AppError(message: "YouTube סירב להוריד את השמע. נסו שוב מאוחר יותר.")}
+    private static var damaged: AppError {AppError(message: "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב.")}
+    private static var tooLarge: AppError {AppError(message: "קובץ השמע גדול מדי לשיר.")}
 }
