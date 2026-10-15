@@ -150,8 +150,7 @@ struct MusicStartView: View {
         player.play(); playing = true
     }
     private func move(_ seconds: Double) {setStart(start + seconds)}
-    /// The skip buttons move what is heard, from wherever it is playing; the
-    /// start moves only when the rider sets it.
+    /// Moves playback only; the start changes when the rider says so.
     private func skip(_ seconds: Double) {
         position = min(max(0, position + seconds), max(0, song.duration - 0.25))
         player?.seek(to: time(position), toleranceBefore: .zero, toleranceAfter: .zero)

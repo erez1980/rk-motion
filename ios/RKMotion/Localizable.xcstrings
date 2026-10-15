@@ -4353,6 +4353,198 @@
         }
       }
     },
+    "ערבוב סדר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle order"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערבוב סדר"
+          }
+        }
+      }
+    },
+    "ביטול ערבוב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo shuffle"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול ערבוב"
+          }
+        }
+      }
+    },
+    "בחירה אוטומטית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-pick"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירה אוטומטית"
+          }
+        }
+      }
+    },
+    "סרט של 30 שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A 30-second movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של 30 שניות"
+          }
+        }
+      }
+    },
+    "סרט של דקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A one-minute movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של דקה"
+          }
+        }
+      }
+    },
+    "סרט של 2 דקות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A 2-minute movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט של 2 דקות"
+          }
+        }
+      }
+    },
+    "דעיכה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fade"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דעיכה"
+          }
+        }
+      }
+    },
+    "הבזק": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flash"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הבזק"
+          }
+        }
+      }
+    },
+    "החלקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החלקה"
+          }
+        }
+      }
+    },
+    "זום": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זום"
+          }
+        }
+      }
+    },
+    "חיתוך לפי קצב השיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cut to the beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיתוך לפי קצב השיר"
+          }
+        }
+      }
+    },
+    "כל מעבר בין קטעים נופל על הביט של השיר הראשון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every cut between clips lands on the first song's beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל מעבר בין קטעים נופל על הביט של השיר הראשון"
+          }
+        }
+      }
+    },
     "כותרת פתיחה": {
       "localizations": {
         "en": {

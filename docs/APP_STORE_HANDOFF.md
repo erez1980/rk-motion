@@ -187,7 +187,7 @@ authorized. No Apple credentials are currently available.
   first song. Version 0.18.0. Not verified: search against YouTube today,
   since CI and this sandbox cannot reach YouTube. Only a device can confirm
   it.
-- Opening title (0.19.0): the export step takes a title and a smaller line
+- Opening title (0.21.0): the export step takes a title and a smaller line
   under it (`titleText`, `subtitleText` in the edit's settings, 60
   characters each). `LocalEngine.titleCard` draws them once into a
   transparent picture, low on the frame over a shade, right-aligned when the
@@ -198,6 +198,31 @@ authorized. No Apple credentials are currently available.
   tried first and brought the simulator's test run down, so it could not be
   verified. The preview shows no title. The waveform reads at 8 kHz, the
   lowest rate `AVAssetReader` accepts.
+
+- Checkpoint 8 (edit tools, Claude): Erez found no shuffle after analysis,
+  and transitions only appeared at export. The edit step now has the web
+  app's clip tools: shuffle order (never the same order, with an undo chip)
+  and an automatic choice for a 30-second, 1-minute or 2-minute movie. The
+  choice is scaled by playback speed, so the target is the finished
+  movie's length (`ClipPicker`). The cut or dissolve choice moved from export
+  to the edit step. Version 0.19.0.
+
+- Checkpoint 9 (beat sync and transitions, Claude): cuts now land on the
+  song's beat (`Beats.swift`). An onset envelope of the first song's playing
+  stretch is read at 100 frames a second. Autocorrelation over 70 to 180 BPM,
+  weighted towards 120, gives the tempo, then the phase that collects the
+  most onsets. In `prepare` each selected clip's end moves to the nearest
+  beat. The move is a trim, or an extension only where the source has room,
+  and leaves at least 1 s on screen. With an overlapping transition, the
+  midpoint of the overlap is what lands on the beat. It is on by default
+  (`beatSync`) and applies to preview and export alike. The edit itself is
+  not rewritten, so changing the song or its start re-syncs. Four
+  transitions joined cut and dissolve: dip to black, flash to white, push
+  and zoom, all made from layer opacity and transform ramps.
+  `LocalEngine.transitions` is the allowed list. Version 0.20.0. Not
+  verified: how the beat finder does on real songs, as opposed to the
+  synthetic and click-track tests, and how the new transitions look on a
+  device.
 
 ## Current release limits and next steps
 

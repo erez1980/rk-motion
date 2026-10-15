@@ -38,7 +38,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The finished movie's length, or nil while nothing exportable is chosen.
     var expectedDuration: Double? {
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        let fade = edit.settings["transition"]?.string == "dissolve" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         return LocalEngine.timeline(clips: selectedClips, speed: speed, transition: fade).last?.end ?? 0
     }
@@ -211,6 +211,18 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         edit.clips = LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold) + edit.clips.filter {$0.manual == true}
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
+    }
+    func shuffleClips() {
+        guard !busy, edit.clips.count > 1 else {return}
+        var generator = SystemRandomNumberGenerator()
+        edit.clips = ClipPicker.shuffled(edit.clips, using: &generator)
+    }
+    /// `seconds` is the finished movie's length, so playback speed counts.
+    func autoPick(seconds: Double) {
+        guard !busy, !edit.clips.isEmpty else {return}
+        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let overlap = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
     }
     func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; updateUndo(); scheduleSave()}
     func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; updateUndo(); scheduleSave()}

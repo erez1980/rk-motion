@@ -207,6 +207,7 @@ private struct EditStep: View {
     @State private var showingEdit = false
     @State private var trimming: TrimSelection?
     @State private var tuning = false
+    @State private var shuffled: [Clip]?
     var body: some View {
         List {
             VStack(spacing: 10) {
@@ -226,7 +227,26 @@ private struct EditStep: View {
                 ActivityCard(scores: project.scores, duration: project.duration, clips: model.edit.clips, threshold: model.threshold) {tuning = true}
                     .disabled(model.busy).rkRow()
             }
+            VStack(alignment: .leading, spacing: 12) {
+                ChoiceGroup(title: "מעבר בין קטעים", options: [
+                    (NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"),
+                    (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve"),
+                    (NSLocalizedString("דעיכה", comment: "Dip-to-black transition"), "fade"),
+                    (NSLocalizedString("הבזק", comment: "Flash-to-white transition"), "flash"),
+                    (NSLocalizedString("החלקה", comment: "Push transition"), "slide"),
+                    (NSLocalizedString("זום", comment: "Zoom transition"), "zoom"),
+                ], selection: setting("transition", fallback: "cut"), columns: 3)
+                if (model.edit.settings["transition"]?.string ?? "cut") != "cut" {
+                    ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
+                }
+                if model.project?.music.isEmpty == false, model.edit.settings["useMusic"]?.bool != false {
+                    Toggle(isOn: Binding(get: {model.edit.settings["beatSync"]?.bool ?? true}, set: {model.edit.settings["beatSync"] = .flag($0)})) {
+                        Label("חיתוך לפי קצב השיר", systemImage: "metronome").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                    }.tint(RK.accent)
+                }
+            }.disabled(model.busy).rkRow(top: 10)
             clipsHeader.rkRow(top: 12)
+            if model.edit.clips.count > 1 {clipTools.rkRow(top: 0, bottom: 4)}
             ForEach($model.edit.clips) {$clip in
                 ClipRow(clip: $clip, canTrim: (model.project?.duration ?? 0) > 0.01) {trimming = TrimSelection(id: clip.id)}
                     .disabled(model.busy).rkRow(top: 4, bottom: 4)
@@ -299,6 +319,33 @@ private struct EditStep: View {
                     .padding(.horizontal, 12).frame(minHeight: 36).background(RK.accentSoft, in: Capsule())
             }.buttonStyle(.plain).disabled(model.busy).accessibilityLabel("הוספת קטע ידני")
         }
+    }
+    /// Shuffle and automatic choice, as beside the web app's clip list.
+    private var clipTools: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                tool("ערבוב סדר", symbol: "shuffle") {model.shuffleClips(); shuffled = model.edit.clips}
+                if let shuffled, shuffled == model.edit.clips, model.undoAvailable {
+                    tool("ביטול ערבוב", symbol: "arrow.uturn.backward") {model.undo(); self.shuffled = nil}
+                }
+                Menu {
+                    Button("סרט של 30 שניות") {model.autoPick(seconds: 30)}
+                    Button("סרט של דקה") {model.autoPick(seconds: 60)}
+                    Button("סרט של 2 דקות") {model.autoPick(seconds: 120)}
+                } label: {toolLabel("בחירה אוטומטית", symbol: "wand.and.stars")}
+            }
+        }.disabled(model.busy)
+    }
+    private func tool(_ title: LocalizedStringKey, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {toolLabel(title, symbol: symbol)}.buttonStyle(.plain)
+    }
+    private func toolLabel(_ title: LocalizedStringKey, symbol: String) -> some View {
+        Label(title, systemImage: symbol).font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.ink)
+            .padding(.horizontal, 12).frame(minHeight: 36)
+            .background(RK.card, in: Capsule()).overlay(Capsule().stroke(RK.line))
+    }
+    private func setting(_ key: String, fallback: String) -> Binding<String> {
+        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
     }
     private func addClip() {
         // Edited-preview time is not a timestamp in the original.
@@ -467,6 +514,7 @@ private struct MusicStep: View {
                 if !songs.isEmpty {
                     ToggleRow(title: "שימוש במוזיקה", isOn: flag("useMusic", fallback: true))
                     ChoiceGroup(title: "עוצמת המוזיקה", options: [(NSLocalizedString("רקע", comment: "Quiet music"), "0.35"), (NSLocalizedString("מאוזן", comment: "Balanced music"), "0.65"), (NSLocalizedString("חזק", comment: "Loud music"), "1")], selection: setting("musicVolume", fallback: "0.65"))
+                    ToggleRow(title: "חיתוך לפי קצב השיר", detail: "כל מעבר בין קטעים נופל על הביט של השיר הראשון", isOn: flag("beatSync", fallback: true))
                 }
                 ToggleRow(title: "השתקת שמע הרכיבה", isOn: flag("muteOriginal", fallback: false))
             }.rkCard().disabled(model.busy).rkRow(top: 12)
@@ -633,10 +681,6 @@ private struct ExportStep: View {
             Group {
                 ChoiceGroup(title: "מסגרת", options: [(NSLocalizedString("מקור", comment: "Source framing"), "source"), (NSLocalizedString("סטורי 9:16", comment: "Story framing"), "9:16")], selection: setting("aspect", fallback: "source"))
                 ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
-                ChoiceGroup(title: "מעבר בין קטעים", options: [(NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"), (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve")], selection: setting("transition", fallback: "cut"))
-                if model.edit.settings["transition"]?.string == "dissolve" {
-                    ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
-                }
                 ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
             }.disabled(model.busy).rkRow()
             VStack(alignment: .leading, spacing: 10) {
