@@ -9,7 +9,6 @@ enum UITestFixture {
     static var requested: Bool {ProcessInfo.processInfo.arguments.contains("-RKUITestFixture")}
 
     @MainActor static func load(into model: EditorModel) async {
-        await model.discardTestRides()
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("rk-ui-fixture-\(UUID().uuidString).mov")
         do {try await makeRide(file)} catch {model.message = "fixture: \(error.localizedDescription)"; return}
         await model.importVideo(file)

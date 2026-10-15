@@ -44,7 +44,9 @@ struct RootView: View {
         .task {
             await model.restore()
             #if DEBUG
-            if UITestFixture.requested {path = [.project]; await UITestFixture.load(into: model)}
+            // Earlier test rides go before the project screen opens: deleting
+            // the open one would close the screen again.
+            if UITestFixture.requested {await model.discardTestRides(); path = [.project]; await UITestFixture.load(into: model)}
             #endif
         }
         .onChange(of: model.edit) {previous, _ in model.changed(from: previous)}
