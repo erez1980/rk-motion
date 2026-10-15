@@ -544,6 +544,9 @@ private struct MusicStep: View {
         .onChange(of: model.busy) {_, busy in if !busy && model.addedSong == nil {fetching = nil}}
         .sheet(item: $choosing) {song in MusicStartView(model: model, song: song)}
         .onDisappear {searchTask?.cancel(); listening.stop()}
+        // A song whose row goes away stops with it.
+        .onChange(of: results) {listening.stop()}
+        .onChange(of: showYouTube) {listening.stop()}
     }
     private var songs: [LocalMusic] {model.project?.music ?? []}
     private var isLink: Bool {YouTubeMusic.link(in: query) != nil}

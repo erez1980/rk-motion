@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 
 /// Plays a YouTube search result straight from YouTube, so the rider can
@@ -10,6 +11,7 @@ import Foundation
     private let player = AVPlayer()
     private var task: Task<Void, Never>?
     private var ended: NSObjectProtocol?
+    private var watching: AnyCancellable?
     typealias Resolve = (URL) async throws -> URL
     private let resolve: Resolve
 
@@ -29,20 +31,33 @@ import Foundation
                 ended = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) {[weak self] _ in
                     Task {@MainActor in self?.stop()}
                 }
+                // The song counts as playing only once AVFoundation can play
+                // it: a refused or broken stream fails here, after the item
+                // was made, and must not leave a stop button over silence.
+                watching = item.publisher(for: \.status).receive(on: DispatchQueue.main).sink {[weak self] status in
+                    guard let self, self.loading == id || self.playing == id else {return}
+                    switch status {
+                    case .readyToPlay: self.loading = nil; self.playing = id
+                    case .failed: self.fail()
+                    default: break
+                    }
+                }
                 player.replaceCurrentItem(with: item)
                 player.play()
-                loading = nil; playing = id
             } catch is CancellationError {
             } catch {
-                loading = nil
-                failure = NSLocalizedString("לא ניתן להשמיע את השיר כרגע.", comment: "A YouTube song could not be played")
+                fail()
             }
         }
+    }
+    private func fail() {
+        stop()
+        failure = NSLocalizedString("לא ניתן להשמיע את השיר כרגע.", comment: "A YouTube song could not be played")
     }
     func stop() {
         task?.cancel(); task = nil
         player.pause(); player.replaceCurrentItem(with: nil)
         if let ended {NotificationCenter.default.removeObserver(ended)}
-        ended = nil; playing = nil; loading = nil
+        watching = nil; ended = nil; playing = nil; loading = nil
     }
 }
