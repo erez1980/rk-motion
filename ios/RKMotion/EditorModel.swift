@@ -54,7 +54,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var addedSong: String?
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
-    private let persistence = ProjectPersistence()
+    private let persistence: ProjectPersistence
+    init(persistence: ProjectPersistence = ProjectPersistence()) {self.persistence = persistence}
     private var saveTask: Task<Void, Never>?
     private var revision = 0
     private let engine = LocalEngine()
@@ -271,17 +272,24 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             setBusy(false)
         }
     }
+    /// The song leaves the project in memory first, so a save made meanwhile
+    /// (the app going to the background) cannot list it again; its file goes
+    /// only once a project without it is on disk.
     func removeMusic(_ id: String) async {
         guard !busy, var p = project, let song = p.music.first(where: {$0.id == id}) else {return}
-        p.music.removeAll {$0.id == id}
         setBusy(true)
-        guard await save() else {setBusy(false); return}
-        p.edit = edit
+        saveTask?.cancel(); saveTask = nil
+        p.edit = edit; p.music.removeAll {$0.id == id}
+        project = p; refreshLibrary(p); previewEdit = nil
         revision += 1
-        do {try await persistence.save(p, revision: revision); project = p; refreshLibrary(p); previewEdit = nil}
-        catch {message = error.localizedDescription; setBusy(false); return}
-        try? FileManager.default.removeItem(at: LocalStore.file(song.file, project: p.id))
-        projectBytes = await persistence.bytes(p); setBusy(false)
+        do {
+            if let warning = try await persistence.removeMusic(song, from: p, revision: revision) {message = warning}
+        } catch {
+            project?.music = (project?.music ?? []) + [song]; message = error.localizedDescription
+            if let restored = project {refreshLibrary(restored)}
+        }
+        if let current = project {projectBytes = await persistence.bytes(current)}
+        setBusy(false)
     }
     func exportMovie() {
         guard !busy, let p = project, p.analyzed else {return}
@@ -305,6 +313,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
     }
     func cancel() {operation?.cancel()}
+    /// Waits for the save already scheduled, for tests and orderly shutdown.
+    func settleSaves() async {await saveTask?.value}
     func pause() {
         scheduleSave(immediate: true)
         if busy && !continued.hasActiveTask && backgroundID == .invalid {
@@ -317,7 +327,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func endBackground() {if backgroundID != .invalid {UIApplication.shared.endBackgroundTask(backgroundID); backgroundID = .invalid}}
     func reset() async {
         guard !busy, let p = project else {return}
-        setBusy(true); saveTask?.cancel(); saveTask = nil
+        // A save already on its way is cancelled, and the persistence actor
+        // refuses any write for a deleted project, so none can recreate it.
+        setBusy(true); saveTask?.cancel()
         do {
             try await persistence.deleteProject(p.id)
             projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
@@ -335,18 +347,25 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         changed(from: previous); suppressedEdit = edit
         message = wholeVideo ? "כל הסרטון נבחר. ניתן לבטל את השינוי." : "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי."
     }
+    /// As with a song: out of the project in memory first, then on disk, and
+    /// only then is the file removed.
     func deleteExport(_ result: LocalExport) async {
         guard !busy, var p = project else {return}
         setBusy(true)
-        guard await save() else {setBusy(false); return}
-        p.edit = edit; p.exports.removeAll {$0.id == result.id}; revision += 1
+        saveTask?.cancel(); saveTask = nil
+        let previous = p.exports
+        p.edit = edit; p.exports.removeAll {$0.id == result.id}
+        project = p; refreshLibrary(p)
+        if movieURL?.lastPathComponent == result.file {movieURL = nil}
+        revision += 1
         do {
             let warning = try await persistence.deleteExport(result, from: p, revision: revision)
-            project = p; refreshLibrary(p)
-            if movieURL?.lastPathComponent == result.file {movieURL = nil}
-            projectBytes = await persistence.bytes(p)
             message = warning.map {NSLocalizedString("הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: ", comment: "Export removed but file left behind") + $0} ?? "הסרט שנוצר נמחק מהאפליקציה"
-        } catch {message = error.localizedDescription}
+        } catch {
+            project?.exports = previous; message = error.localizedDescription
+            if let restored = project {refreshLibrary(restored)}
+        }
+        if let current = project {projectBytes = await persistence.bytes(current)}
         setBusy(false)
     }
     func preview() {
