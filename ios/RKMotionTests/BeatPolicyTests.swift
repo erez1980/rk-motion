@@ -62,7 +62,8 @@ final class BeatPolicyTests: XCTestCase {
 
         let edit = Edit(clips: [Clip(start: 0, end: 1.9), Clip(start: 2.2, end: 3.95)])
         let naive = LocalEngine.timeline(clips: edit.clips, speed: 1, transition: 0).last!.end
-        let planned = try XCTUnwrap(await engine.plannedLength(project, edit: edit))
+        let plannedLength = await engine.plannedLength(project, edit: edit)
+        let planned = try XCTUnwrap(plannedLength)
         XCTAssertGreaterThan(abs(planned - naive), 0.05, "The clicks fall off the naive cuts, so beat sync must move them")
         let output = folder.appendingPathComponent("beats.mp4")
         let exported = try await engine.export(project, edit: edit, output: output) {_, _ in}
