@@ -49,17 +49,22 @@ final class PlayerUITests: XCTestCase {
         let app = launch()
         let music = app.buttons["step.2"]
         wait(for: app.buttons["edit.showEdit"], in: app, timeout: 120, "The fixture ride never reached the edit step")
+        // The steps stay locked while the edit preview is being prepared.
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: music)
+        waitForExpectations(timeout: 90)
         music.tap()
-        let youTube = app.buttons["music.youtube"]
-        XCTAssertTrue(youTube.waitForExistence(timeout: 10))
+        let youTube = app.descendants(matching: .any)["music.youtube"]
+        wait(for: youTube, in: app, timeout: 10, "The music step shows the From YouTube tile")
         // Well past the icon, on the words and the space after them.
         youTube.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).tap()
-        XCTAssertTrue(app.textFields["music.query"].waitForExistence(timeout: 5), "A tap on the words opens the YouTube search")
+        wait(for: app.textFields["music.query"], in: app, timeout: 5, "A tap on the words opens the YouTube search")
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        let newRide = app.buttons["home.newRide"]
-        XCTAssertTrue(newRide.waitForExistence(timeout: 10))
+        let newRide = app.descendants(matching: .any)["home.newRide"]
+        wait(for: newRide, in: app, timeout: 10, "Back on the project list")
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: newRide)
+        waitForExpectations(timeout: 30)
         newRide.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap()
-        XCTAssertTrue(app.buttons["step.0"].waitForExistence(timeout: 10), "A tap on the words starts a new ride")
+        wait(for: app.buttons["step.0"], in: app, timeout: 10, "A tap on the words starts a new ride")
     }
 
     /// F09: in English the screens read left to right; the step bar's first
