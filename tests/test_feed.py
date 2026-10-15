@@ -1,5 +1,7 @@
 """Feed/URL resolution tests. Network is stubbed — no real fetching."""
 
+from pathlib import Path
+
 import pytest
 
 from sofit import feed
@@ -141,6 +143,25 @@ def test_an_interrupted_download_leaves_nothing_in_the_cache(tmp_path, monkeypat
     monkeypatch.setattr(feed.urllib.request, "urlopen", lambda *a, **k: _SlowBody(payload))
     with open(feed.download_audio("https://x/show/ep.mp3"), "rb") as f:
         assert f.read() == payload
+
+
+def test_a_refused_download_closes_its_temporary_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+
+    def refuse(*a, **k):
+        raise ConnectionRefusedError("refused")
+
+    monkeypatch.setattr(feed.urllib.request, "urlopen", refuse)
+    fds = Path("/proc/self/fd")
+    if not fds.exists():
+        pytest.skip("needs /proc to count open files")
+    before = len(list(fds.iterdir()))
+    for _ in range(20):
+        with pytest.raises(ConnectionRefusedError):
+            feed.download_audio("https://x/show/ep.mp3")
+    assert len(list(fds.iterdir())) <= before
+    cache = tmp_path / "sofit" / "downloads"
+    assert [p.name for p in cache.iterdir() if not p.name.endswith(".lock")] == []
 
 
 def test_concurrent_youtube_downloads_finish_one_file(tmp_path, monkeypatch):

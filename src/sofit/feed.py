@@ -101,7 +101,9 @@ def download_audio(url: str) -> str:
             return str(dest)
         fd, tmp = tempfile.mkstemp(dir=dest.parent, prefix=f"{key}.", suffix=".part")
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=120) as r, os.fdopen(fd, "wb") as f:
+            # The file takes the descriptor first, so a refused connection
+            # still closes it.
+            with os.fdopen(fd, "wb") as f, urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=120) as r:
                 for chunk in iter(lambda: r.read(1 << 20), b""):
                     f.write(chunk)
             os.replace(tmp, dest)
