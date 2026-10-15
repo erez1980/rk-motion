@@ -458,6 +458,10 @@ actor LocalEngine {
         guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
         session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
         session.videoComposition = prepared.video; session.audioMix = prepared.audio
+        // The movie ends where the edit ends. Without this the iOS 27
+        // simulator wrote a file longer than the edit, with no picture at the
+        // end, which the length shown to the rider would not match.
+        session.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: prepared.length, preferredTimescale: 600))
         let observer = Task {
             while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}
         }
