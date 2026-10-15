@@ -57,15 +57,26 @@ enum YouTubeMusic {
     /// remote server, which would hand the video to a third party.
     static func download(_ link: URL, into folder: URL, progress: Progress) async throws -> URL {
         let video = YouTube(url: link, methods: [.local])
-        let streams = try await video.streams
-        guard let stream = streams.filterAudioOnly().filter({$0.isNativelyPlayable}).highestAudioBitrateStream() else {
-            throw AppError(message: "לא נמצא בסרטון שמע שהאייפון יכול לנגן.")
-        }
+        let stream = try await audioStream(of: video)
         let title = (try? await video.metadata)?.title ?? ""
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(fileName(for: title))
         try await fetch(stream.url, to: target, progress: progress)
         return target
+    }
+
+    /// The address of a song's audio, to listen to before adding it. It is
+    /// extracted on this iPhone like a download, and plays straight from
+    /// YouTube without being saved.
+    static func listeningURL(_ link: URL) async throws -> URL {
+        try await audioStream(of: YouTube(url: link, methods: [.local])).url
+    }
+    private static func audioStream(of video: YouTube) async throws -> YouTubeKit.Stream {
+        let streams = try await video.streams
+        guard let stream = streams.filterAudioOnly().filter({$0.isNativelyPlayable}).highestAudioBitrateStream() else {
+            throw AppError(message: "לא נמצא בסרטון שמע שהאייפון יכול לנגן.")
+        }
+        return stream
     }
 
     /// Downloads `url` into `target` in ranged pieces. Each response streams

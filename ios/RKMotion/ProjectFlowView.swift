@@ -492,6 +492,7 @@ private struct MusicStep: View {
     @State private var searching = false
     @State private var searchNote: String?
     @State private var searchTask: Task<Void, Never>?
+    @StateObject private var listening = SongPreview()
     @State private var fetching: String?
     @State private var added: Set<String> = []
     @State private var choosing: LocalMusic?
@@ -542,7 +543,7 @@ private struct MusicStep: View {
         }
         .onChange(of: model.busy) {_, busy in if !busy && model.addedSong == nil {fetching = nil}}
         .sheet(item: $choosing) {song in MusicStartView(model: model, song: song)}
-        .onDisappear {searchTask?.cancel()}
+        .onDisappear {searchTask?.cancel(); listening.stop()}
     }
     private var songs: [LocalMusic] {model.project?.music ?? []}
     private var isLink: Bool {YouTubeMusic.link(in: query) != nil}
@@ -584,6 +585,7 @@ private struct MusicStep: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.busy || searching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 if let searchNote {Text(verbatim: searchNote).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)}
+                if let failure = listening.failure {Text(verbatim: failure).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)}
                 else {Text("השמע יורד ישירות לאייפון.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)}
             }
         }.rkCard()
@@ -614,13 +616,25 @@ private struct MusicStep: View {
                     .font(RK.font(12, 400, style: .caption1)).monospacedDigit().foregroundStyle(RK.soft).lineLimit(1)
             }
             Spacer(minLength: 0)
+            Button {listening.toggle(result.id, link: result.link)} label: {
+                Group {
+                    if listening.loading == result.id {ProgressView().tint(RK.accent)}
+                    else {Image(systemName: listening.playing == result.id ? "stop.fill" : "play.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(RK.ink)}
+                }
+                .frame(width: 40, height: 40).background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("music.listen")
+            .accessibilityLabel(listening.playing == result.id
+                ? String(format: NSLocalizedString("עצירת %@", comment: "Stop a found song"), result.title)
+                : String(format: NSLocalizedString("האזנה ל־%@", comment: "Listen to a found song"), result.title))
             if fetching == result.id {
                 ProgressView().tint(RK.accent).frame(width: 40, height: 40)
             } else if added.contains(result.id) {
                 Image(systemName: "checkmark").font(.system(size: 16, weight: .bold)).foregroundStyle(RK.accent).frame(width: 40, height: 40)
                     .accessibilityLabel("השיר נוסף לפרויקט")
             } else {
-                Button {fetching = result.id; model.importYouTube(link: result.link)} label: {
+                Button {listening.stop(); fetching = result.id; model.importYouTube(link: result.link)} label: {
                     Image(systemName: "plus").font(.system(size: 17, weight: .bold)).foregroundStyle(RK.accentSoftInk)
                         .frame(width: 40, height: 40).background(RK.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
