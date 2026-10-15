@@ -395,6 +395,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(true); saveTask?.cancel()
         do {
             try await persistence.deleteProject(p.id)
+            await Thumbnails.shared.forget(p.id)
             projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
