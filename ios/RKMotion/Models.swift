@@ -45,6 +45,15 @@ extension Edit {
     mutating func setMusicStart(_ seconds: Double, for song: String) {
         settings["musicStart:" + song] = .text(String(format: "%.2f", max(0, seconds)))
     }
+    /// The opening title over the first seconds of the movie, trimmed; empty
+    /// when the rider left it blank.
+    var openingTitle: (title: String, subtitle: String) {
+        func line(_ key: String) -> String {
+            String((settings[key]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(Edit.titleLimit))
+        }
+        return (line("titleText"), line("subtitleText"))
+    }
+    static let titleLimit = 60
 }
 /// One-tap clip choices, the same ones the web app's clip panel offers.
 enum ClipPicker {

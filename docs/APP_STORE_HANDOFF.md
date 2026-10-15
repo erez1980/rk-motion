@@ -187,6 +187,17 @@ authorized. No Apple credentials are currently available.
   first song. Version 0.18.0. Not verified: search against YouTube today,
   since CI and this sandbox cannot reach YouTube. Only a device can confirm
   it.
+- Opening title (0.21.0): the export step takes a title and a smaller line
+  under it (`titleText`, `subtitleText` in the edit's settings, 60
+  characters each). `LocalEngine.titleCard` draws them once into a
+  transparent picture, low on the frame over a shade, right-aligned when the
+  text starts in Hebrew. A second Core Image pass lays it over the finished
+  movie, faded in and out over the first seconds (`titleTimes`,
+  `titleOpacity`), so a titled export takes about twice as long and needs
+  twice the room for a moment. `AVVideoCompositionCoreAnimationTool` was
+  tried first and brought the simulator's test run down, so it could not be
+  verified. The preview shows no title. The waveform reads at 8 kHz, the
+  lowest rate `AVAssetReader` accepts.
 
 - Checkpoint 8 (edit tools, Claude): Erez found no shuffle after analysis,
   and transitions only appeared at export. The edit step now has the web

@@ -89,7 +89,7 @@ struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(RK.font(15, 500))
-            .foregroundStyle(RK.ink)
+            .foregroundStyle(configuration.role == .destructive ? RK.danger : RK.ink)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(RK.line))

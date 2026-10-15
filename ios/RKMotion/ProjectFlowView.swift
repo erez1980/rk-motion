@@ -688,6 +688,12 @@ private struct ExportStep: View {
                 ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
                 ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
             }.disabled(model.busy).rkRow()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("כותרת פתיחה").font(RK.font(15, 500)).foregroundStyle(RK.ink)
+                titleField("שם הרוכב או הרכיבה", key: "titleText")
+                titleField("מקום ותאריך", key: "subtitleText")
+                Text("מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)
+            }.rkCard(padding: 16).disabled(model.busy).rkRow(top: 10)
             Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).rkRow()
             if model.movieURL != nil {
                 Button(action: showMovie) {Label("לסרט האחרון שנוצר", systemImage: "play.rectangle")}
@@ -716,6 +722,13 @@ private struct ExportStep: View {
     }
     private func setting(_ key: String, fallback: String) -> Binding<String> {
         Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
+    }
+    private func titleField(_ prompt: LocalizedStringKey, key: String) -> some View {
+        let text = Binding(get: {model.edit.settings[key]?.string ?? ""}, set: {model.edit.settings[key] = .text(String($0.prefix(Edit.titleLimit)))})
+        return TextField(prompt, text: text)
+            .font(RK.font(15)).foregroundStyle(RK.ink).submitLabel(.done)
+            .padding(.horizontal, 12).frame(minHeight: 44)
+            .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -749,6 +762,10 @@ private struct DoneStep: View {
                     ShareLink(item: movie) {Label("שיתוף", systemImage: "square.and.arrow.up")}.buttonStyle(SecondaryButtonStyle())
                     Button(action: backToEdit) {Label("חזרה לעריכה", systemImage: "slider.horizontal.3")}.buttonStyle(SecondaryButtonStyle())
                 }.disabled(model.busy).rkRow()
+                if let current {
+                    Button(role: .destructive) {Task {await model.deleteExport(current)}} label: {Label("מחיקת הסרט", systemImage: "trash")}
+                        .buttonStyle(SecondaryButtonStyle()).disabled(model.busy).rkRow()
+                }
             }
             if model.busy {ProgressCard(model: model).rkRow()}
             MessageCard(model: model).rkRow()
