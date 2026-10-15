@@ -68,7 +68,7 @@ struct MusicStartView: View {
             .toolbar {ToolbarItem(placement: .cancellationAction) {Button("ביטול") {dismiss()}}}
         }
         .tint(RK.accent)
-        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.layoutDirection, AppLanguage.direction)
         .task {await prepare()}
         .onDisappear(perform: stop)
     }

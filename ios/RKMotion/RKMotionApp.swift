@@ -18,7 +18,7 @@ import UIKit
         UINavigationBar.appearance().compactAppearance = bar
         UINavigationBar.appearance().tintColor = RK.UI.soft
     }
-    var body: some Scene {WindowGroup {RootView().environment(\.layoutDirection, .rightToLeft)}}
+    var body: some Scene {WindowGroup {RootView().environment(\.layoutDirection, AppLanguage.direction)}}
 }
 
 struct RootView: View {

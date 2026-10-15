@@ -470,7 +470,7 @@ private struct SensitivitySheet: View {
         }
         .padding(20)
         .presentationBackground(RK.bg)
-        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.layoutDirection, AppLanguage.direction)
     }
 }
 
