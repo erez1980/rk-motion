@@ -103,7 +103,7 @@ private struct ProjectRow: View {
         let date = project.created.formatted(date: .abbreviated, time: .omitted)
         guard project.analyzed else {return date}
         let clips = project.edit.clips.filter {$0.selected != false}.count
-        return date + " · " + String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(clips)")
+        return date + " · " + clipCount(clips)
     }
     @ViewBuilder private var status: some View {
         if !project.analyzed {Pill(text: NSLocalizedString("ממתין לניתוח", comment: "Project awaiting analysis"))}

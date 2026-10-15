@@ -255,3 +255,9 @@ struct MessageCard: View {
         }
     }
 }
+
+/// "1 clip" / "2 clips" in either language.
+func clipCount(_ count: Int) -> String {
+    count == 1 ? NSLocalizedString("קטע אחד", comment: "One clip")
+        : String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(count)")
+}

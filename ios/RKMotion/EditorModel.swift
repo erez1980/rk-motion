@@ -468,3 +468,19 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         catch {message = error.localizedDescription}
     }
 }
+
+#if DEBUG
+extension EditorModel {
+    /// Removes the rides earlier UI test runs made, so the simulator's
+    /// project list does not fill up with them.
+    func discardTestRides() async {
+        let mark = "rk-ui-fixture-"
+        if project?.name.hasPrefix(mark) == true {await reset()}
+        for old in projects where old.name.hasPrefix(mark) && old.id != project?.id {
+            try? await persistence.deleteProject(old.id)
+            await Thumbnails.shared.forget(old.id)
+        }
+        projects.removeAll {$0.name.hasPrefix(mark) && $0.id != project?.id}
+    }
+}
+#endif

@@ -709,7 +709,7 @@ private struct ExportStep: View {
         }
     }
     private var contents: String {
-        let clips = String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(model.selectedClips.count)")
+        let clips = clipCount(model.selectedClips.count)
         let songs = model.project?.music ?? []
         guard model.edit.settings["useMusic"]?.bool != false, let first = songs.first else {return clips + " · " + NSLocalizedString("ללא מוזיקה", comment: "No music in the movie")}
         return clips + " · " + (songs.count == 1 ? first.name : String(format: NSLocalizedString("%@ שירים", comment: "Song count"), "\(songs.count)"))

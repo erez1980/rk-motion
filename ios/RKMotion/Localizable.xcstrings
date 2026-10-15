@@ -4688,6 +4688,22 @@
           }
         }
       }
+    },
+    "קטע אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטע אחד"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
