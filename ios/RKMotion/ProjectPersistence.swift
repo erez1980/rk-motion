@@ -62,6 +62,6 @@ actor ProjectPersistence {
         catch {deleted.remove(id); throw error}
         revisions.removeValue(forKey: id); scores.removeValue(forKey: id); scoreFiles.removeValue(forKey: id); retired.removeValue(forKey: id)
     }
-    func cleanTemporaryFiles() throws -> Int64 {try LocalStore.cleanTemporaryFiles()}
+    func cleanTemporaryFiles() async throws -> Int64 {try await LocalStore.cleanTemporaryFiles()}
     func bytes(_ project: LocalProject) -> Int64 {LocalStore.bytes(in: LocalStore.folder(project.id))}
 }

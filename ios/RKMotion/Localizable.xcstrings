@@ -4544,6 +4544,70 @@
           }
         }
       }
+    },
+    "לא ניתן לשמור את הסרטון באייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video could not be saved on this iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לשמור את הסרטון באייפון."
+          }
+        }
+      }
+    },
+    "נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is left over from an interrupted import. You can free it from the project menu → Clean up temporary files."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים."
+          }
+        }
+      }
+    },
+    "סרטון ששוחזר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rescued video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטון ששוחזר"
+          }
+        }
+      }
+    },
+    "שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ videos were rescued from an interrupted import. They are in your project list."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -79,7 +79,14 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 
     func restore() async {
         guard !busy, projects.isEmpty, project == nil else {return}
-        setBusy(true); projects = await persistence.load(); setBusy(false)
+        setBusy(true)
+        let recovery = await LocalStore.recoverImports()
+        projects = await persistence.load(); setBusy(false)
+        if !recovery.rescued.isEmpty {
+            message = String(format: NSLocalizedString("שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.", comment: "Videos rescued from an interrupted import"), "\(recovery.rescued.count)")
+        } else if recovery.fragmentBytes > 0 {
+            message = String(format: NSLocalizedString("נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים.", comment: "Pieces of an interrupted import that can be cleaned up"), ByteCountFormatter.string(fromByteCount: recovery.fragmentBytes, countStyle: .file))
+        }
         guard project == nil, let id = UserDefaults.standard.string(forKey: "localProject"), let saved = projects.first(where: {$0.id == id}) else {return}
         await open(saved)
     }
@@ -152,6 +159,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
         if !value {continued.complete(success: processingSucceeded); operation = nil; endBackground()}
     }
+    /// One operation from the picker to a saved project, so "cancel" reaches
+    /// whichever part is running: the picker's hand-over or the copy.
     func importPickedVideo(_ item: PhotosPickerItem) {
         guard !busy else {return}
         setBusy(true, .importing); percent = 0; message = "האייפון מכין את הקובץ…"
@@ -160,29 +169,54 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             do {
                 guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
                 staged = picked.url; try Task.checkCancellation()
-                setBusy(false); await importVideo(picked.url)
-            } catch is CancellationError {setBusy(false); message = "ייבוא הסרטון בוטל"}
-            catch {setBusy(false); message = error.localizedDescription}
-            if let staged, staged.deletingLastPathComponent() == LocalStore.imports {try? FileManager.default.removeItem(at: staged)}
+                await runImport(picked.url)
+            } catch is CancellationError {finishImport(nil, cancelled: true)}
+            catch {finishImport(nil, error: error)}
+            // Moved into the project when the import succeeded; otherwise it
+            // is this operation's own copy and goes with it.
+            if let staged, FileManager.default.fileExists(atPath: staged.path) {try? FileManager.default.removeItem(at: staged)}
         }
     }
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
-        setBusy(true, .importing)
+        setBusy(true, .importing); percent = 0
+        let task = Task {await runImport(file)}
+        operation = task
+        await task.value
+    }
+    /// Writes a manifest, copies the video into the new project's folder in
+    /// pieces, and only then saves the project. An interruption leaves the
+    /// manifest behind for `restore` to find; a cancellation removes this
+    /// import's own partial copy and nothing else.
+    private func runImport(_ file: URL) async {
         guard await save() else {setBusy(false); return}
-        percent = 0; message = "מעתיקה את הסרטון לאחסון המקומי…"
+        message = "מעתיקה את הסרטון לאחסון המקומי…"
         let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("רכיבה ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         do {
-            p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source")
-            revision += 1; try await persistence.save(p, revision: revision); project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
+            let size = Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            let target = "source-" + UUID().uuidString + "." + (file.pathExtension.isEmpty ? "mov" : file.pathExtension)
+            try LocalStore.writeManifest(.init(name: name, source: target, bytes: size, wholeVideo: p.wholeVideo), project: p.id)
+            p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source", named: target) {[weak self] fraction in
+                await self?.progress(fraction, "מעתיקה את הסרטון לאחסון המקומי…")
+            }
+            try Task.checkCancellation()
+            revision += 1; try await persistence.save(p, revision: revision)
+            LocalStore.finishImport(project: p.id)
+            project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
             undoStack = []; redoStack = []; updateUndo(); refreshLibrary(p)
             UserDefaults.standard.set(p.id, forKey: "localProject")
             sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
             previewEdit = nil; projectBytes = await persistence.bytes(p)
-            setBusy(false); analyze()
-        } catch {setBusy(false); message = error.localizedDescription; try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
+            processingSucceeded = true; setBusy(false); analyze()
+        } catch is CancellationError {finishImport(p.id, cancelled: true)}
+        catch {finishImport(p.id, error: error)}
+    }
+    private func finishImport(_ id: String?, cancelled: Bool = false, error: Error? = nil) {
+        if let id {LocalStore.abandonImport(project: id)}
+        message = cancelled ? "ייבוא הסרטון בוטל" : error?.localizedDescription ?? ""
+        if busy {setBusy(false)}
     }
     func analyze() {
         guard !busy, var p = project else {return}
@@ -388,6 +422,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         do {
             let bytes = try await persistence.cleanTemporaryFiles()
+            projects = await persistence.load()
             if let p = project {projectBytes = await persistence.bytes(p)}
             message = NSLocalizedString("הניקוי הסתיים. פונו ", comment: "Cleanup finished prefix") + ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
         } catch {message = NSLocalizedString("הניקוי לא הושלם: ", comment: "Cleanup failure prefix") + error.localizedDescription}
