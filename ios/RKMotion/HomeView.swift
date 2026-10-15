@@ -108,6 +108,6 @@ private struct ProjectRow: View {
     @ViewBuilder private var status: some View {
         if !project.analyzed {Pill(text: NSLocalizedString("ממתין לניתוח", comment: "Project awaiting analysis"))}
         else if project.exports.isEmpty {Pill(text: NSLocalizedString("בעריכה", comment: "Project being edited"), fill: RK.raised, ink: RK.soft)}
-        else {Pill(text: String(format: NSLocalizedString("%@ סרטים", comment: "Movies made from a project"), "\(project.exports.count)"), fill: RK.good.opacity(0.14), ink: RK.good)}
+        else {Pill(text: project.exports.count == 1 ? NSLocalizedString("סרט אחד", comment: "One movie made from a project") : String(format: NSLocalizedString("%@ סרטים", comment: "Movies made from a project"), "\(project.exports.count)"), fill: RK.good.opacity(0.14), ink: RK.good)}
     }
 }

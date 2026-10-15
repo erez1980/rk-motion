@@ -4672,6 +4672,22 @@
           }
         }
       }
+    },
+    "סרט אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט אחד"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
