@@ -10,6 +10,12 @@ final class PlayerUITests: XCTestCase {
         app.launch()
         return app
     }
+    /// Waits for `element`; on a timeout the failure carries what the app was
+    /// showing, since CI keeps only the log.
+    private func wait(for element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval, _ message: String) {
+        if element.waitForExistence(timeout: timeout) {return}
+        XCTFail("\(message). App state \(app.state.rawValue). Screen:\n\(app.debugDescription)")
+    }
 
     /// F01: the same AVPlayerItem was handed to a new AVPlayer on every tap of
     /// "Edit", and on coming back to the step, which AVFoundation answers by
@@ -18,7 +24,7 @@ final class PlayerUITests: XCTestCase {
     func testRepeatedTapsOnTheEditPreviewKeepTheAppAlive() throws {
         let app = launch()
         let showEdit = app.buttons["edit.showEdit"], showSource = app.buttons["edit.showSource"]
-        XCTAssertTrue(showEdit.waitForExistence(timeout: 120), "The fixture ride never reached the edit step")
+        wait(for: showEdit, in: app, timeout: 120, "The fixture ride never reached the edit step")
         showEdit.tap()
         // The first tap prepares the preview; then the choice is enabled again.
         expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: showEdit)
@@ -42,7 +48,7 @@ final class PlayerUITests: XCTestCase {
     func testTilesRespondToATapOnTheirWords() throws {
         let app = launch()
         let music = app.buttons["step.2"]
-        XCTAssertTrue(app.buttons["edit.showEdit"].waitForExistence(timeout: 120))
+        wait(for: app.buttons["edit.showEdit"], in: app, timeout: 120, "The fixture ride never reached the edit step")
         music.tap()
         let youTube = app.buttons["music.youtube"]
         XCTAssertTrue(youTube.waitForExistence(timeout: 10))
@@ -62,7 +68,7 @@ final class PlayerUITests: XCTestCase {
         for (language, firstOnLeft) in [("en", true), ("he", false)] {
             let app = launch(language: language)
             let first = app.buttons["step.0"], last = app.buttons["step.3"]
-            XCTAssertTrue(first.waitForExistence(timeout: 120))
+            wait(for: first, in: app, timeout: 120, "No step bar in \(language)")
             XCTAssertEqual(first.frame.midX < last.frame.midX, firstOnLeft, "language \(language)")
             app.terminate()
         }

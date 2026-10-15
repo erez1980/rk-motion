@@ -5,7 +5,10 @@ import AVFoundation
 /// F01: one AVPlayerItem must never reach two players.
 @MainActor final class PreviewPlaybackTests: XCTestCase {
     private func preview() -> PreviewEdit {
-        PreviewEdit(composition: AVMutableComposition(), video: AVMutableVideoComposition(), audio: AVMutableAudioMix())
+        // AVPlayerItem refuses a video composition without a frame size.
+        let video = AVMutableVideoComposition()
+        video.renderSize = CGSize(width: 320, height: 240); video.frameDuration = CMTime(value: 1, timescale: 30)
+        return PreviewEdit(composition: AVMutableComposition(), video: video, audio: AVMutableAudioMix())
     }
     func testTappingEditAgainKeepsTheSameItemOnTheSamePlayer() {
         let playback = PreviewPlayback(), edit = preview()
