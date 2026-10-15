@@ -11,6 +11,7 @@ struct ProjectFlowView: View {
     @State private var step: FlowStep = .video
     @State private var confirmDelete = false
     @State private var showAbout = false
+    @State private var placed = false
     var body: some View {
         VStack(spacing: 0) {
             StepBar(current: step, reachable: reachable) {step = $0}
@@ -24,7 +25,12 @@ struct ProjectFlowView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("בוצע") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
         }
-        .onAppear {step = model.project?.analyzed == true ? .edit : .video}
+        // Only the first appearance picks the step: SwiftUI can call onAppear
+        // again while the screen stays up, which threw the rider back to Edit.
+        .onAppear {
+            guard !placed else {return}
+            placed = true; step = model.project?.analyzed == true ? .edit : .video
+        }
         .onChange(of: model.project?.analyzed) {old, new in if new == true && old == false {step = .edit}}
         .onChange(of: model.project?.exports.count) {old, new in if let old, let new, new > old {step = .done}}
         .onChange(of: model.movieURL) {_, movie in if movie == nil && step == .done {step = .export}}
