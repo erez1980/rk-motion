@@ -56,7 +56,16 @@ anywhere on them (reported from the simulator).
   (209 before this work, plus 4 new).
 - Native: `.github/workflows/ios.yml` (Xcode 26.3, simulator) runs the unit
   tests, the UI tests in `ios/RKMotionUITests` and builds the unsigned IPA.
-  See PR #6 checks for the latest run.
+  Run 38693678442 (build 85) on `45a22c2` passed: 68 unit tests and 3 UI
+  tests, IPA artifact `RK-Motion-unsigned-IPA`
+  (https://github.com/erez1980/rk-motion/actions/runs/38693678442/artifacts/11953293429).
+- The same three UI tests and LocalEngineTests also passed on a Mac
+  simulator (Xcode 27, iOS 27, iPhone 18 Pro). Simulator only, not iPhone.
+- Simulator findings fixed along the way: "1 movie"/"1 clip" plurals, the
+  project screen jumping back to Edit when it reappeared (7176325), and the
+  export running past the edit on iOS 27 (4aa7309, `session.timeRange`).
+- Debug builds now define `DEBUG` (the generator never set it, so `#if DEBUG`
+  code was silently left out). Release/IPA is unchanged.
 - UI tests launch with `-RKUITestFixture` (Debug only): the app makes its own
   4-second ride and imports it like a picked video, so tests need no Photos.
 
