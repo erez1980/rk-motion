@@ -665,8 +665,9 @@ private struct ExportStep: View {
         List {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: model.expectedDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
-                    Text("אורך הסרט").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                    Text(verbatim: model.movieDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
+                        .accessibilityIdentifier("export.length")
+                    Text(model.beatChangesLength ? LocalizedStringKey("אורך הסרט, עם החיתוכים על הקצב") : LocalizedStringKey("אורך הסרט")).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
                 }
                 Rectangle().fill(RK.line).frame(width: 1, height: 44)
                 VStack(alignment: .leading, spacing: 4) {

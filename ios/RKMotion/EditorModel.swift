@@ -12,8 +12,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 @MainActor final class EditorModel: ObservableObject {
     @Published private(set) var work: Work?
     @Published var projects: [LocalProject] = []
-    @Published var project: LocalProject?
-    @Published var edit = Edit(clips: [])
+    @Published var project: LocalProject? {didSet {refreshPlan()}}
+    @Published var edit = Edit(clips: []) {didSet {refreshPlan()}}
     @Published var busy = false
     @Published var percent: Double = 0
     @Published var message = ""
@@ -44,6 +44,32 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         return LocalEngine.timeline(clips: selectedClips, speed: speed, transition: fade).last?.end ?? 0
     }
+    /// The exported movie's length as the engine will really make it, beat
+    /// moves included, worked out again shortly after every change.
+    @Published private(set) var plannedDuration: Double?
+    private var planTask: Task<Void, Never>?
+    /// What to show as the movie's length: the planned one once known.
+    var movieDuration: Double? {plannedDuration ?? expectedDuration}
+    /// Whether moving cuts to the beat makes the movie a different length.
+    var beatChangesLength: Bool {
+        guard let planned = plannedDuration, let naive = expectedDuration else {return false}
+        return abs(planned - naive) >= 0.05
+    }
+    private func refreshPlan() {
+        planTask?.cancel()
+        plannedDuration = nil
+        guard let p = project, p.analyzed else {return}
+        let snapshot = edit
+        planTask = Task {[weak self, engine] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else {return}
+            let length = await engine.plannedLength(p, edit: snapshot)
+            guard !Task.isCancelled else {return}
+            self?.plannedDuration = length
+        }
+    }
+    /// Waits for the planned length, for tests.
+    func settlePlan() async {await planTask?.value}
     var expectedFormat: String {
         let quality = edit.settings["quality"]?.string ?? "1080"
         let cap: Double? = quality == "original" ? nil : ["720", "whatsapp"].contains(quality) ? 720 : 1080

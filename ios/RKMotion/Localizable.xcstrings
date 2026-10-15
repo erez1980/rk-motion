@@ -4640,6 +4640,22 @@
           }
         }
       }
+    },
+    "אורך הסרט, עם החיתוכים על הקצב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie length, with cuts on the beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך הסרט, עם החיתוכים על הקצב"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
