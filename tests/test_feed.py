@@ -1,5 +1,7 @@
 """Feed/URL resolution tests. Network is stubbed — no real fetching."""
 
+from pathlib import Path
+
 import pytest
 
 from sofit import feed
@@ -78,3 +80,135 @@ def test_resolve_direct_audio_url_skips_feed_parse(monkeypatch):
     monkeypatch.setattr(feed, "_fetch", lambda *a, **k: pytest.fail("should not parse feed"))
     monkeypatch.setattr(feed, "download_audio", lambda url: "/cache/direct.mp3")
     assert feed.resolve("https://x/show/episode.mp3") == "/cache/direct.mp3"
+
+
+class _SlowBody:
+    """A response that hands out its bytes slowly, so two downloads overlap."""
+
+    def __init__(self, data: bytes, fail_after: int | None = None):
+        self.data, self.sent, self.fail_after = data, 0, fail_after
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, size):
+        import time
+        if self.fail_after is not None and self.sent >= self.fail_after:
+            raise ConnectionResetError("connection dropped")
+        time.sleep(0.01)
+        piece = self.data[self.sent:self.sent + 4096]
+        self.sent += len(piece)
+        return piece
+
+
+def test_concurrent_downloads_of_one_url_share_one_whole_file(tmp_path, monkeypatch):
+    import threading
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    payload = bytes(range(256)) * 160  # 40 KB, ten slow reads
+    calls = []
+    monkeypatch.setattr(feed.urllib.request, "urlopen", lambda *a, **k: calls.append(1) or _SlowBody(payload))
+    start, results, errors = threading.Barrier(2), [], []
+
+    def fetch():
+        start.wait()
+        try:
+            results.append(feed.download_audio("https://x/show/ep.mp3"))
+        except Exception as error:  # noqa: BLE001 - the test reports any failure
+            errors.append(error)
+
+    threads = [threading.Thread(target=fetch) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert len(set(results)) == 1
+    with open(results[0], "rb") as f:
+        assert f.read() == payload
+    assert len(calls) == 1, "the second request should reuse the first download"
+    assert not list((tmp_path / "sofit" / "downloads").glob("*.part"))
+
+
+def test_an_interrupted_download_leaves_nothing_in_the_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    payload = b"x" * 40000
+    monkeypatch.setattr(feed.urllib.request, "urlopen", lambda *a, **k: _SlowBody(payload, fail_after=8192))
+    with pytest.raises(ConnectionResetError):
+        feed.download_audio("https://x/show/ep.mp3")
+    cache = tmp_path / "sofit" / "downloads"
+    assert [p.name for p in cache.iterdir() if not p.name.endswith(".lock")] == []
+    monkeypatch.setattr(feed.urllib.request, "urlopen", lambda *a, **k: _SlowBody(payload))
+    with open(feed.download_audio("https://x/show/ep.mp3"), "rb") as f:
+        assert f.read() == payload
+
+
+def test_a_refused_download_closes_its_temporary_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+
+    def refuse(*a, **k):
+        raise ConnectionRefusedError("refused")
+
+    monkeypatch.setattr(feed.urllib.request, "urlopen", refuse)
+    fds = Path("/proc/self/fd")
+    if not fds.exists():
+        pytest.skip("needs /proc to count open files")
+    before = len(list(fds.iterdir()))
+    for _ in range(20):
+        with pytest.raises(ConnectionRefusedError):
+            feed.download_audio("https://x/show/ep.mp3")
+    assert len(list(fds.iterdir())) <= before
+    cache = tmp_path / "sofit" / "downloads"
+    assert [p.name for p in cache.iterdir() if not p.name.endswith(".lock")] == []
+
+
+def test_concurrent_youtube_downloads_finish_one_file(tmp_path, monkeypatch):
+    import sys
+    import threading
+    import time
+    import types
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    runs = []
+
+    class FakeYDL:
+        def __init__(self, opts):
+            self.template = opts["outtmpl"]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def extract_info(self, url, download):
+            runs.append(url)
+            target = self.template.replace("%(ext)s", "m4a")
+            with open(target + ".part", "wb") as f:  # yt-dlp writes a .part, then renames it
+                for _ in range(10):
+                    f.write(b"a" * 1000)
+                    time.sleep(0.01)
+            import os
+            os.replace(target + ".part", target)
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", types.SimpleNamespace(YoutubeDL=FakeYDL))
+    start, results, errors = threading.Barrier(2), [], []
+
+    def fetch():
+        start.wait()
+        try:
+            results.append(feed.download_youtube("https://youtu.be/abc"))
+        except Exception as error:  # noqa: BLE001
+            errors.append(error)
+
+    threads = [threading.Thread(target=fetch) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [] and len(set(results)) == 1 and len(runs) == 1
+    with open(results[0], "rb") as f:
+        assert f.read() == b"a" * 10000
+    cache = tmp_path / "sofit" / "downloads"
+    assert sorted(p.name for p in cache.iterdir() if not p.name.endswith(".lock")) == [results[0].rsplit("/", 1)[1]]

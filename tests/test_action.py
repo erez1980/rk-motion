@@ -178,3 +178,17 @@ def test_perf_rates_learn_from_measured_runs(tmp_path, monkeypatch):
 
     (tmp_path / "perf.json").write_text("not json")        # corrupt file
     assert ui._perf_rates() == ui.DEFAULT_RATES
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_action_render_writes_yuv420p_from_a_444_source(tmp_path):
+    """--action-render clips must play on phones; libx264 keeps a 4:4:4 source's
+    chroma (High 4:4:4 profile) unless told otherwise, and phones refuse that."""
+    from sofit.action import render_action_clips
+    source = tmp_path / "ride.mov"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=3",
+                    "-c:v", "libx264", "-pix_fmt", "yuv444p", str(source)], check=True)
+    [clip] = render_action_clips(str(source), [{"start": 0.5, "end": 2.0, "duration": 1.5}], str(tmp_path / "out"))
+    probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                            "stream=pix_fmt", "-of", "csv=p=0", clip], capture_output=True, text=True, check=True)
+    assert probe.stdout.strip() == "yuv420p"

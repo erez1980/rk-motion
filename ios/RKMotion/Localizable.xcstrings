@@ -4544,6 +4544,166 @@
           }
         }
       }
+    },
+    "לא ניתן לשמור את הסרטון באייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video could not be saved on this iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לשמור את הסרטון באייפון."
+          }
+        }
+      }
+    },
+    "נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is left over from an interrupted import. You can free it from the project menu → Clean up temporary files."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים."
+          }
+        }
+      }
+    },
+    "סרטון ששוחזר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rescued video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטון ששוחזר"
+          }
+        }
+      }
+    },
+    "שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ videos were rescued from an interrupted import. They are in your project list."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים."
+          }
+        }
+      }
+    },
+    "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The YouTube download arrived broken and was stopped. Try again."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב."
+          }
+        }
+      }
+    },
+    "קובץ השמע גדול מדי לשיר.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio file is too large for a song."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קובץ השמע גדול מדי לשיר."
+          }
+        }
+      }
+    },
+    "אורך הסרט, עם החיתוכים על הקצב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie length, with cuts on the beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך הסרט, עם החיתוכים על הקצב"
+          }
+        }
+      }
+    },
+    "בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One movie holds up to %1$@ clips. %2$@ are selected; deselect some of them."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם."
+          }
+        }
+      }
+    },
+    "סרט אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט אחד"
+          }
+        }
+      }
+    },
+    "קטע אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטע אחד"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

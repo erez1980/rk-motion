@@ -18,7 +18,7 @@ import UIKit
         UINavigationBar.appearance().compactAppearance = bar
         UINavigationBar.appearance().tintColor = RK.UI.soft
     }
-    var body: some Scene {WindowGroup {RootView().environment(\.layoutDirection, .rightToLeft)}}
+    var body: some Scene {WindowGroup {RootView().environment(\.layoutDirection, AppLanguage.direction)}}
 }
 
 struct RootView: View {
@@ -41,7 +41,14 @@ struct RootView: View {
             }
         }
         .tint(RK.accent)
-        .task {await model.restore()}
+        .task {
+            await model.restore()
+            #if DEBUG
+            // Earlier test rides go before the project screen opens: deleting
+            // the open one would close the screen again.
+            if UITestFixture.requested {await model.discardTestRides(); path = [.project]; await UITestFixture.load(into: model)}
+            #endif
+        }
         .onChange(of: model.edit) {previous, _ in model.changed(from: previous)}
         .onChange(of: scenePhase) {_, phase in
             if phase == .background {model.pause()}

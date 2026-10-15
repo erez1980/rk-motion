@@ -12,8 +12,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 @MainActor final class EditorModel: ObservableObject {
     @Published private(set) var work: Work?
     @Published var projects: [LocalProject] = []
-    @Published var project: LocalProject?
-    @Published var edit = Edit(clips: [])
+    @Published var project: LocalProject? {didSet {refreshPlan()}}
+    @Published var edit = Edit(clips: []) {didSet {refreshPlan()}}
     @Published var busy = false
     @Published var percent: Double = 0
     @Published var message = ""
@@ -22,13 +22,18 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var movieURL: URL?
     @Published var undoAvailable = false
     @Published var redoAvailable = false
-    @Published var previewItem: AVPlayerItem?
+    /// The prepared edit, played only through `PreviewPlayback`, which makes
+    /// its own item from it.
+    @Published var previewEdit: PreviewEdit?
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
     var editValidationMessage: String? {
         guard let p = project else {return nil}
         let clips = edit.clips.filter {$0.selected != false}
         guard !clips.isEmpty else {return "בחרו לפחות קטע אחד"}
+        if clips.count > Edit.clipLimit {
+            return String(format: NSLocalizedString("בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם.", comment: "Too many clips selected"), "\(Edit.clipLimit)", "\(clips.count)")
+        }
         if clips.contains(where: {!$0.start.isFinite || !$0.end.isFinite || $0.start < 0 || $0.end <= $0.start || $0.end > p.duration}) {
             return "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה"
         }
@@ -42,6 +47,32 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         return LocalEngine.timeline(clips: selectedClips, speed: speed, transition: fade).last?.end ?? 0
     }
+    /// The exported movie's length as the engine will really make it, beat
+    /// moves included, worked out again shortly after every change.
+    @Published private(set) var plannedDuration: Double?
+    private var planTask: Task<Void, Never>?
+    /// What to show as the movie's length: the planned one once known.
+    var movieDuration: Double? {plannedDuration ?? expectedDuration}
+    /// Whether moving cuts to the beat makes the movie a different length.
+    var beatChangesLength: Bool {
+        guard let planned = plannedDuration, let naive = expectedDuration else {return false}
+        return abs(planned - naive) >= 0.05
+    }
+    private func refreshPlan() {
+        planTask?.cancel()
+        plannedDuration = nil
+        guard let p = project, p.analyzed else {return}
+        let snapshot = edit
+        planTask = Task {[weak self, engine] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else {return}
+            let length = await engine.plannedLength(p, edit: snapshot)
+            guard !Task.isCancelled else {return}
+            self?.plannedDuration = length
+        }
+    }
+    /// Waits for the planned length, for tests.
+    func settlePlan() async {await planTask?.value}
     var expectedFormat: String {
         let quality = edit.settings["quality"]?.string ?? "1080"
         let cap: Double? = quality == "original" ? nil : ["720", "whatsapp"].contains(quality) ? 720 : 1080
@@ -52,7 +83,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var addedSong: String?
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
-    private let persistence = ProjectPersistence()
+    private let persistence: ProjectPersistence
+    init(persistence: ProjectPersistence = ProjectPersistence()) {self.persistence = persistence}
     private var saveTask: Task<Void, Never>?
     private var revision = 0
     private let engine = LocalEngine()
@@ -76,7 +108,14 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 
     func restore() async {
         guard !busy, projects.isEmpty, project == nil else {return}
-        setBusy(true); projects = await persistence.load(); setBusy(false)
+        setBusy(true)
+        let recovery = await LocalStore.recoverImports()
+        projects = await persistence.load(); setBusy(false)
+        if !recovery.rescued.isEmpty {
+            message = String(format: NSLocalizedString("שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.", comment: "Videos rescued from an interrupted import"), "\(recovery.rescued.count)")
+        } else if recovery.fragmentBytes > 0 {
+            message = String(format: NSLocalizedString("נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים.", comment: "Pieces of an interrupted import that can be cleaned up"), ByteCountFormatter.string(fromByteCount: recovery.fragmentBytes, countStyle: .file))
+        }
         guard project == nil, let id = UserDefaults.standard.string(forKey: "localProject"), let saved = projects.first(where: {$0.id == id}) else {return}
         await open(saved)
     }
@@ -89,7 +128,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
         sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(value.source, project: value.id))) ?? .zero
-        previewItem = nil; projectBytes = await persistence.bytes(value); setBusy(false)
+        previewEdit = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
     /// Puts the current project away so a new ride starts from an empty screen.
@@ -97,7 +136,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !busy, project != nil else {return}
         setBusy(true)
         guard await save() else {setBusy(false); return}
-        project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewItem = nil; projectBytes = 0
+        project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewEdit = nil; projectBytes = 0
         sourceDimensions = .zero; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
         UserDefaults.standard.removeObject(forKey: "localProject")
         setBusy(false)
@@ -115,7 +154,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func scheduleSave(immediate: Bool = false) {
         saveTask?.cancel()
         guard let p = snapshot() else {return}
-        previewItem = nil
+        previewEdit = nil
         revision += 1; let version = revision
         saveTask = Task {
             do {
@@ -149,6 +188,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
         if !value {continued.complete(success: processingSucceeded); operation = nil; endBackground()}
     }
+    /// One operation from the picker to a saved project, so "cancel" reaches
+    /// whichever part is running: the picker's hand-over or the copy.
     func importPickedVideo(_ item: PhotosPickerItem) {
         guard !busy else {return}
         setBusy(true, .importing); percent = 0; message = "האייפון מכין את הקובץ…"
@@ -157,29 +198,54 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             do {
                 guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
                 staged = picked.url; try Task.checkCancellation()
-                setBusy(false); await importVideo(picked.url)
-            } catch is CancellationError {setBusy(false); message = "ייבוא הסרטון בוטל"}
-            catch {setBusy(false); message = error.localizedDescription}
-            if let staged, staged.deletingLastPathComponent() == LocalStore.imports {try? FileManager.default.removeItem(at: staged)}
+                await runImport(picked.url)
+            } catch is CancellationError {finishImport(nil, cancelled: true)}
+            catch {finishImport(nil, error: error)}
+            // Moved into the project when the import succeeded; otherwise it
+            // is this operation's own copy and goes with it.
+            if let staged, FileManager.default.fileExists(atPath: staged.path) {try? FileManager.default.removeItem(at: staged)}
         }
     }
     func importVideo(_ file: URL) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
-        setBusy(true, .importing)
+        setBusy(true, .importing); percent = 0
+        let task = Task {await runImport(file)}
+        operation = task
+        await task.value
+    }
+    /// Writes a manifest, copies the video into the new project's folder in
+    /// pieces, and only then saves the project. An interruption leaves the
+    /// manifest behind for `restore` to find; a cancellation removes this
+    /// import's own partial copy and nothing else.
+    private func runImport(_ file: URL) async {
         guard await save() else {setBusy(false); return}
-        percent = 0; message = "מעתיקה את הסרטון לאחסון המקומי…"
+        message = "מעתיקה את הסרטון לאחסון המקומי…"
         let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("רכיבה ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         do {
-            p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source")
-            revision += 1; try await persistence.save(p, revision: revision); project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
+            let size = Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            let target = "source-" + UUID().uuidString + "." + (file.pathExtension.isEmpty ? "mov" : file.pathExtension)
+            try LocalStore.writeManifest(.init(name: name, source: target, bytes: size, wholeVideo: p.wholeVideo), project: p.id)
+            p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source", named: target) {[weak self] fraction in
+                await self?.progress(fraction, "מעתיקה את הסרטון לאחסון המקומי…")
+            }
+            try Task.checkCancellation()
+            revision += 1; try await persistence.save(p, revision: revision)
+            LocalStore.finishImport(project: p.id)
+            project = p; edit = p.edit; suppressedEdit = edit; movieURL = nil
             undoStack = []; redoStack = []; updateUndo(); refreshLibrary(p)
             UserDefaults.standard.set(p.id, forKey: "localProject")
             sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
-            previewItem = nil; projectBytes = await persistence.bytes(p)
-            setBusy(false); analyze()
-        } catch {setBusy(false); message = error.localizedDescription; try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
+            previewEdit = nil; projectBytes = await persistence.bytes(p)
+            processingSucceeded = true; setBusy(false); analyze()
+        } catch is CancellationError {finishImport(p.id, cancelled: true)}
+        catch {finishImport(p.id, error: error)}
+    }
+    private func finishImport(_ id: String?, cancelled: Bool = false, error: Error? = nil) {
+        if let id {LocalStore.abandonImport(project: id)}
+        message = cancelled ? "ייבוא הסרטון בוטל" : error?.localizedDescription ?? ""
+        if busy {setBusy(false)}
     }
     func analyze() {
         guard !busy, var p = project else {return}
@@ -196,7 +262,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
                 current.duration = duration; current.scores = scores; current.analyzed = true
-                project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewItem = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
+                project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
                 if await save() {processingSucceeded = true; message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
@@ -269,17 +335,24 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             setBusy(false)
         }
     }
+    /// The song leaves the project in memory first, so a save made meanwhile
+    /// (the app going to the background) cannot list it again; its file goes
+    /// only once a project without it is on disk.
     func removeMusic(_ id: String) async {
         guard !busy, var p = project, let song = p.music.first(where: {$0.id == id}) else {return}
-        p.music.removeAll {$0.id == id}
         setBusy(true)
-        guard await save() else {setBusy(false); return}
-        p.edit = edit
+        saveTask?.cancel(); saveTask = nil
+        p.edit = edit; p.music.removeAll {$0.id == id}
+        project = p; refreshLibrary(p); previewEdit = nil
         revision += 1
-        do {try await persistence.save(p, revision: revision); project = p; refreshLibrary(p); previewItem = nil}
-        catch {message = error.localizedDescription; setBusy(false); return}
-        try? FileManager.default.removeItem(at: LocalStore.file(song.file, project: p.id))
-        projectBytes = await persistence.bytes(p); setBusy(false)
+        do {
+            if let warning = try await persistence.removeMusic(song, from: p, revision: revision) {message = warning}
+        } catch {
+            project?.music = (project?.music ?? []) + [song]; message = error.localizedDescription
+            if let restored = project {refreshLibrary(restored)}
+        }
+        if let current = project {projectBytes = await persistence.bytes(current)}
+        setBusy(false)
     }
     func exportMovie() {
         guard !busy, let p = project, p.analyzed else {return}
@@ -303,6 +376,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
     }
     func cancel() {operation?.cancel()}
+    /// Waits for the save already scheduled, for tests and orderly shutdown.
+    func settleSaves() async {await saveTask?.value}
     func pause() {
         scheduleSave(immediate: true)
         if busy && !continued.hasActiveTask && backgroundID == .invalid {
@@ -315,10 +390,13 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func endBackground() {if backgroundID != .invalid {UIApplication.shared.endBackgroundTask(backgroundID); backgroundID = .invalid}}
     func reset() async {
         guard !busy, let p = project else {return}
-        setBusy(true); saveTask?.cancel(); saveTask = nil
+        // A save already on its way is cancelled, and the persistence actor
+        // refuses any write for a deleted project, so none can recreate it.
+        setBusy(true); saveTask?.cancel()
         do {
             try await persistence.deleteProject(p.id)
-            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewItem = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
+            await Thumbnails.shared.forget(p.id)
+            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
         setBusy(false)
@@ -333,18 +411,25 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         changed(from: previous); suppressedEdit = edit
         message = wholeVideo ? "כל הסרטון נבחר. ניתן לבטל את השינוי." : "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי."
     }
+    /// As with a song: out of the project in memory first, then on disk, and
+    /// only then is the file removed.
     func deleteExport(_ result: LocalExport) async {
         guard !busy, var p = project else {return}
         setBusy(true)
-        guard await save() else {setBusy(false); return}
-        p.edit = edit; p.exports.removeAll {$0.id == result.id}; revision += 1
+        saveTask?.cancel(); saveTask = nil
+        let previous = p.exports
+        p.edit = edit; p.exports.removeAll {$0.id == result.id}
+        project = p; refreshLibrary(p)
+        if movieURL?.lastPathComponent == result.file {movieURL = nil}
+        revision += 1
         do {
             let warning = try await persistence.deleteExport(result, from: p, revision: revision)
-            project = p; refreshLibrary(p)
-            if movieURL?.lastPathComponent == result.file {movieURL = nil}
-            projectBytes = await persistence.bytes(p)
             message = warning.map {NSLocalizedString("הסרט הוסר מהרשימה אך פינוי הקובץ נכשל: ", comment: "Export removed but file left behind") + $0} ?? "הסרט שנוצר נמחק מהאפליקציה"
-        } catch {message = error.localizedDescription}
+        } catch {
+            project?.exports = previous; message = error.localizedDescription
+            if let restored = project {refreshLibrary(restored)}
+        }
+        if let current = project {projectBytes = await persistence.bytes(current)}
         setBusy(false)
     }
     func preview() {
@@ -354,7 +439,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}
-            do {previewItem = try await engine.preview(p, edit: snapshot); processingSucceeded = true; message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
+            do {previewEdit = try await engine.previewEdit(p, edit: snapshot); processingSucceeded = true; message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
             catch is CancellationError {message = "התצוגה המקדימה בוטלה"}
             catch {message = error.localizedDescription}
             setBusy(false)
@@ -367,6 +452,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         do {
             let bytes = try await persistence.cleanTemporaryFiles()
+            projects = await persistence.load()
             if let p = project {projectBytes = await persistence.bytes(p)}
             message = NSLocalizedString("הניקוי הסתיים. פונו ", comment: "Cleanup finished prefix") + ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
         } catch {message = NSLocalizedString("הניקוי לא הושלם: ", comment: "Cleanup failure prefix") + error.localizedDescription}
@@ -382,3 +468,19 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         catch {message = error.localizedDescription}
     }
 }
+
+#if DEBUG
+extension EditorModel {
+    /// Removes the rides earlier UI test runs made, so the simulator's
+    /// project list does not fill up with them.
+    func discardTestRides() async {
+        let mark = "rk-ui-fixture-"
+        if project?.name.hasPrefix(mark) == true {await reset()}
+        for old in projects where old.name.hasPrefix(mark) && old.id != project?.id {
+            try? await persistence.deleteProject(old.id)
+            await Thumbnails.shared.forget(old.id)
+        }
+        projects.removeAll {$0.name.hasPrefix(mark) && $0.id != project?.id}
+    }
+}
+#endif

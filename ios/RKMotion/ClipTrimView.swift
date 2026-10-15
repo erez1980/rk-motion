@@ -49,7 +49,7 @@ struct ClipTrimView: View {
             .onDisappear {player?.pause()}
         }
         .tint(RK.accent)
-        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.layoutDirection, AppLanguage.direction)
     }
     private func field(_ title: LocalizedStringKey, value: Binding<Double>, label: LocalizedStringKey) -> some View {
         HStack(spacing: 8) {

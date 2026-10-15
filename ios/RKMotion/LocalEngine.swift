@@ -44,7 +44,7 @@ actor LocalEngine {
                 windows[windows.count - 1].1 = max(previous.1, end)
             } else {windows.append((start, end))}
         }
-        return windows.flatMap {window -> [Clip] in
+        var clips = windows.flatMap {window -> [Clip] in
             let start = window.0, end = window.1
             let first = max(0, Int(start)), last = min(scores.count - 1, max(first, Int(ceil(end)) - 1))
             guard end - start >= min(5, duration) else {return []}
@@ -52,6 +52,44 @@ actor LocalEngine {
             // Split long activity spans so the editor stays useful for long rides.
             return stride(from: start, to: end, by: 30).map {Clip(start: $0, end: min(end, $0 + 30), score: score)}
         }.sorted {$0.start < $1.start}
+        // A long ride can suggest more clips than one movie holds. All stay
+        // listed; only the strongest are chosen, so the default edit exports.
+        if clips.count > Edit.clipLimit {
+            let kept = Set(clips.indices.sorted {(clips[$0].score ?? 0, -$0) > (clips[$1].score ?? 0, -$1)}.prefix(Edit.clipLimit))
+            for index in clips.indices {clips[index].selected = kept.contains(index)}
+        }
+        return clips
+    }
+    /// Whether cuts move to the song's beat. Never for a video kept whole:
+    /// its one clip is the rider's own edit, and its end is the video's end.
+    static func syncsToBeat(_ edit: Edit, project: LocalProject) -> Bool {
+        edit.settings["beatSync"]?.bool != false && edit.settings["useMusic"]?.bool != false && !project.music.isEmpty
+            && edit.settings["wholeVideo"]?.bool != true && !(edit.settings["wholeVideo"] == nil && project.wholeVideo)
+    }
+    /// The clips as they will be exported: with each cut moved onto the
+    /// beat when that applies. Only the first song is measured, since it is
+    /// the one playing from the movie's first frame.
+    private func synced(_ clips: [Clip], project: LocalProject, edit: Edit, speed: Double, overlap: Double, total: Double) async -> [Clip] {
+        guard Self.syncsToBeat(edit, project: project), let song = project.music.first else {return clips}
+        let start = edit.musicStart(for: song.id, first: true)
+        let estimate = Self.timeline(clips: clips, speed: speed, transition: overlap).last?.end ?? 0
+        // Rounded up to half minutes, so small edits reuse the same beats.
+        let window = min(max(0, song.duration - start), ceil((estimate + 15) / 30) * 30)
+        guard let beats = await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window) else {return clips}
+        return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total)
+    }
+    /// The finished movie's length exactly as `export` will make it, beat
+    /// moves included; nil when the edit cannot be exported as it stands.
+    func plannedLength(_ project: LocalProject, edit: Edit) async -> Double? {
+        let clips = edit.clips.filter {$0.selected != false}
+        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let transition = edit.settings["transition"]?.string ?? "cut"
+        let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
+        guard !clips.isEmpty, speed > 0, speed.isFinite, project.duration > 0,
+              clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= project.duration}) else {return nil}
+        let overlap = transition == "cut" ? 0 : (fade.isFinite ? fade : 0.5)
+        let planned = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: project.duration)
+        return Self.timeline(clips: planned, speed: speed, transition: overlap).last?.end
     }
     func sourceDimensions(_ source: URL) async throws -> CGSize {
         guard let video = try await AVURLAsset(url: source).loadTracks(withMediaType: .video).first else {return .zero}
@@ -236,7 +274,7 @@ actor LocalEngine {
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
-        guard !clips.isEmpty, clips.count <= 500, [1.0, 1.25, 1.5, 2.0].contains(speed),
+        guard !clips.isEmpty, clips.count <= Edit.clipLimit, [1.0, 1.25, 1.5, 2.0].contains(speed),
               Self.transitions.contains(transition), fade.isFinite, 0.1...3 ~= fade,
               clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= total}) else {
             throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")
@@ -252,18 +290,8 @@ actor LocalEngine {
         let cap: Double? = ["720", "whatsapp"].contains(quality) ? 720 : quality == "original" ? nil : 1080
         let size = Self.frame(source: displayed, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
         let overlap = transition == "cut" ? 0 : fade
-        // Cuts land on the song's beat. Only the first song is measured, since
-        // it is the one playing from the movie's first frame.
-        if edit.settings["beatSync"]?.bool != false, edit.settings["useMusic"]?.bool != false, let song = project.music.first {
-            let start = edit.musicStart(for: song.id, first: true)
-            let estimate = Self.timeline(clips: clips, speed: speed, transition: overlap).last?.end ?? 0
-            // Rounded up to half minutes, so small edits reuse the same beats.
-            let window = min(max(0, song.duration - start), ceil((estimate + 15) / 30) * 30)
-            if let beats = await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window) {
-                clips = Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total)
-            }
-            try Task.checkCancellation()
-        }
+        clips = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: total)
+        try Task.checkCancellation()
         let segments = Self.timeline(clips: clips, speed: speed, transition: overlap)
         let length = segments.last!.end
         guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
@@ -409,12 +437,18 @@ actor LocalEngine {
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
         return PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
     }
-    func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
+    /// The edit ready to play, as immutable copies that any number of player
+    /// items can share without one of them changing under another.
+    func previewEdit(_ project: LocalProject, edit: Edit) async throws -> PreviewEdit {
         let prepared = try await prepare(project, edit: edit) {_, _ in}
         try Task.checkCancellation()
-        let item = AVPlayerItem(asset: prepared.composition)
-        item.videoComposition = prepared.video; item.audioMix = prepared.audio
-        return item
+        guard let composition = prepared.composition.copy() as? AVComposition,
+              let video = prepared.video.copy() as? AVVideoComposition,
+              let audio = prepared.audio.copy() as? AVAudioMix else {throw AppError(message: "הרכבת הסרט נכשלה: ")}
+        return PreviewEdit(composition: composition, video: video, audio: audio)
+    }
+    func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
+        try await previewEdit(project, edit: edit).makeItem()
     }
     func export(_ project: LocalProject, edit: Edit, output: URL, progress: @escaping Progress) async throws -> Double {
         let started = Date()
@@ -424,6 +458,10 @@ actor LocalEngine {
         guard let session = AVAssetExportSession(asset: prepared.composition, presetName: prepared.preset), session.supportedFileTypes.contains(.mp4) else {throw AppError(message: "הייצוא אינו זמין במכשיר זה.")}
         session.outputURL = output; session.outputFileType = .mp4; session.shouldOptimizeForNetworkUse = true
         session.videoComposition = prepared.video; session.audioMix = prepared.audio
+        // The movie ends where the edit ends. Without this the iOS 27
+        // simulator wrote a file longer than the edit, with no picture at the
+        // end, which the length shown to the rider would not match.
+        session.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: prepared.length, preferredTimescale: 600))
         let observer = Task {
             while !Task.isCancelled {await progress(0.1 + Double(session.progress) * 0.9, "מייצאת את הסרט באייפון…"); try? await Task.sleep(for: .milliseconds(250))}
         }

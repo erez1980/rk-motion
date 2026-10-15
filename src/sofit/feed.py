@@ -9,8 +9,11 @@ re-runs don't re-fetch.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
+import shutil
+import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -66,23 +69,60 @@ def list_episodes(feed_url: str) -> list[Episode]:
     return episodes
 
 
+@contextlib.contextmanager
+def _cache_lock(key: str):
+    """Holds one cache entry while it is checked and filled. Two runs asking
+    for the same URL at once (the web app and the CLI, or two browser tabs)
+    otherwise wrote into one shared ``.part`` file and renamed it under each
+    other. Another key never waits."""
+    path = _cache_dir() / f"{key}.lock"
+    with open(path, "a") as handle:
+        try:
+            import fcntl
+        except ImportError:  # Windows: unique temp files below still keep entries whole
+            yield
+            return
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def download_audio(url: str) -> str:
-    """Stream a media URL to the cache, keyed by URL. Returns the local path."""
+    """Stream a media URL to the cache, keyed by URL. Returns the local path.
+    The download goes to a temporary file of its own and is renamed into place
+    only once complete, so the cache never holds a partial or mixed file."""
     ext = os.path.splitext(url.split("?")[0])[1] or ".mp3"
-    dest = _cache_dir() / f"{hashlib.sha256(url.encode()).hexdigest()[:32]}{ext}"
-    if dest.exists():
-        return str(dest)
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=120) as r, open(tmp, "wb") as f:
-        for chunk in iter(lambda: r.read(1 << 20), b""):
-            f.write(chunk)
-    tmp.rename(dest)
+    key = hashlib.sha256(url.encode()).hexdigest()[:32]
+    dest = _cache_dir() / f"{key}{ext}"
+    with _cache_lock(key):
+        if dest.exists():
+            return str(dest)
+        fd, tmp = tempfile.mkstemp(dir=dest.parent, prefix=f"{key}.", suffix=".part")
+        try:
+            # The file takes the descriptor first, so a refused connection
+            # still closes it.
+            with os.fdopen(fd, "wb") as f, urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=120) as r:
+                for chunk in iter(lambda: r.read(1 << 20), b""):
+                    f.write(chunk)
+            os.replace(tmp, dest)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
     return str(dest)
+
+
+def _cached_youtube(d: Path, key: str) -> list[Path]:
+    return [p for p in d.glob(f"{key}.*") if p.is_file() and not p.name.endswith((".part", ".lock"))]
 
 
 def download_youtube(url: str) -> str:
     """Download a YouTube video's audio via yt-dlp (optional `[youtube]` extra).
-    Cached by URL. faster-whisper decodes the m4a/webm yt-dlp yields directly."""
+    Cached by URL. faster-whisper decodes the m4a/webm yt-dlp yields directly.
+    yt-dlp writes into a private folder; the finished file is renamed into the
+    cache, so a concurrent or interrupted run never leaves a half file there."""
     try:
         import yt_dlp
     except ImportError as e:
@@ -90,23 +130,30 @@ def download_youtube(url: str) -> str:
 
     key = hashlib.sha256(url.encode()).hexdigest()[:32]
     d = _cache_dir()
-    cached = [p for p in d.glob(f"{key}.*") if not p.name.endswith(".part")]
-    if cached:
-        return str(cached[0])
-    opts = {
-        "format": "bestaudio/best",
-        "outtmpl": str(d / f"{key}.%(ext)s"),
-        "quiet": True,
-        "no_warnings": True,
-        "noprogress": True,
-    }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.extract_info(url, download=True)
-    # Glob after download — the real extension isn't known until yt-dlp picks a stream.
-    files = [p for p in d.glob(f"{key}.*") if not p.name.endswith(".part")]
-    if not files:
-        raise FeedError("yt-dlp produced no audio file")
-    return str(files[0])
+    with _cache_lock(key):
+        cached = _cached_youtube(d, key)
+        if cached:
+            return str(cached[0])
+        work = Path(tempfile.mkdtemp(dir=d, prefix=f"{key}.", suffix=".part"))
+        try:
+            opts = {
+                "format": "bestaudio/best",
+                "outtmpl": str(work / f"{key}.%(ext)s"),
+                "quiet": True,
+                "no_warnings": True,
+                "noprogress": True,
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.extract_info(url, download=True)
+            # The real extension isn't known until yt-dlp picks a stream.
+            files = [p for p in work.glob(f"{key}.*") if p.is_file() and not p.name.endswith(".part")]
+            if not files:
+                raise FeedError("yt-dlp produced no audio file")
+            dest = d / files[0].name
+            os.replace(files[0], dest)
+            return str(dest)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
 
 
 def resolve(source: str, episode: int = 1) -> str:

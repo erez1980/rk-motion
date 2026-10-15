@@ -95,10 +95,21 @@ enum Beats {
 
     /// Moves each cut onto the nearest beat by shortening the clip before it,
     /// or lengthening it when the source has room. `beats` are movie seconds.
-    /// A clip never drops below `minimum` seconds on screen.
+    ///
+    /// The policy at the edges: a clip's start never moves, only its end. It
+    /// never drops below `minimum` seconds on screen. It may grow only into
+    /// footage no other clip uses: never past the source's end, nor into the
+    /// next clip along the source, so no moment plays twice. A clip that
+    /// already overlaps another (the rider's choice) only ever shrinks.
     static func synced(_ clips: [Clip], beats: [Double], speed: Double, transition: Double, sourceDuration: Double, minimum: Double = 1) -> [Clip] {
         guard clips.count > 0, beats.count > 1, speed > 0 else {return clips}
         var result = clips
+        let ceilings = clips.indices.map {index -> Double in
+            let clip = clips[index]
+            let others = clips.indices.filter {$0 != index}.map {clips[$0]}
+            if others.contains(where: {$0.start < clip.end && clip.start < $0.end}) {return clip.end}
+            return others.map(\.start).filter {$0 >= clip.end}.min().map {min($0, sourceDuration)} ?? sourceDuration
+        }
         for index in result.indices {
             // Two passes: a shorter clip can also shorten its transition.
             for _ in 0..<2 {
@@ -110,7 +121,7 @@ enum Beats {
                 func fits(_ beat: Double?) -> Bool {
                     guard let beat else {return false}
                     let end = result[index].end + (beat - cut) * speed
-                    return onScreen + beat - cut >= minimum && end <= sourceDuration && end > result[index].start
+                    return onScreen + beat - cut >= minimum && end <= ceilings[index] + 0.0001 && end > result[index].start
                 }
                 let options = [earlier, later].filter(fits).compactMap {$0}
                 guard let target = options.min(by: {abs($0 - cut) < abs($1 - cut)}), abs(target - cut) > 0.005 else {break}
