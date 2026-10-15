@@ -785,6 +785,22 @@
         }
       }
     },
+    "האזנה ל־%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listen to %@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "האזנה ל־%@"
+          }
+        }
+      }
+    },
     "האזנה לשיר ובחירת המקום שממנו יתחיל" : {
       "localizations" : {
         "en" : {
@@ -2529,6 +2545,22 @@
         }
       }
     },
+    "לא ניתן להשמיע את השיר כרגע." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This song cannot be played right now."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן להשמיע את השיר כרגע."
+          }
+        }
+      }
+    },
     "לא ניתן לפענח את השמע בסרטון." : {
       "localizations" : {
         "en" : {
@@ -3981,6 +4013,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "עצירה"
+          }
+        }
+      }
+    },
+    "עצירת %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop %@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "עצירת %@"
           }
         }
       }
