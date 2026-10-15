@@ -37,6 +37,25 @@ final class PlayerUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["edit.player"].exists || app.descendants(matching: .any)["edit.player"].exists)
     }
 
+    /// Reported from the simulator: tapping the words of "From YouTube" or
+    /// "New ride", not their icons, did nothing.
+    func testTilesRespondToATapOnTheirWords() throws {
+        let app = launch()
+        let music = app.buttons["step.2"]
+        XCTAssertTrue(app.buttons["edit.showEdit"].waitForExistence(timeout: 120))
+        music.tap()
+        let youTube = app.buttons["music.youtube"]
+        XCTAssertTrue(youTube.waitForExistence(timeout: 10))
+        // Well past the icon, on the words and the space after them.
+        youTube.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).tap()
+        XCTAssertTrue(app.textFields["music.query"].waitForExistence(timeout: 5), "A tap on the words opens the YouTube search")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let newRide = app.buttons["home.newRide"]
+        XCTAssertTrue(newRide.waitForExistence(timeout: 10))
+        newRide.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["step.0"].waitForExistence(timeout: 10), "A tap on the words starts a new ride")
+    }
+
     /// F09: in English the screens read left to right; the step bar's first
     /// step sits on the left. In Hebrew it sits on the right.
     func testLayoutFollowsTheLanguage() throws {

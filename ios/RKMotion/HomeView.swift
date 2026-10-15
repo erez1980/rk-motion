@@ -41,7 +41,8 @@ struct HomeView: View {
                     }
                     .foregroundStyle(RK.accentInk).padding(16)
                     .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }.buttonStyle(.plain).disabled(model.busy).opacity(model.busy ? 0.4 : 1)
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                     Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)

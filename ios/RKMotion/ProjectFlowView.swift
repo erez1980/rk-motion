@@ -494,6 +494,7 @@ private struct MusicStep: View {
             HStack(spacing: 10) {
                 Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
+                    .accessibilityIdentifier("music.youtube")
             }.buttonStyle(.plain).disabled(model.busy).rkRow(top: 0)
             if showYouTube || model.work == .downloading {
                 youTube.rkRow()
@@ -549,7 +550,7 @@ private struct MusicStep: View {
                         .autocorrectionDisabled().submitLabel(isLink ? .go : .search)
                         .onSubmit(go)
                         .font(RK.font(15)).foregroundStyle(RK.ink)
-                        .accessibilityLabel("חיפוש שיר ב־YouTube")
+                        .accessibilityLabel("חיפוש שיר ב־YouTube").accessibilityIdentifier("music.query")
                     if !query.isEmpty {
                         Button {query = ""; results = []; searchNote = nil} label: {Image(systemName: "xmark.circle.fill").foregroundStyle(RK.faint)}
                             .buttonStyle(.plain).accessibilityLabel("ניקוי החיפוש")
