@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import CoreTransferable
 import UniformTypeIdentifiers
 
@@ -8,7 +9,7 @@ struct PickedMovie: Transferable {
         FileRepresentation(importedContentType: .movie) {received in
             let target = LocalStore.imports.appendingPathComponent(UUID().uuidString).appendingPathExtension(received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension)
             try LocalStore.checkSpace(at: received.file)
-            try FileManager.default.copyItem(at: received.file, to: target)
+            try await LocalStore.copy(received.file, to: target)
             return PickedMovie(url: target)
         }
     }
@@ -61,18 +62,28 @@ enum LocalStore {
     }
     /// Called explicitly while the editor is idle, never during a live import.
     /// Retains all originals/music and all exports referenced by valid projects.
-    static func cleanTemporaryFiles() throws -> Int64 {
+    /// Anything that can still become a project is rescued first, so what is
+    /// removed from `imports` and from folders without a project is only what
+    /// could not be played: pieces of an interrupted copy.
+    static func cleanTemporaryFiles() async throws -> Int64 {
+        _ = await recoverImports()
         var reclaimed: Int64 = 0
         func remove(_ url: URL) throws {
-            let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            try FileManager.default.removeItem(at: url); reclaimed += size
+            reclaimed += bytes(in: url) + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            try FileManager.default.removeItem(at: url)
         }
         for url in try FileManager.default.contentsOfDirectory(at: imports, includingPropertiesForKeys: nil) {try remove(url)}
-        for p in load() {
+        let projects = load()
+        let valid = Set(projects.map(\.id))
+        // Only folders that never got a project: an import's own pieces.
+        for folder in projectFolders() where !valid.contains(folder.lastPathComponent)
+            && !FileManager.default.fileExists(atPath: folder.appendingPathComponent("project.json").path) {try remove(folder)}
+        for p in projects {
             let retained = Set(p.exports.map { $0.file })
             for url in try FileManager.default.contentsOfDirectory(at: folder(p.id), includingPropertiesForKeys: nil)
                 where (url.lastPathComponent.hasPrefix("RK-Motion-") && url.pathExtension == "mp4" && !retained.contains(url.lastPathComponent)) ||
-                      (url.lastPathComponent.hasPrefix("scores-") && url.pathExtension == "json" && url.lastPathComponent != p.scoresFile) {
+                      (url.lastPathComponent.hasPrefix("scores-") && url.pathExtension == "json" && url.lastPathComponent != p.scoresFile) ||
+                      url.pathExtension == "part" || url.lastPathComponent == manifestName {
                 try remove(url)
             }
         }
@@ -88,20 +99,129 @@ enum LocalStore {
         let available = values.volumeAvailableCapacityForImportantUsage ?? fallback
         guard available >= required else {throw AppError(message: "אין מספיק מקום פנוי באייפון. פנו מקום ונסו שוב.")}
     }
-    static func importFile(_ source: URL, project: String, prefix: String) async throws -> String {
-        try await Task.detached(priority: .userInitiated) {
-            let access = source.startAccessingSecurityScopedResource()
-            defer {if access {source.stopAccessingSecurityScopedResource()}}
-            try FileManager.default.createDirectory(at: folder(project), withIntermediateDirectories: true)
-            let name = prefix + "-" + UUID().uuidString + "." + (source.pathExtension.isEmpty ? "mov" : source.pathExtension)
-            let target = file(name, project: project)
-            if source.deletingLastPathComponent() == imports {
-                try FileManager.default.moveItem(at: source, to: target)
-            } else {
-                try checkSpace(at: source)
-                try FileManager.default.copyItem(at: source, to: target)
+    static func importFile(_ source: URL, project: String, prefix: String, named: String? = nil, progress: (@Sendable (Double) async -> Void)? = nil) async throws -> String {
+        let access = source.startAccessingSecurityScopedResource()
+        defer {if access {source.stopAccessingSecurityScopedResource()}}
+        try FileManager.default.createDirectory(at: folder(project), withIntermediateDirectories: true)
+        let name = named ?? prefix + "-" + UUID().uuidString + "." + (source.pathExtension.isEmpty ? "mov" : source.pathExtension)
+        let target = file(name, project: project)
+        if source.deletingLastPathComponent() == imports {
+            try FileManager.default.moveItem(at: source, to: target)
+        } else {
+            try checkSpace(at: source)
+            try await copy(source, to: target, progress: progress)
+        }
+        return name
+    }
+
+    // MARK: Copying and interrupted imports
+
+    /// Bytes per piece of a copy; cancellation is checked between pieces.
+    nonisolated(unsafe) static var copyChunk = 8 << 20
+    /// Tests hold a copy here, after its first piece, to cancel it mid-way.
+    nonisolated(unsafe) static var copyObserver: (@Sendable (Int64) async -> Void)?
+    /// Copies in pieces into `target.part`, renamed into place only when
+    /// whole. Cancelling stops between pieces and removes the partial file.
+    static func copy(_ source: URL, to target: URL, progress: (@Sendable (Double) async -> Void)? = nil) async throws {
+        let partial = target.appendingPathExtension("part")
+        try? FileManager.default.removeItem(at: partial)
+        guard FileManager.default.createFile(atPath: partial.path, contents: nil) else {throw AppError(message: "לא ניתן לשמור את הסרטון באייפון.")}
+        do {
+            let reader = try FileHandle(forReadingFrom: source), writer = try FileHandle(forWritingTo: partial)
+            defer {try? reader.close(); try? writer.close()}
+            let total = max(1, Int64((try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 1))
+            var copied: Int64 = 0
+            while true {
+                try Task.checkCancellation()
+                let piece = try autoreleasepool {try reader.read(upToCount: copyChunk)} ?? Data()
+                if piece.isEmpty {break}
+                try writer.write(contentsOf: piece); copied += Int64(piece.count)
+                await progress?(min(1, Double(copied) / Double(total)))
+                await copyObserver?(copied)
             }
-            return name
-        }.value
+            try writer.synchronize()
+            try Task.checkCancellation()
+            try FileManager.default.moveItem(at: partial, to: target)
+        } catch {
+            try? FileManager.default.removeItem(at: partial); throw error
+        }
+    }
+    /// Written into a new project's folder before its video is copied, and
+    /// removed once the project is saved. Finding one later means the import
+    /// was interrupted.
+    struct ImportManifest: Codable {
+        var name: String
+        var source: String
+        var bytes: Int64
+        var wholeVideo: Bool
+        var started = Date()
+    }
+    static let manifestName = "import.json"
+    static func writeManifest(_ manifest: ImportManifest, project: String) throws {
+        try FileManager.default.createDirectory(at: folder(project), withIntermediateDirectories: true)
+        try JSONEncoder().encode(manifest).write(to: file(manifestName, project: project), options: .atomic)
+    }
+    static func finishImport(project: String) {try? FileManager.default.removeItem(at: file(manifestName, project: project))}
+    /// Removes what one live import made: its manifest and its own partial
+    /// copy. The rider's original is never in this folder.
+    static func abandonImport(project: String) {try? FileManager.default.removeItem(at: folder(project))}
+    static func projectFolders() -> [URL] {
+        let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        return folders.filter {(try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && UUID(uuidString: $0.lastPathComponent) != nil}
+    }
+    static func isPlayableVideo(_ url: URL) async -> Bool {
+        let asset = AVURLAsset(url: url)
+        guard let duration = try? await asset.load(.duration).seconds, duration.isFinite, duration > 0,
+              let tracks = try? await asset.loadTracks(withMediaType: .video) else {return false}
+        return !tracks.isEmpty
+    }
+    struct Recovery {
+        var rescued: [LocalProject] = []
+        /// Pieces that could not become a project. Kept until the rider
+        /// chooses to clean up, never removed on their own.
+        var fragmentBytes: Int64 = 0
+    }
+    /// Turns what an interrupted import left behind back into projects: a
+    /// folder whose whole video was copied but whose project was never saved
+    /// (from a manifest, or an older version's bare source file), and a movie
+    /// the photo picker had already handed over. Nothing is deleted here.
+    static func recoverImports() async -> Recovery {
+        var report = Recovery()
+        let valid = Set(load().map(\.id))
+        for folder in projectFolders() {
+            let id = folder.lastPathComponent
+            if valid.contains(id) {finishImport(project: id); continue}
+            // A saved project that no longer loads is not an import; leave it.
+            guard !FileManager.default.fileExists(atPath: folder.appendingPathComponent("project.json").path) else {continue}
+            let manifest = (try? Data(contentsOf: folder.appendingPathComponent(manifestName))).flatMap {try? JSONDecoder().decode(ImportManifest.self, from: $0)}
+            let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            let candidates = ([manifest?.source].compactMap {$0} + files.filter {$0.hasPrefix("source-") && !$0.hasSuffix(".part")}.sorted())
+                .filter {files.contains($0)}
+            var rescued = false
+            for name in candidates where await isPlayableVideo(folder.appendingPathComponent(name)) {
+                var p = LocalProject(name: manifest?.name ?? NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: name)
+                p.id = id; p.wholeVideo = manifest?.wholeVideo ?? false
+                if (try? save(p)) != nil {finishImport(project: id); report.rescued.append(p); rescued = true}
+                break
+            }
+            if !rescued {report.fragmentBytes += bytes(in: folder)}
+        }
+        let picked = (try? FileManager.default.contentsOfDirectory(at: imports, includingPropertiesForKeys: nil)) ?? []
+        for url in picked.sorted(by: {$0.lastPathComponent < $1.lastPathComponent}) {
+            guard url.pathExtension != "part", await isPlayableVideo(url) else {
+                report.fragmentBytes += Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                continue
+            }
+            var p = LocalProject(name: NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: "")
+            do {
+                p.source = try await importFile(url, project: p.id, prefix: "source")
+                try save(p); report.rescued.append(p)
+            } catch {
+                // Put the movie back where it was rather than lose it.
+                if !p.source.isEmpty {try? FileManager.default.moveItem(at: file(p.source, project: p.id), to: url)}
+                try? FileManager.default.removeItem(at: folder(p.id))
+            }
+        }
+        return report
     }
 }

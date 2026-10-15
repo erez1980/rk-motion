@@ -342,8 +342,8 @@ def render_action_clips(path: str, clips: list[dict], output_dir: str) -> list[s
         target = out / f"action-{index:02d}-{clip['start']:08.2f}-{clip['end']:08.2f}.mp4"
         cmd = ["ffmpeg", "-y", "-v", "error", "-ss", str(clip["start"]), "-i", path,
                "-t", str(clip["duration"]), "-map", "0:v:0", "-map", "0:a?",
-               "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac",
-               "-movflags", "+faststart", str(target)]
+               "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
+               "-c:a", "aac", "-movflags", "+faststart", str(target)]
         run_process(cmd, check=True, capture_output=True)
         outputs.append(str(target))
     return outputs

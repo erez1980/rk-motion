@@ -11,6 +11,7 @@ struct ProjectFlowView: View {
     @State private var step: FlowStep = .video
     @State private var confirmDelete = false
     @State private var showAbout = false
+    @State private var placed = false
     var body: some View {
         VStack(spacing: 0) {
             StepBar(current: step, reachable: reachable) {step = $0}
@@ -24,7 +25,12 @@ struct ProjectFlowView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("בוצע") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
         }
-        .onAppear {step = model.project?.analyzed == true ? .edit : .video}
+        // Only the first appearance picks the step: SwiftUI can call onAppear
+        // again while the screen stays up, which threw the rider back to Edit.
+        .onAppear {
+            guard !placed else {return}
+            placed = true; step = model.project?.analyzed == true ? .edit : .video
+        }
         .onChange(of: model.project?.analyzed) {old, new in if new == true && old == false {step = .edit}}
         .onChange(of: model.project?.exports.count) {old, new in if let old, let new, new > old {step = .done}}
         .onChange(of: model.movieURL) {_, movie in if movie == nil && step == .done {step = .export}}
@@ -203,21 +209,22 @@ private struct EditStep: View {
     @ObservedObject var model: EditorModel
     let next: () -> Void
     private struct TrimSelection: Identifiable {let id: String}
-    @State private var player: AVPlayer?
-    @State private var showingEdit = false
+    @StateObject private var playback = PreviewPlayback()
+    private var showingEdit: Bool {playback.showingEdit}
     @State private var trimming: TrimSelection?
     @State private var tuning = false
     @State private var shuffled: [Clip]?
     var body: some View {
         List {
             VStack(spacing: 10) {
-                Group {
-                    if let player {VideoPlayer(player: player)} else {RK.card}
-                }
+                VideoPlayer(player: playback.player)
+                    .accessibilityIdentifier("edit.player")
                 .frame(height: 210).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 HStack(spacing: 0) {
                     viewChoice("המקור", picked: !showingEdit) {showSource()}
+                        .accessibilityIdentifier("edit.showSource")
                     viewChoice("העריכה", picked: showingEdit) {showEdit()}
+                        .accessibilityIdentifier("edit.showEdit")
                         .disabled(model.busy || model.editValidationMessage != nil)
                 }
                 .padding(3).background(RK.card, in: Capsule())
@@ -281,14 +288,14 @@ private struct EditStep: View {
         }
         .sheet(isPresented: $tuning) {SensitivitySheet(model: model).presentationDetents([.height(320)])}
         .onAppear {
-            if let item = model.previewItem {player = AVPlayer(playerItem: item); showingEdit = true}
-            else if player == nil {player = model.sourceURL.map(AVPlayer.init(url:))}
+            if let preview = model.previewEdit {playback.showEdit(preview)}
+            else if !showingEdit {playback.showSource(model.sourceURL)}
         }
-        .onChange(of: model.previewItem) {_, item in
-            if let item {player?.pause(); player = AVPlayer(playerItem: item); showingEdit = true; player?.play()}
+        .onChange(of: model.previewEdit) {_, preview in
+            if let preview {playback.showEdit(preview, play: true)}
             else if showingEdit {showSource()}
         }
-        .onDisappear {player?.pause()}
+        .onDisappear {playback.pause()}
     }
     private func viewChoice(_ title: LocalizedStringKey, picked: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -296,14 +303,10 @@ private struct EditStep: View {
                 .frame(maxWidth: .infinity, minHeight: 36).background(picked ? RK.accent : Color.clear, in: Capsule()).contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(picked ? .isSelected : [])
     }
-    private func showSource() {
-        player?.pause(); showingEdit = false
-        player = model.sourceURL.map(AVPlayer.init(url:))
-    }
+    private func showSource() {playback.showSource(model.sourceURL)}
     private func showEdit() {
-        if let item = model.previewItem {
-            player?.pause(); player = AVPlayer(playerItem: item); showingEdit = true
-        } else {model.preview()}
+        if let preview = model.previewEdit {playback.showEdit(preview)}
+        else {model.preview()}
     }
     private var clipsHeader: some View {
         let selected = model.selectedClips
@@ -349,7 +352,7 @@ private struct EditStep: View {
     }
     private func addClip() {
         // Edited-preview time is not a timestamp in the original.
-        let playhead = showingEdit ? 0 : (player?.currentTime().seconds ?? 0)
+        let playhead = showingEdit ? 0 : playback.player.currentTime().seconds
         let duration = model.project?.duration ?? 0
         let start = min(playhead.isFinite ? max(0, playhead) : 0, max(0, duration - 1))
         var clip = Clip(start: max(0, start), end: min(duration, start + 5)); clip.manual = true
@@ -473,7 +476,7 @@ private struct SensitivitySheet: View {
         }
         .padding(20)
         .presentationBackground(RK.bg)
-        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.layoutDirection, AppLanguage.direction)
     }
 }
 
@@ -497,6 +500,7 @@ private struct MusicStep: View {
             HStack(spacing: 10) {
                 Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
+                    .accessibilityIdentifier("music.youtube")
             }.buttonStyle(.plain).disabled(model.busy).rkRow(top: 0)
             if showYouTube || model.work == .downloading {
                 youTube.rkRow()
@@ -552,7 +556,7 @@ private struct MusicStep: View {
                         .autocorrectionDisabled().submitLabel(isLink ? .go : .search)
                         .onSubmit(go)
                         .font(RK.font(15)).foregroundStyle(RK.ink)
-                        .accessibilityLabel("חיפוש שיר ב־YouTube")
+                        .accessibilityLabel("חיפוש שיר ב־YouTube").accessibilityIdentifier("music.query")
                     if !query.isEmpty {
                         Button {query = ""; results = []; searchNote = nil} label: {Image(systemName: "xmark.circle.fill").foregroundStyle(RK.faint)}
                             .buttonStyle(.plain).accessibilityLabel("ניקוי החיפוש")
@@ -668,8 +672,9 @@ private struct ExportStep: View {
         List {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: model.expectedDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
-                    Text("אורך הסרט").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                    Text(verbatim: model.movieDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
+                        .accessibilityIdentifier("export.length")
+                    Text(model.beatChangesLength ? LocalizedStringKey("אורך הסרט, עם החיתוכים על הקצב") : LocalizedStringKey("אורך הסרט")).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
                 }
                 Rectangle().fill(RK.line).frame(width: 1, height: 44)
                 VStack(alignment: .leading, spacing: 4) {
@@ -710,7 +715,7 @@ private struct ExportStep: View {
         }
     }
     private var contents: String {
-        let clips = String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(model.selectedClips.count)")
+        let clips = clipCount(model.selectedClips.count)
         let songs = model.project?.music ?? []
         guard model.edit.settings["useMusic"]?.bool != false, let first = songs.first else {return clips + " · " + NSLocalizedString("ללא מוזיקה", comment: "No music in the movie")}
         return clips + " · " + (songs.count == 1 ? first.name : String(format: NSLocalizedString("%@ שירים", comment: "Song count"), "\(songs.count)"))

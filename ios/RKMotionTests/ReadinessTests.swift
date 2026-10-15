@@ -53,7 +53,7 @@ final class ReadinessTests: XCTestCase {
         XCTAssertFalse(model.wholeVideo)
         let saved = await model.save(); XCTAssertTrue(saved)
     }
-    func testTemporaryCleanupPreservesSourceAndReferencedExports() throws {
+    func testTemporaryCleanupPreservesSourceAndReferencedExports() async throws {
         var p = LocalProject(name: "cleanup", source: "source.mov")
         try FileManager.default.createDirectory(at: LocalStore.folder(p.id), withIntermediateDirectories: true)
         defer {try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
@@ -62,7 +62,7 @@ final class ReadinessTests: XCTestCase {
             try Data([0, 1]).write(to: LocalStore.file(name, project: p.id))
         }
         try LocalStore.save(p)
-        _ = try LocalStore.cleanTemporaryFiles()
+        _ = try await LocalStore.cleanTemporaryFiles()
         XCTAssertTrue(FileManager.default.fileExists(atPath: LocalStore.file(p.source, project: p.id).path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: LocalStore.file("RK-Motion-keep.mp4", project: p.id).path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: LocalStore.file("RK-Motion-orphan.mp4", project: p.id).path))

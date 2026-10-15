@@ -32,6 +32,9 @@ struct Edit: Codable, Equatable {
         "musicVolume": .text("0.65"), "muteOriginal": .flag(false), "useMusic": .flag(true)]
 }
 extension Edit {
+    /// The most clips one movie can hold. The editor, the activity
+    /// suggestions and the engine all use this one number.
+    static let clipLimit = 500
     /// Where in a song the movie starts playing it. Each song keeps its own
     /// point; an older project's single start still applies to its first song.
     func musicStart(for song: String, first: Bool) -> Double {

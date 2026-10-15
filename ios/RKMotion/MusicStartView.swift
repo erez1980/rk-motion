@@ -68,13 +68,13 @@ struct MusicStartView: View {
             .toolbar {ToolbarItem(placement: .cancellationAction) {Button("ביטול") {dismiss()}}}
         }
         .tint(RK.accent)
-        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.layoutDirection, AppLanguage.direction)
         .task {await prepare()}
         .onDisappear(perform: stop)
     }
 
     private var length: Double {max(1, song.duration)}
-    private var used: Double? {model.expectedDuration}
+    private var used: Double? {model.movieDuration}
     private var note: String? {
         guard let used, used > 0 else {return nil}
         if start + used <= song.duration {

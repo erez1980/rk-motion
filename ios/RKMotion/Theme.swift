@@ -204,6 +204,7 @@ struct StepBar: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).disabled(!reachable(step) || here)
                 .accessibilityAddTraits(here ? .isSelected : [])
+                .accessibilityIdentifier("step.\(step.rawValue)")
             }
         }
     }
@@ -253,4 +254,10 @@ struct MessageCard: View {
             .background(RK.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
+}
+
+/// "1 clip" / "2 clips" in either language.
+func clipCount(_ count: Int) -> String {
+    count == 1 ? NSLocalizedString("קטע אחד", comment: "One clip")
+        : String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(count)")
 }

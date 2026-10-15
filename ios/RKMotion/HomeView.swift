@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import AVFoundation
 
 /// The first screen: start a new ride or return to one.
 struct HomeView: View {
@@ -10,7 +9,8 @@ struct HomeView: View {
     let about: () -> Void
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            // Lazy, so a long list asks only for the pictures on screen.
+            LazyVStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
                         (Text(verbatim: "RK ").foregroundStyle(RK.ink) + Text(verbatim: "Motion").foregroundStyle(RK.accent))
@@ -41,7 +41,8 @@ struct HomeView: View {
                     }
                     .foregroundStyle(RK.accentInk).padding(16)
                     .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }.buttonStyle(.plain).disabled(model.busy).opacity(model.busy ? 0.4 : 1)
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                     Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)
@@ -94,23 +95,19 @@ private struct ProjectRow: View {
         .contentShape(Rectangle())
         .task(id: project.source) {
             guard image == nil else {return}
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: LocalStore.file(project.source, project: project.id)))
-            generator.maximumSize = CGSize(width: 240, height: 180); generator.appliesPreferredTrackTransform = true
-            do {
-                let (frame, _) = try await generator.image(at: .zero)
-                try Task.checkCancellation(); image = UIImage(cgImage: frame)
-            } catch {} // A missing thumbnail must not block opening a saved project.
+            // A missing thumbnail must not block opening a saved project.
+            image = await Thumbnails.shared.image(for: project)
         }
     }
     private var meta: String {
         let date = project.created.formatted(date: .abbreviated, time: .omitted)
         guard project.analyzed else {return date}
         let clips = project.edit.clips.filter {$0.selected != false}.count
-        return date + " · " + String(format: NSLocalizedString("%@ קטעים", comment: "Clip count"), "\(clips)")
+        return date + " · " + clipCount(clips)
     }
     @ViewBuilder private var status: some View {
         if !project.analyzed {Pill(text: NSLocalizedString("ממתין לניתוח", comment: "Project awaiting analysis"))}
         else if project.exports.isEmpty {Pill(text: NSLocalizedString("בעריכה", comment: "Project being edited"), fill: RK.raised, ink: RK.soft)}
-        else {Pill(text: String(format: NSLocalizedString("%@ סרטים", comment: "Movies made from a project"), "\(project.exports.count)"), fill: RK.good.opacity(0.14), ink: RK.good)}
+        else {Pill(text: project.exports.count == 1 ? NSLocalizedString("סרט אחד", comment: "One movie made from a project") : String(format: NSLocalizedString("%@ סרטים", comment: "Movies made from a project"), "\(project.exports.count)"), fill: RK.good.opacity(0.14), ink: RK.good)}
     }
 }
