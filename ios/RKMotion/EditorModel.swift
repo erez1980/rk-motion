@@ -31,6 +31,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard let p = project else {return nil}
         let clips = edit.clips.filter {$0.selected != false}
         guard !clips.isEmpty else {return "בחרו לפחות קטע אחד"}
+        if clips.count > Edit.clipLimit {
+            return String(format: NSLocalizedString("בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם.", comment: "Too many clips selected"), "\(Edit.clipLimit)", "\(clips.count)")
+        }
         if clips.contains(where: {!$0.start.isFinite || !$0.end.isFinite || $0.start < 0 || $0.end <= $0.start || $0.end > p.duration}) {
             return "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה"
         }

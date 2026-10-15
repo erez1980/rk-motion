@@ -4656,6 +4656,22 @@
           }
         }
       }
+    },
+    "בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One movie holds up to %1$@ clips. %2$@ are selected; deselect some of them."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בסרט אחד יש מקום לעד %@ קטעים. נבחרו %@; בטלו את הבחירה בחלק מהם."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
