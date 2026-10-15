@@ -409,12 +409,18 @@ actor LocalEngine {
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
         return PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
     }
-    func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
+    /// The edit ready to play, as immutable copies that any number of player
+    /// items can share without one of them changing under another.
+    func previewEdit(_ project: LocalProject, edit: Edit) async throws -> PreviewEdit {
         let prepared = try await prepare(project, edit: edit) {_, _ in}
         try Task.checkCancellation()
-        let item = AVPlayerItem(asset: prepared.composition)
-        item.videoComposition = prepared.video; item.audioMix = prepared.audio
-        return item
+        guard let composition = prepared.composition.copy() as? AVComposition,
+              let video = prepared.video.copy() as? AVVideoComposition,
+              let audio = prepared.audio.copy() as? AVAudioMix else {throw AppError(message: "הרכבת הסרט נכשלה: ")}
+        return PreviewEdit(composition: composition, video: video, audio: audio)
+    }
+    func preview(_ project: LocalProject, edit: Edit) async throws -> AVPlayerItem {
+        try await previewEdit(project, edit: edit).makeItem()
     }
     func export(_ project: LocalProject, edit: Edit, output: URL, progress: @escaping Progress) async throws -> Double {
         let started = Date()

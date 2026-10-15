@@ -22,7 +22,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var movieURL: URL?
     @Published var undoAvailable = false
     @Published var redoAvailable = false
-    @Published var previewItem: AVPlayerItem?
+    /// The prepared edit, played only through `PreviewPlayback`, which makes
+    /// its own item from it.
+    @Published var previewEdit: PreviewEdit?
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
     var editValidationMessage: String? {
@@ -89,7 +91,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
         sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(value.source, project: value.id))) ?? .zero
-        previewItem = nil; projectBytes = await persistence.bytes(value); setBusy(false)
+        previewEdit = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
     /// Puts the current project away so a new ride starts from an empty screen.
@@ -97,7 +99,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !busy, project != nil else {return}
         setBusy(true)
         guard await save() else {setBusy(false); return}
-        project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewItem = nil; projectBytes = 0
+        project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewEdit = nil; projectBytes = 0
         sourceDimensions = .zero; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
         UserDefaults.standard.removeObject(forKey: "localProject")
         setBusy(false)
@@ -115,7 +117,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func scheduleSave(immediate: Bool = false) {
         saveTask?.cancel()
         guard let p = snapshot() else {return}
-        previewItem = nil
+        previewEdit = nil
         revision += 1; let version = revision
         saveTask = Task {
             do {
@@ -177,7 +179,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             undoStack = []; redoStack = []; updateUndo(); refreshLibrary(p)
             UserDefaults.standard.set(p.id, forKey: "localProject")
             sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
-            previewItem = nil; projectBytes = await persistence.bytes(p)
+            previewEdit = nil; projectBytes = await persistence.bytes(p)
             setBusy(false); analyze()
         } catch {setBusy(false); message = error.localizedDescription; try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
     }
@@ -196,7 +198,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
                 current.duration = duration; current.scores = scores; current.analyzed = true
-                project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewItem = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
+                project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
                 if await save() {processingSucceeded = true; message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
@@ -276,7 +278,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         p.edit = edit
         revision += 1
-        do {try await persistence.save(p, revision: revision); project = p; refreshLibrary(p); previewItem = nil}
+        do {try await persistence.save(p, revision: revision); project = p; refreshLibrary(p); previewEdit = nil}
         catch {message = error.localizedDescription; setBusy(false); return}
         try? FileManager.default.removeItem(at: LocalStore.file(song.file, project: p.id))
         projectBytes = await persistence.bytes(p); setBusy(false)
@@ -318,7 +320,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(true); saveTask?.cancel(); saveTask = nil
         do {
             try await persistence.deleteProject(p.id)
-            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewItem = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
+            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
         setBusy(false)
@@ -354,7 +356,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}
-            do {previewItem = try await engine.preview(p, edit: snapshot); processingSucceeded = true; message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
+            do {previewEdit = try await engine.previewEdit(p, edit: snapshot); processingSucceeded = true; message = "תצוגה מקדימה של העריכה — ללא יצירת קובץ"}
             catch is CancellationError {message = "התצוגה המקדימה בוטלה"}
             catch {message = error.localizedDescription}
             setBusy(false)

@@ -53,9 +53,25 @@ for kind in ("Debug", "Release"):
     add("test-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.tests; PRODUCT_NAME = RKMotionTests; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RKMotion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RKMotion"; BUNDLE_LOADER = "$(TEST_HOST)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";}};')
 add("test-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid("test-Debug")},{uid("test-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug;')
 add("test-target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("test-configs")}; buildPhases = ({uid("test-sources")},{uid("test-frameworks")},); buildRules = (); dependencies = ({uid("test-dependency")},); name = RKMotionTests; productName = RKMotionTests; productReference = {uid("test-product")}; productType = "com.apple.product-type.bundle.unit-test";')
-add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")},); name = Products; sourceTree = "<group>";')
+# UI tests drive the real screens on a ride the Debug app makes for itself.
+ui_files = sorted((IOS / "RKMotionUITests").glob("*.swift"))
+ui_refs, ui_builds = [], []
+for file in ui_files:
+    ui_refs.append(add("ui-" + file.name, f'isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "{file.name}"; sourceTree = "<group>";'))
+    ui_builds.append(add("ui-build-" + file.name, f'isa = PBXBuildFile; fileRef = {uid("ui-" + file.name)};'))
+add("ui-product", 'isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = RKMotionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR;')
+add("ui-group", f'isa = PBXGroup; children = ({",".join(ui_refs)},); path = RKMotionUITests; sourceTree = "<group>";')
+add("ui-sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(ui_builds)},); runOnlyForDeploymentPostprocessing = 0;')
+add("ui-frameworks", 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
+add("ui-proxy", f'isa = PBXContainerItemProxy; containerPortal = {uid("project")}; proxyType = 1; remoteGlobalIDString = {uid("target")}; remoteInfo = RKMotion;')
+add("ui-dependency", f'isa = PBXTargetDependency; target = {uid("target")}; targetProxy = {uid("ui-proxy")};')
+for kind in ("Debug", "Release"):
+    add("ui-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SDKROOT = iphoneos; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.uitests; PRODUCT_NAME = RKMotionUITests; TEST_TARGET_NAME = RKMotion; TARGETED_DEVICE_FAMILY = 1; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";}};')
+add("ui-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid("ui-Debug")},{uid("ui-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug;')
+add("ui-target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("ui-configs")}; buildPhases = ({uid("ui-sources")},{uid("ui-frameworks")},); buildRules = (); dependencies = ({uid("ui-dependency")},); name = RKMotionUITests; productName = RKMotionUITests; productReference = {uid("ui-product")}; productType = "com.apple.product-type.bundle.ui-testing";')
+add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")},{uid("ui-product")},); name = Products; sourceTree = "<group>";')
 add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RKMotion; sourceTree = "<group>";')
-add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("products")},); sourceTree = "<group>";')
+add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("ui-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
 add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},{uid("font-build")},{uid("font-license-build")},); runOnlyForDeploymentPostprocessing = 0;')
 # YouTubeKit fetches a song's audio from a YouTube link, on the device.
@@ -69,7 +85,7 @@ for kind in ("Debug", "Release"):
     debug_arch = " ONLY_ACTIVE_ARCH = YES;" if kind == "Debug" else ""
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;{debug_arch}}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.20.0; RK_COMMIT = local;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.20.1; RK_COMMIT = local;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
@@ -81,7 +97,7 @@ for kind in ("Debug", "Release"):
 for prefix in ("project", "target"):
     add(prefix + "-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid(prefix + "-Debug")},{uid(prefix + "-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
 add("target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("target-configs")}; buildPhases = ({uid("sources")},{uid("frameworks")},{uid("resources")},); buildRules = (); dependencies = (); name = RKMotion; packageProductDependencies = ({uid("ytkit-product")},); productName = RKMotion; productReference = {uid("app")}; productType = "com.apple.product-type.application";')
-add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; packageReferences = ({uid("ytkit-package")},); productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},);')
+add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; packageReferences = ({uid("ytkit-package")},); productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},{uid("ui-target")},);')
 project = IOS / "RKMotion.xcodeproj"
 project.mkdir(exist_ok=True)
 (project / "project.pbxproj").write_text('// !$*UTF8*$!\n{\narchiveVersion = 1; classes = {}; objectVersion = 56;\nobjects = {\n' + '\n'.join(objects) + '\n};\nrootObject = ' + uid("project") + ';\n}\n')
@@ -91,7 +107,7 @@ reference = f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentif
 (scheme / "RKMotion.xcscheme").write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="1640" version="1.3">
 <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">{reference}</BuildActionEntry></BuildActionEntries></BuildAction>
-<TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB"><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{uid("test-target")}" BuildableName="RKMotionTests.xctest" BlueprintName="RKMotionTests" ReferencedContainer="container:RKMotion.xcodeproj"/></TestableReference></Testables></TestAction>
+<TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB"><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{uid("test-target")}" BuildableName="RKMotionTests.xctest" BlueprintName="RKMotionTests" ReferencedContainer="container:RKMotion.xcodeproj"/></TestableReference><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{uid("ui-target")}" BuildableName="RKMotionUITests.xctest" BlueprintName="RKMotionUITests" ReferencedContainer="container:RKMotion.xcodeproj"/></TestableReference></Testables></TestAction>
 <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{reference}</BuildableProductRunnable></LaunchAction>
 <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">{reference}</BuildableProductRunnable></ProfileAction>
 <AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>

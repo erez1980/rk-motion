@@ -204,6 +204,7 @@ struct StepBar: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).disabled(!reachable(step) || here)
                 .accessibilityAddTraits(here ? .isSelected : [])
+                .accessibilityIdentifier("step.\(step.rawValue)")
             }
         }
     }
