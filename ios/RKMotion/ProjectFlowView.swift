@@ -262,6 +262,11 @@ private struct EditStep: View {
                         Label("חיתוך לפי קצב השיר", systemImage: "metronome").font(RK.font(14, 500)).foregroundStyle(RK.ink)
                     }.tint(RK.accent)
                 }
+                if model.project?.scores.isEmpty == false {
+                    Toggle(isOn: Binding(get: {model.edit.settings["slowPeak"]?.bool ?? false}, set: {model.edit.settings["slowPeak"] = .flag($0)})) {
+                        Label("האטה ברגע השיא", systemImage: "tortoise").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                    }.tint(RK.accent).accessibilityIdentifier("edit.slowPeak")
+                }
             }.disabled(model.busy).rkRow(top: 10)
             clipsHeader.rkRow(top: 12)
             if model.edit.clips.count > 1 {clipTools.rkRow(top: 0, bottom: 4)}
@@ -641,6 +646,9 @@ private struct MusicStep: View {
                     ToggleRow(title: "חיתוך לפי קצב השיר", detail: "כל מעבר בין קטעים נופל על הביט של השיר הראשון", isOn: flag("beatSync", fallback: true))
                 }
                 ToggleRow(title: "השתקת קול המקור", detail: "קולות, מוזיקה ורעשים מהצילום עצמו", isOn: flag("muteOriginal", fallback: false))
+                if !songs.isEmpty, model.edit.settings["muteOriginal"]?.bool != true {
+                    ToggleRow(title: "הנמכת המוזיקה כשמדברים או צוחקים", detail: "המוזיקה יורדת לבד ברגעים שבהם שומעים את האנשים בסרטון", isOn: flag("duckMusic", fallback: true))
+                }
             }.rkCard().disabled(model.busy).rkRow(top: 12)
             MessageCard(model: model).rkRow()
         }
@@ -811,6 +819,7 @@ private struct MusicStep: View {
 private struct ExportStep: View {
     @ObservedObject var model: EditorModel
     let showMovie: () -> Void
+    @State private var naming = false
     var body: some View {
         List {
             HStack(alignment: .center, spacing: 16) {
@@ -828,6 +837,12 @@ private struct ExportStep: View {
             }.rkCard(padding: 16).rkRow(top: 0)
             Group {
                 ChoiceGroup(title: "מסגרת", options: [(NSLocalizedString("מקור", comment: "Source framing"), "source"), (NSLocalizedString("סטורי 9:16", comment: "Story framing"), "9:16")], selection: setting("aspect", fallback: "source"))
+                if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
+                    ToggleRow(title: "מסגור חכם לפי האנשים", detail: "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז", isOn: flag("smartFrame", fallback: true))
+                }
+                if model.project?.reading != nil {
+                    ChoiceGroup(title: "צבע", options: [(NSLocalizedString("לפי האווירה ✨", comment: "Colour grade chosen for the content kind"), "auto"), (NSLocalizedString("מקורי", comment: "No colour grade"), "none")], selection: setting("look", fallback: "auto"))
+                }
                 ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
                 ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
             }.disabled(model.busy).rkRow()
@@ -836,6 +851,13 @@ private struct ExportStep: View {
                 titleField("שם האירוע, המקום או האנשים", key: "titleText")
                 titleField("מקום ותאריך", key: "subtitleText")
                 Text("מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)
+                Button(action: suggestWords) {
+                    if naming {ProgressView().tint(RK.accent)}
+                    else {Label("הצעה לכותרת ולכיתוב ✨", systemImage: "sparkles")}
+                }
+                .buttonStyle(SecondaryButtonStyle()).disabled(naming)
+                .accessibilityIdentifier("export.suggestWords")
+                if let caption = model.edit.settings["caption"]?.string, !caption.isEmpty {CaptionRow(caption: caption)}
             }.rkCard(padding: 16).disabled(model.busy).rkRow(top: 10)
             Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).rkRow()
             if model.movieURL != nil {
@@ -866,12 +888,50 @@ private struct ExportStep: View {
     private func setting(_ key: String, fallback: String) -> Binding<String> {
         Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
     }
+    private func flag(_ key: String, fallback: Bool) -> Binding<Bool> {
+        Binding(get: {model.edit.settings[key]?.bool ?? fallback}, set: {model.edit.settings[key] = .flag($0)})
+    }
+    /// Fills the opening title and a post caption from what the scan found.
+    private func suggestWords() {
+        guard let project = model.project, !naming else {return}
+        naming = true
+        Task {
+            let words: MovieWords.Words
+            if let reading = project.reading {
+                words = await MovieWords.suggest(for: reading, date: project.created, language: Bundle.main.preferredLocalizations.first)
+            } else {
+                words = MovieWords.fallback(for: .general, date: project.created)
+            }
+            model.edit.settings["titleText"] = .text(words.title)
+            model.edit.settings["subtitleText"] = .text(words.subtitle)
+            model.edit.settings["caption"] = .text(words.caption)
+            naming = false
+        }
+    }
     private func titleField(_ prompt: LocalizedStringKey, key: String) -> some View {
         let text = Binding(get: {model.edit.settings[key]?.string ?? ""}, set: {model.edit.settings[key] = .text(String($0.prefix(Edit.titleLimit)))})
         return TextField(prompt, text: text)
             .font(RK.font(15)).foregroundStyle(RK.ink).submitLabel(.done)
             .padding(.horizontal, 12).frame(minHeight: 44)
             .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// A post caption, ready to paste under the movie.
+private struct CaptionRow: View {
+    let caption: String
+    @State private var copied = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("כיתוב לפוסט").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+            Text(verbatim: caption).font(RK.font(14)).foregroundStyle(RK.ink).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            Button {UIPasteboard.general.string = caption; copied = true} label: {
+                Label(copied ? LocalizedStringKey("הועתק") : LocalizedStringKey("העתקת הכיתוב"), systemImage: copied ? "checkmark" : "doc.on.doc")
+            }
+            .font(RK.font(13, 500, style: .footnote)).buttonStyle(.plain).foregroundStyle(RK.accent)
+        }
+        .onChange(of: caption) {copied = false}
+        .accessibilityIdentifier("export.caption")
     }
 }
 
@@ -905,6 +965,7 @@ private struct DoneStep: View {
                     ShareLink(item: movie) {Label("שיתוף", systemImage: "square.and.arrow.up")}.buttonStyle(SecondaryButtonStyle())
                     Button(action: backToEdit) {Label("חזרה לעריכה", systemImage: "slider.horizontal.3")}.buttonStyle(SecondaryButtonStyle())
                 }.disabled(model.busy).rkRow()
+                if let caption = model.edit.settings["caption"]?.string, !caption.isEmpty {CaptionRow(caption: caption).rkCard(padding: 16).rkRow()}
                 if let current {
                     Button(role: .destructive) {Task {await model.deleteExport(current)}} label: {Label("מחיקת הסרט", systemImage: "trash")}
                         .buttonStyle(SecondaryButtonStyle()).disabled(model.busy).rkRow()

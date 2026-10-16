@@ -12,6 +12,7 @@ struct MusicStartView: View {
     @State private var levels: [Double] = []
     @State private var player: AVPlayer?
     @State private var observer: Any?
+    @State private var drop: (start: Double, drop: Double, peak: Double)?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -52,6 +53,16 @@ struct MusicStartView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(abs(position - start) < 0.5)
+                    if let drop {
+                        Button {setStart(drop.start)} label: {
+                            Label(String(format: NSLocalizedString("הדרופ על השיא — %@", comment: "Start the song so its drop lands on the movie's strongest moment"), RK.clock(drop.start)), systemImage: "sparkles")
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(abs(drop.start - start) < 0.1)
+                        .accessibilityIdentifier("music.dropStart")
+                        Text(verbatim: String(format: NSLocalizedString("הדרופ של השיר ב־%1$@ ייפול על הרגע הכי חזק בסרט, ב־%2$@.", comment: "What the drop start does"), RK.clock(drop.drop), RK.clock(drop.peak)))
+                            .font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+                    }
                     if let note {Text(verbatim: note).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)}
                 }.padding(20)
             }
@@ -136,6 +147,11 @@ struct MusicStartView: View {
             }
         }
         levels = (try? await LocalEngine.waveform(file)) ?? []
+        drop = await model.dropStart(for: song)
+        // A song whose start nobody chose yet starts where its drop meets the peak.
+        if let drop, model.edit.settings["musicStart:" + song.id] == nil, !(project.music.first?.id == song.id && model.edit.settings["musicStart"].map({$0.string != "0"}) == true) {
+            setStart(drop.start)
+        }
     }
     private func stop() {
         player?.pause()

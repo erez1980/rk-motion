@@ -321,6 +321,22 @@
         }
       }
     },
+    "איזו מסיבה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What a party"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "איזו מסיבה"
+          }
+        }
+      }
+    },
     "איכות" : {
       "localizations" : {
         "en" : {
@@ -1089,6 +1105,22 @@
         }
       }
     },
+    "האטה ברגע השיא" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow motion at the peak"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "האטה ברגע השיא"
+          }
+        }
+      }
+    },
     "האייפון מכין את הקובץ…" : {
       "localizations" : {
         "en" : {
@@ -1165,6 +1197,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הדביקו קישור לסרטון. השמע יורד ישירות לאייפון."
+          }
+        }
+      }
+    },
+    "הדרופ על השיא — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop on the peak — %@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הדרופ על השיא — %@"
+          }
+        }
+      }
+    },
+    "הדרופ של השיר ב־%1$@ ייפול על הרגע הכי חזק בסרט, ב־%2$@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The song's drop at %1$@ lands on the movie's strongest moment, at %2$@."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הדרופ של השיר ב־%1$@ ייפול על הרגע הכי חזק בסרט, ב־%2$@."
           }
         }
       }
@@ -1281,6 +1345,22 @@
         }
       }
     },
+    "הועתק" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הועתק"
+          }
+        }
+      }
+    },
     "הורדה" : {
       "localizations" : {
         "en" : {
@@ -1377,6 +1457,22 @@
         }
       }
     },
+    "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tall crop follows the people in each clip instead of staying in the middle"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז"
+          }
+        }
+      }
+    },
     "החלקה" : {
       "localizations" : {
         "en" : {
@@ -1469,6 +1565,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הייצוא נכשל באייפון."
+          }
+        }
+      }
+    },
+    "המוזיקה יורדת לבד ברגעים שבהם שומעים את האנשים בסרטון" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The music dips by itself whenever the people in the video can be heard"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "המוזיקה יורדת לבד ברגעים שבהם שומעים את האנשים בסרטון"
           }
         }
       }
@@ -1677,6 +1789,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הניתוח רץ באייפון. הסרטון לא יוצא מהמכשיר."
+          }
+        }
+      }
+    },
+    "הנמכת המוזיקה כשמדברים או צוחקים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lower the music when people talk or laugh"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הנמכת המוזיקה כשמדברים או צוחקים"
           }
         }
       }
@@ -1985,6 +2113,22 @@
         }
       }
     },
+    "העתקת הכיתוב" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the caption"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "העתקת הכיתוב"
+          }
+        }
+      }
+    },
     "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי." : {
       "localizations" : {
         "en" : {
@@ -2081,6 +2225,22 @@
         }
       }
     },
+    "הצעה לכותרת ולכיתוב ✨" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggest a title and caption ✨"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הצעה לכותרת ולכיתוב ✨"
+          }
+        }
+      }
+    },
     "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי." : {
       "localizations" : {
         "en" : {
@@ -2125,6 +2285,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הרבה תנועה ומהירות"
+          }
+        }
+      }
+    },
+    "הרגעים החשובים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The moments that matter"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרגעים החשובים"
           }
         }
       }
@@ -2705,6 +2881,22 @@
         }
       }
     },
+    "יום על הגלגלים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A day on wheels"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "יום על הגלגלים"
+          }
+        }
+      }
+    },
     "יותר קטעים" : {
       "localizations" : {
         "en" : {
@@ -2833,6 +3025,22 @@
         }
       }
     },
+    "יצאנו לטייל" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Out exploring"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "יצאנו לטייל"
+          }
+        }
+      }
+    },
     "כותרת פתיחה" : {
       "localizations" : {
         "en" : {
@@ -2845,6 +3053,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "כותרת פתיחה"
+          }
+        }
+      }
+    },
+    "כיתוב לפוסט" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post caption"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "כיתוב לפוסט"
           }
         }
       }
@@ -3229,6 +3453,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "לסרט האחרון שנוצר"
+          }
+        }
+      }
+    },
+    "לפי האווירה ✨" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To the mood ✨"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לפי האווירה ✨"
           }
         }
       }
@@ -3761,6 +4001,22 @@
         }
       }
     },
+    "מסגור חכם לפי האנשים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart framing on people"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מסגור חכם לפי האנשים"
+          }
+        }
+      }
+    },
     "מסגרת" : {
       "localizations" : {
         "en" : {
@@ -3917,6 +4173,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מקור"
+          }
+        }
+      }
+    },
+    "מקורי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מקורי"
           }
         }
       }
@@ -4945,6 +5217,38 @@
         }
       }
     },
+    "צבע" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צבע"
+          }
+        }
+      }
+    },
+    "צובעת את הסרט לפי האווירה…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grading the movie to suit its mood…"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צובעת את הסרט לפי האווירה…"
+          }
+        }
+      }
+    },
     "צולם בחוץ" : {
       "localizations" : {
         "en" : {
@@ -5213,6 +5517,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "רגישות זיהוי הפעילות"
+          }
+        }
+      }
+    },
+    "רגעים טובים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good moments"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגעים טובים"
+          }
+        }
+      }
+    },
+    "רגעים משפחתיים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Family moments"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגעים משפחתיים"
           }
         }
       }

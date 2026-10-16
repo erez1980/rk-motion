@@ -68,6 +68,9 @@ struct Signals: Codable, Equatable {
     var people: [Double] = []
     /// Scene labels and the share of sampled frames that showed them.
     var scenes: [String: Double] = [:]
+    /// Where across the frame people stand each second, 0 left … 1 right,
+    /// or -1 when nobody is seen; nil for scans made before it was measured.
+    var focus: [Double]? = nil
 
     func values(_ channel: Channel) -> [Double] {
         switch channel {
@@ -104,8 +107,12 @@ struct Signals: Codable, Equatable {
         for piece in pieces where total > 0 {
             for (label, share) in piece.signals.scenes {scenes[label, default: 0] += share * piece.duration / total}
         }
+        let focus: [Double]? = pieces.contains(where: {!($0.signals.focus ?? []).isEmpty}) ? place.map {
+            let values = pieces[$0.piece].signals.focus ?? []
+            return values.isEmpty ? -1 : values[min(values.count - 1, $0.local)]
+        } : nil
         return Signals(motion: join(\.motion), loudness: join(\.loudness), music: join(\.music), speech: join(\.speech),
-                       cheer: join(\.cheer), people: join(\.people), scenes: scenes)
+                       cheer: join(\.cheer), people: join(\.people), scenes: scenes, focus: focus)
     }
     /// Each second's score for `kind`. Channels that were not measured drop
     /// out and the rest are scaled back up, so a missing one never sinks

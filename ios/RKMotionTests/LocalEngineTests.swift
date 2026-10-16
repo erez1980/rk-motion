@@ -95,6 +95,24 @@ final class LocalEngineTests: XCTestCase {
         let smartPreview = try await engine.preview(project, edit: smart)
         let smartDuration = try await smartPreview.asset.load(.duration).seconds
         XCTAssertEqual(smartDuration, expected, accuracy: 0.1)
+        // Slow motion on the strongest second makes the movie longer, and the
+        // planned length, the preview and the export agree on it.
+        var scored = project
+        scored.scores = scores
+        var slow = Edit(clips: [Clip(start: 0.1, end: 2.9)])
+        slow.settings["slowPeak"] = .flag(true)
+        slow.settings["aspect"] = .text("9:16")
+        let slowLength = try XCTUnwrap(await engine.plannedLength(scored, edit: slow))
+        XCTAssertEqual(slowLength, 2.8 + Clip.slowSpan, accuracy: 0.05)
+        let slowPreview = try await engine.preview(scored, edit: slow)
+        let slowDuration = try await slowPreview.asset.load(.duration).seconds
+        XCTAssertEqual(slowDuration, slowLength, accuracy: 0.1)
+        // A read video exports with its mood's colour, in the title's second pass.
+        scored.reading = analysis.reading
+        let graded = folder.appendingPathComponent("graded.mp4")
+        let gradedLength = try await engine.export(scored, edit: slow, output: graded) {_, _ in}
+        let gradedDuration = try await AVURLAsset(url: graded).load(.duration).seconds
+        XCTAssertEqual(gradedDuration, gradedLength, accuracy: 0.1)
         XCTAssertEqual(preview.videoComposition?.renderSize, CGSize(width: 134, height: 240))
         XCTAssertNotNil(preview.audioMix)
         // The music track takes the song from the chosen second, not from its beginning.
