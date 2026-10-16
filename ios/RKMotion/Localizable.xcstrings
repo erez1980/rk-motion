@@ -321,6 +321,22 @@
         }
       }
     },
+    "איזו מסיבה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What a party"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "איזו מסיבה"
+          }
+        }
+      }
+    },
     "איכות" : {
       "localizations" : {
         "en" : {
@@ -385,6 +401,54 @@
         }
       }
     },
+    "אינדי פולק לדרך" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Road-trip indie folk"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אינדי פולק לדרך"
+          }
+        }
+      }
+    },
+    "אינדי רוק קצבי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upbeat indie rock"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אינדי רוק קצבי"
+          }
+        }
+      }
+    },
+    "אפי ואנרגטי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Epic and driving"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אפי ואנרגטי"
+          }
+        }
+      }
+    },
     "אפשרו שמירה בתמונות בהגדרות האייפון" : {
       "localizations" : {
         "en" : {
@@ -429,6 +493,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "אפשרויות ייצוא"
+          }
+        }
+      }
+    },
+    "אקוסטי רגוע" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calm acoustic"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אקוסטי רגוע"
           }
         }
       }
@@ -961,6 +1041,38 @@
         }
       }
     },
+    "דראם אנד בייס" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drum and bass"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "דראם אנד בייס"
+          }
+        }
+      }
+    },
+    "האוס לקיץ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summer house"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "האוס לקיץ"
+          }
+        }
+      }
+    },
     "האזנה ל־%@" : {
       "localizations" : {
         "en" : {
@@ -989,6 +1101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "האזנה לשיר ובחירת המקום שממנו יתחיל"
+          }
+        }
+      }
+    },
+    "האטה ברגע השיא" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow motion at the peak"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "האטה ברגע השיא"
           }
         }
       }
@@ -1069,6 +1197,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הדביקו קישור לסרטון. השמע יורד ישירות לאייפון."
+          }
+        }
+      }
+    },
+    "הדרופ על השיא — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop on the peak — %@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הדרופ על השיא — %@"
+          }
+        }
+      }
+    },
+    "הדרופ של השיר ב־%1$@ ייפול על הרגע הכי חזק בסרט, ב־%2$@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The song's drop at %1$@ lands on the movie's strongest moment, at %2$@."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הדרופ של השיר ב־%1$@ ייפול על הרגע הכי חזק בסרט, ב־%2$@."
           }
         }
       }
@@ -1185,6 +1345,22 @@
         }
       }
     },
+    "הועתק" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הועתק"
+          }
+        }
+      }
+    },
     "הורדה" : {
       "localizations" : {
         "en" : {
@@ -1281,6 +1457,22 @@
         }
       }
     },
+    "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tall crop follows the people in each clip instead of staying in the middle"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז"
+          }
+        }
+      }
+    },
     "החלקה" : {
       "localizations" : {
         "en" : {
@@ -1373,6 +1565,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הייצוא נכשל באייפון."
+          }
+        }
+      }
+    },
+    "המוזיקה יורדת לבד ברגעים שבהם שומעים את האנשים בסרטון" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The music dips by itself whenever the people in the video can be heard"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "המוזיקה יורדת לבד ברגעים שבהם שומעים את האנשים בסרטון"
           }
         }
       }
@@ -1581,6 +1789,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הניתוח רץ באייפון. הסרטון לא יוצא מהמכשיר."
+          }
+        }
+      }
+    },
+    "הנמכת המוזיקה כשמדברים או צוחקים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lower the music when people talk or laugh"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הנמכת המוזיקה כשמדברים או צוחקים"
           }
         }
       }
@@ -1889,6 +2113,22 @@
         }
       }
     },
+    "העתקת הכיתוב" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the caption"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "העתקת הכיתוב"
+          }
+        }
+      }
+    },
     "הפעולה מחליפה את הקטעים הנוכחיים; אפשר לבטל את השינוי." : {
       "localizations" : {
         "en" : {
@@ -1985,6 +2225,22 @@
         }
       }
     },
+    "הצעה לכותרת ולכיתוב ✨" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggest a title and caption ✨"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הצעה לכותרת ולכיתוב ✨"
+          }
+        }
+      }
+    },
     "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי." : {
       "localizations" : {
         "en" : {
@@ -2029,6 +2285,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הרבה תנועה ומהירות"
+          }
+        }
+      }
+    },
+    "הרגעים החשובים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The moments that matter"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרגעים החשובים"
           }
         }
       }
@@ -2401,6 +2673,22 @@
         }
       }
     },
+    "חיפוש %@ ב־YouTube" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search YouTube for %@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "חיפוש %@ ב־YouTube"
+          }
+        }
+      }
+    },
     "חיפוש שיר ב־YouTube" : {
       "localizations" : {
         "en" : {
@@ -2497,6 +2785,22 @@
         }
       }
     },
+    "חכם ✨" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart ✨"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "חכם ✨"
+          }
+        }
+      }
+    },
     "חמש שניות אחורה" : {
       "localizations" : {
         "en" : {
@@ -2573,6 +2877,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ידני"
+          }
+        }
+      }
+    },
+    "יום על הגלגלים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A day on wheels"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "יום על הגלגלים"
           }
         }
       }
@@ -2705,6 +3025,22 @@
         }
       }
     },
+    "יצאנו לטייל" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Out exploring"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "יצאנו לטייל"
+          }
+        }
+      }
+    },
     "כותרת פתיחה" : {
       "localizations" : {
         "en" : {
@@ -2717,6 +3053,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "כותרת פתיחה"
+          }
+        }
+      }
+    },
+    "כיתוב לפוסט" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post caption"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "כיתוב לפוסט"
           }
         }
       }
@@ -2977,6 +3329,86 @@
         }
       }
     },
+    "להיטי הקיץ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summer hits"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "להיטי הקיץ"
+          }
+        }
+      }
+    },
+    "להיטי מסיבות" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Party hits"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "להיטי מסיבות"
+          }
+        }
+      }
+    },
+    "להיטים ישראליים שמחים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Happy Israeli hits"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "להיטים ישראליים שמחים"
+          }
+        }
+      }
+    },
+    "לו־פיי רגוע" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chill lo-fi"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לו־פיי רגוע"
+          }
+        }
+      }
+    },
+    "לכל חיבור אבחר מעבר לפי מה שקורה בו: זום כשהתנועה מאיצה, הבזק ברגע של שמחה, החלקה בין שני רגעים מהירים, המסה בין רגעים רגועים ודעיכה כשעוברים לסרטון או לזמן אחר." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pick each seam's transition from what happens there: a zoom as the action speeds up, a flash on a joyful moment, a push between two fast moments, a dissolve between calm ones and a dip to black when the movie moves to another video or time."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לכל חיבור אבחר מעבר לפי מה שקורה בו: זום כשהתנועה מאיצה, הבזק ברגע של שמחה, החלקה בין שני רגעים מהירים, המסה בין רגעים רגועים ודעיכה כשעוברים לסרטון או לזמן אחר."
+          }
+        }
+      }
+    },
     "ללא מוזיקה" : {
       "localizations" : {
         "en" : {
@@ -3021,6 +3453,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "לסרט האחרון שנוצר"
+          }
+        }
+      }
+    },
+    "לפי האווירה ✨" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To the mood ✨"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לפי האווירה ✨"
+          }
+        }
+      }
+    },
+    "לפי מה שזיהיתי: %@, בקצב של %ld–%ld פעימות לדקה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From what I found: %@, at %ld–%ld beats a minute"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לפי מה שזיהיתי: %@, בקצב של %ld–%ld פעימות לדקה"
           }
         }
       }
@@ -3181,6 +3645,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מוזיקה ב־%d%% מהזמן"
+          }
+        }
+      }
+    },
+    "מוזיקה לוולוג טיולים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travel vlog music"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מוזיקה לוולוג טיולים"
           }
         }
       }
@@ -3521,6 +4001,22 @@
         }
       }
     },
+    "מסגור חכם לפי האנשים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart framing on people"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מסגור חכם לפי האנשים"
+          }
+        }
+      }
+    },
     "מסגרת" : {
       "localizations" : {
         "en" : {
@@ -3581,6 +4077,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מעבר בין קטעים"
+          }
+        }
+      }
+    },
+    "מעורר השראה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inspiring"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מעורר השראה"
           }
         }
       }
@@ -3661,6 +4173,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מקור"
+          }
+        }
+      }
+    },
+    "מקורי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מקורי"
           }
         }
       }
@@ -4529,6 +5057,38 @@
         }
       }
     },
+    "פונק לדריפט" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drift phonk"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "פונק לדריפט"
+          }
+        }
+      }
+    },
+    "פופ שמח" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feel-good pop"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "פופ שמח"
+          }
+        }
+      }
+    },
     "פחות קטעים" : {
       "localizations" : {
         "en" : {
@@ -4541,6 +5101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "פחות קטעים"
+          }
+        }
+      }
+    },
+    "פסנתר שקט ברקע" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soft background piano"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "פסנתר שקט ברקע"
           }
         }
       }
@@ -4641,6 +5217,38 @@
         }
       }
     },
+    "צבע" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צבע"
+          }
+        }
+      }
+    },
+    "צובעת את הסרט לפי האווירה…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grading the movie to suit its mood…"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צובעת את הסרט לפי האווירה…"
+          }
+        }
+      }
+    },
     "צולם בחוץ" : {
       "localizations" : {
         "en" : {
@@ -4733,6 +5341,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "קולות, מוזיקה ורעשים מהצילום עצמו"
+          }
+        }
+      }
+    },
+    "קולנועי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinematic"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "קולנועי"
           }
         }
       }
@@ -4897,6 +5521,54 @@
         }
       }
     },
+    "רגעים טובים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good moments"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגעים טובים"
+          }
+        }
+      }
+    },
+    "רגעים משפחתיים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Family moments"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגעים משפחתיים"
+          }
+        }
+      }
+    },
+    "רוק אנרגטי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Energetic rock"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רוק אנרגטי"
+          }
+        }
+      }
+    },
     "רזולוציית מקור" : {
       "localizations" : {
         "en" : {
@@ -5057,6 +5729,86 @@
         }
       }
     },
+    "שירי חתונה לריקודים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wedding dance songs"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שירי חתונה לריקודים"
+          }
+        }
+      }
+    },
+    "שירי טיולים ישראליים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Israeli road-trip songs"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שירי טיולים ישראליים"
+          }
+        }
+      }
+    },
+    "שירי ילדים שמחים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Happy kids songs"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שירי ילדים שמחים"
+          }
+        }
+      }
+    },
+    "שירים מרגשים למשפחה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feel-good family songs"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שירים מרגשים למשפחה"
+          }
+        }
+      }
+    },
+    "שירים שמתאימים לסרטון" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Songs that suit your video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שירים שמתאימים לסרטון"
+          }
+        }
+      }
+    },
     "שיתוף" : {
       "localizations" : {
         "en" : {
@@ -5117,6 +5869,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "שם השיר והאמן"
+          }
+        }
+      }
+    },
+    "שמח עם יוקלילי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Happy ukulele"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שמח עם יוקלילי"
           }
         }
       }
@@ -5197,6 +5965,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "שניות"
+          }
+        }
+      }
+    },
+    "שריקה ומחיאות כפיים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Whistles and claps"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שריקה ומחיאות כפיים"
           }
         }
       }

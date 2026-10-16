@@ -7,8 +7,34 @@ struct Clip: Codable, Identifiable, Equatable {
     var score: Double?
     var selected: Bool? = true
     var manual: Bool?
+    /// Where slow motion starts, in source seconds; nil plays the clip at one pace.
+    var slowAt: Double?
     var duration: Double {end - start}
     var id: String {uid}
+}
+extension Clip {
+    /// How long slow motion lasts in the source, and how much it slows it.
+    static let slowSpan = 1.5, slowFactor = 2.0
+    /// The source seconds played slowed, kept inside the clip; nil when
+    /// none are marked or the clip is too short to slow a part of it.
+    var slowRange: (start: Double, end: Double)? {
+        guard let slowAt, slowAt.isFinite, duration >= Self.slowSpan + 0.5 else {return nil}
+        let from = min(max(start, slowAt), end - Self.slowSpan)
+        return (from, from + Self.slowSpan)
+    }
+    /// How long the clip is on screen at `speed`, slow motion included.
+    func shown(_ speed: Double) -> Double {
+        (duration + (slowRange == nil ? 0 : Self.slowSpan * (Self.slowFactor - 1))) / speed
+    }
+    /// How far into the clip, on screen, a source moment plays.
+    func screenOffset(of time: Double, speed: Double) -> Double {
+        let into = min(max(time, start), end) - start
+        guard let slow = slowRange else {return into / speed}
+        let from = slow.start - start, to = slow.end - start
+        if into <= from {return into / speed}
+        if into <= to {return (from + (into - from) * Self.slowFactor) / speed}
+        return (from + (to - from) * Self.slowFactor + into - to) / speed
+    }
 }
 enum Setting: Codable, Equatable {
     case text(String), flag(Bool), number(Double)

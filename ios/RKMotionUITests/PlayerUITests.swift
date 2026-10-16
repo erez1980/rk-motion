@@ -55,6 +55,8 @@ final class PlayerUITests: XCTestCase {
         music.tap()
         let youTube = app.descendants(matching: .any)["music.youtube"]
         wait(for: youTube, in: app, timeout: 10, "The music step shows the From YouTube tile")
+        // The scan read the ride, so songs for it are suggested.
+        wait(for: app.descendants(matching: .any)["music.ideasCard"], in: app, timeout: 10, "The music step suggests songs for the video")
         // Well past the icon, on the words and the space after them.
         youTube.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).tap()
         wait(for: app.textFields["music.query"], in: app, timeout: 5, "A tap on the words opens the YouTube search")

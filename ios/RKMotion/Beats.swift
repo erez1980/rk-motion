@@ -120,7 +120,7 @@ enum Beats {
                 let cut = index + 1 < segments.count ? segments[index + 1].start + segments[index + 1].incoming / 2 : segments[index].end
                 guard cut <= (beats.last ?? 0) + 0.001 else {return result}
                 let earlier = beats.last {$0 <= cut + 0.0001}, later = beats.first {$0 > cut + 0.0001}
-                let onScreen = result[index].duration / speed
+                let onScreen = result[index].shown(speed)
                 func fits(_ beat: Double?) -> Bool {
                     guard let beat else {return false}
                     let end = result[index].end + (beat - cut) * speed
