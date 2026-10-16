@@ -220,7 +220,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func runImport(_ file: URL) async {
         guard await save() else {setBusy(false); return}
         message = "מעתיקה את הסרטון לאחסון המקומי…"
-        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("רכיבה ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
+        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         do {
@@ -252,18 +252,23 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         p.wholeVideo = wholeVideo; project = p
         setBusy(true, .analyzing); percent = 0; message = "מנתחת באייפון…"
         let whole = wholeVideo
-        launchProcessing(title: "ניתוח סרטון רכיבה") { [self] in
+        launchProcessing(title: "ניתוח סרטון") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}
             do {
-                let (duration, scores, clips) = try await engine.analyze(LocalStore.file(p.source, project: p.id), whole: whole) {[weak self] fraction, text in
+                let result = try await engine.analyze(LocalStore.file(p.source, project: p.id), whole: whole) {[weak self] fraction, text in
                     await self?.progress(fraction, text)
                 }
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
-                current.duration = duration; current.scores = scores; current.analyzed = true
-                project = current; edit.clips = clips; edit.settings["wholeVideo"] = .flag(whole); previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
-                if await save() {processingSucceeded = true; message = clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
+                if let signals = result.signals {try? LocalStore.writeSignals(signals, project: p.id)}
+                current.duration = result.duration; current.scores = result.scores; current.analyzed = true; current.reading = result.reading
+                project = current; edit.clips = result.clips; edit.settings["wholeVideo"] = .flag(whole)
+                if let kind = result.reading?.kind {
+                    edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
+                }
+                previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
+                if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
             setBusy(false)
@@ -278,6 +283,30 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
     }
+    /// Edits the video as another kind of content: scores the scan's saved
+    /// signals with that kind's recipe, picks the moments again and sets its
+    /// source sound. Undo brings the previous kind back.
+    func setKind(_ kind: ContentKind) {
+        guard !busy, let p = project, p.reading != nil, p.reading?.kind != kind,
+              let signals = LocalStore.readSignals(project: p.id) else {return}
+        let previous = edit
+        apply(kind, signals: signals)
+        edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
+        edit.clips = LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold) + edit.clips.filter {$0.manual == true}
+        wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
+        changed(from: previous); suppressedEdit = edit
+        message = String(format: NSLocalizedString("הסרט נערך מחדש כ%@. ניתן לבטל את השינוי.", comment: "Content kind changed"), kind.title)
+    }
+    private func apply(_ kind: ContentKind, signals: Signals) {
+        project?.reading?.kind = kind; project?.scores = signals.scores(for: kind)
+    }
+    /// After undo or redo, the scores follow the kind the restored edit was made as.
+    private func followKind() {
+        guard let raw = edit.settings["contentKind"]?.string, let kind = ContentKind(rawValue: raw),
+              let p = project, p.reading != nil, p.reading?.kind != kind,
+              let signals = LocalStore.readSignals(project: p.id) else {return}
+        apply(kind, signals: signals)
+    }
     func shuffleClips() {
         guard !busy, edit.clips.count > 1 else {return}
         var generator = SystemRandomNumberGenerator()
@@ -290,8 +319,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let overlap = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
     }
-    func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; updateUndo(); scheduleSave()}
-    func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; updateUndo(); scheduleSave()}
+    func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; followKind(); updateUndo(); scheduleSave()}
+    func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; followKind(); updateUndo(); scheduleSave()}
     private func updateUndo() {undoAvailable = !undoStack.isEmpty; redoAvailable = !redoStack.isEmpty}
     func importMusic(_ file: URL) async {
         guard !busy, var p = project else {return}
@@ -360,7 +389,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let snapshot = edit
         setBusy(true, .exporting); percent = 0; message = "מייצאת באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
-        launchProcessing(title: "ייצוא סרטון רכיבה") { [self] in
+        launchProcessing(title: "ייצוא סרטון") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}
             do {

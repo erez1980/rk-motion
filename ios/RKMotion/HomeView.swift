@@ -15,7 +15,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         (Text(verbatim: "RK ").foregroundStyle(RK.ink) + Text(verbatim: "Motion").foregroundStyle(RK.accent))
                             .font(RK.font(28, 700, style: .largeTitle))
-                        Text("מהרכיבה לרגעים הטובים").font(RK.font(15)).foregroundStyle(RK.soft)
+                        Text("מכל סרטון לרגעים הטובים").font(RK.font(15)).foregroundStyle(RK.soft)
                     }
                     Spacer()
                     Button(action: about) {
@@ -34,7 +34,7 @@ struct HomeView: View {
                         Image(systemName: "plus").font(.system(size: 22, weight: .bold))
                             .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("רכיבה חדשה").font(RK.font(19, 700, style: .title3))
+                            Text("סרטון חדש").font(RK.font(19, 700, style: .title3))
                             Text("בחירת סרטון מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
                         }
                         Spacer()

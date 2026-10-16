@@ -209,6 +209,102 @@
         }
       }
     },
+    "אחתוך את הקטעים החיים ביותר: תנועה, קולות ואנשים." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut the liveliest moments: motion, voices and people."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך את הקטעים החיים ביותר: תנועה, קולות ואנשים."
+          }
+        }
+      }
+    },
+    "אחתוך את הקטעים עם הכי הרבה תנועה ורעש: מהירות, קפיצות וירידות." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut the moments with the most motion and noise: speed, jumps and descents."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך את הקטעים עם הכי הרבה תנועה ורעש: מהירות, קפיצות וירידות."
+          }
+        }
+      }
+    },
+    "אחתוך את קטעי הדיבור ואת התגובות של הקהל, ואשאיר את קול המקור." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut the speech and the audience's reactions, and keep the original sound."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך את קטעי הדיבור ואת התגובות של הקהל, ואשאיר את קול המקור."
+          }
+        }
+      }
+    },
+    "אחתוך את קטעי הריקוד, השמחה והצחוק, ואשתיק את קול המקור כדי שהמוזיקה שלו לא תתנגש בשיר." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut the dancing, joy and laughter, and mute the original sound so its music doesn't clash with the song."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך את קטעי הריקוד, השמחה והצחוק, ואשתיק את קול המקור כדי שהמוזיקה שלו לא תתנגש בשיר."
+          }
+        }
+      }
+    },
+    "אחתוך את רגעי הצחוק והשמחה ואת הקטעים עם אנשים בפריים." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut the moments of laughter and joy and the parts with people in frame."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך את רגעי הצחוק והשמחה ואת הקטעים עם אנשים בפריים."
+          }
+        }
+      }
+    },
+    "אחתוך רגעים עם תנועה, אנשים בפריים וצחוק, ואשאיר את קול המקור מתחת למוזיקה." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'll cut moments with motion, people in frame and laughter, and keep the original sound under the music."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אחתוך רגעים עם תנועה, אנשים בפריים וצחוק, ואשאיר את קול המקור מתחת למוזיקה."
+          }
+        }
+      }
+    },
     "איכות" : {
       "localizations" : {
         "en" : {
@@ -333,6 +429,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא."
+          }
+        }
+      }
+    },
+    "בדרך כלל %d אנשים בפריים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usually %d people in frame"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "בדרך כלל %d אנשים בפריים"
+          }
+        }
+      }
+    },
+    "בדרך כלל אדם אחד בפריים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usually one person in frame"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "בדרך כלל אדם אחד בפריים"
           }
         }
       }
@@ -737,18 +865,50 @@
         }
       }
     },
-    "גרף הפעילות לאורך הרכיבה" : {
+    "גרף הפעילות לאורך הסרטון" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activity graph across the ride"
+            "value" : "Activity graph across the video"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "גרף הפעילות לאורך הרכיבה"
+            "value" : "גרף הפעילות לאורך הסרטון"
+          }
+        }
+      }
+    },
+    "דיבור ב־%d%% מהזמן" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech %d%% of the time"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "דיבור ב־%d%% מהזמן"
+          }
+        }
+      }
+    },
+    "דיבור, נאום או הרצאה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking, a speech or a lecture"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "דיבור, נאום או הרצאה"
           }
         }
       }
@@ -1521,6 +1681,22 @@
         }
       }
     },
+    "הסרט נערך מחדש כ%@. ניתן לבטל את השינוי." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The movie was re-edited as %@. You can undo this."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הסרט נערך מחדש כ%@. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
     "הסרט נשמר בתמונות" : {
       "localizations" : {
         "en" : {
@@ -1825,6 +2001,22 @@
         }
       }
     },
+    "הרבה תנועה ומהירות" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lots of motion and speed"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרבה תנועה ומהירות"
+          }
+        }
+      }
+    },
     "הרכבת הסרט נכשלה: " : {
       "localizations" : {
         "en" : {
@@ -1921,18 +2113,18 @@
         }
       }
     },
-    "השתקת שמע הרכיבה" : {
+    "השתקת קול המקור" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mute the ride's sound"
+            "value" : "Mute the original sound"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "השתקת שמע הרכיבה"
+            "value" : "השתקת קול המקור"
           }
         }
       }
@@ -2077,6 +2269,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "זום"
+          }
+        }
+      }
+    },
+    "זיהיתי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I found"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "זיהיתי"
           }
         }
       }
@@ -2321,6 +2529,22 @@
         }
       }
     },
+    "טיול" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A trip"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "טיול"
+          }
+        }
+      }
+    },
     "ידני" : {
       "localizations" : {
         "en" : {
@@ -2417,18 +2641,18 @@
         }
       }
     },
-    "ייצוא סרטון רכיבה" : {
+    "ייצוא סרטון" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exporting a ride video"
+            "value" : "Exporting video"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ייצוא סרטון רכיבה"
+            "value" : "ייצוא סרטון"
           }
         }
       }
@@ -2445,6 +2669,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב."
+          }
+        }
+      }
+    },
+    "ילדים ומשפחה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kids and family"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ילדים ומשפחה"
           }
         }
       }
@@ -2849,22 +3089,6 @@
         }
       }
     },
-    "מהרכיבה לרגעים הטובים" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "From the ride to the best moments"
-          }
-        },
-        "he" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "מהרכיבה לרגעים הטובים"
-          }
-        }
-      }
-    },
     "מהתמונות" : {
       "localizations" : {
         "en" : {
@@ -2893,6 +3117,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מוזיקה"
+          }
+        }
+      }
+    },
+    "מוזיקה ב־%d%% מהזמן" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Music %d%% of the time"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מוזיקה ב־%d%% מהזמן"
           }
         }
       }
@@ -2973,6 +3213,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מורידה את השמע מ־YouTube…"
+          }
+        }
+      }
+    },
+    "מזהה מה יש בסרטון…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recognizing what's in the video…"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מזהה מה יש בסרטון…"
           }
         }
       }
@@ -3121,6 +3377,22 @@
         }
       }
     },
+    "מכל סרטון לרגעים הטובים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From any video to the best moments"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מכל סרטון לרגעים הטובים"
+          }
+        }
+      }
+    },
     "ממדי הסרטון או איכות הייצוא אינם תקינים." : {
       "localizations" : {
         "en" : {
@@ -3217,6 +3489,22 @@
         }
       }
     },
+    "מסיבה או אירוע עם ריקודים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A party or event with dancing"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מסיבה או אירוע עם ריקודים"
+          }
+        }
+      }
+    },
     "מעבר" : {
       "localizations" : {
         "en" : {
@@ -3261,6 +3549,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מעתיקה את הסרטון לאחסון המקומי…"
+          }
+        }
+      }
+    },
+    "מצלמה כמעט יציבה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An almost steady camera"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מצלמה כמעט יציבה"
           }
         }
       }
@@ -3521,18 +3825,18 @@
         }
       }
     },
-    "ניתוח סרטון רכיבה" : {
+    "ניתוח סרטון" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Analyzing a ride video"
+            "value" : "Analyzing video"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ניתוח סרטון רכיבה"
+            "value" : "ניתוח סרטון"
           }
         }
       }
@@ -3565,6 +3869,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "נמוכה"
+          }
+        }
+      }
+    },
+    "נערך לפי הבחירה שלך" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edited as you chose"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "נערך לפי הבחירה שלך"
           }
         }
       }
@@ -3821,6 +4141,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "סרטון"
+          }
+        }
+      }
+    },
+    "סרטון " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video "
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "סרטון "
+          }
+        }
+      }
+    },
+    "סרטון חדש" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "סרטון חדש"
+          }
+        }
+      }
+    },
+    "סרטון כללי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A general video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "סרטון כללי"
           }
         }
       }
@@ -4113,18 +4481,18 @@
         }
       }
     },
-    "פעילות לאורך הרכיבה" : {
+    "פעילות לאורך הסרטון" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Activity across the ride"
+            "value" : "Activity across the video"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "פעילות לאורך הרכיבה"
+            "value" : "פעילות לאורך הסרטון"
           }
         }
       }
@@ -4209,6 +4577,38 @@
         }
       }
     },
+    "צולם בחוץ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmed outdoors"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צולם בחוץ"
+          }
+        }
+      }
+    },
+    "צחוק, קריאות או מחיאות כפיים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laughter, cheering or applause"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צחוק, קריאות או מחיאות כפיים"
+          }
+        }
+      }
+    },
     "ציון פעילות: %@%%" : {
       "localizations" : {
         "en" : {
@@ -4253,6 +4653,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "קובץ השמע גדול מדי לשיר."
+          }
+        }
+      }
+    },
+    "קולות, מוזיקה ורעשים מהצילום עצמו" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voices, music and noise from the footage itself"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "קולות, מוזיקה ורעשים מהצילום עצמו"
           }
         }
       }
@@ -4433,34 +4849,18 @@
         }
       }
     },
-    "רכיבה " : {
+    "רכיבה או ספורט אקשן" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ride "
+            "value" : "A ride or action sport"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "רכיבה "
-          }
-        }
-      }
-    },
-    "רכיבה חדשה" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New ride"
-          }
-        },
-        "he" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "רכיבה חדשה"
+            "value" : "רכיבה או ספורט אקשן"
           }
         }
       }
@@ -4561,6 +4961,38 @@
         }
       }
     },
+    "שינוי" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שינוי"
+          }
+        }
+      }
+    },
+    "שינוי סוג התוכן" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change the content type"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שינוי סוג התוכן"
+          }
+        }
+      }
+    },
     "שיתוף" : {
       "localizations" : {
         "en" : {
@@ -4593,18 +5025,18 @@
         }
       }
     },
-    "שם הרוכב או הרכיבה" : {
+    "שם האירוע, המקום או האנשים" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rider or ride name"
+            "value" : "The event, place or people"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "שם הרוכב או הרכיבה"
+            "value" : "שם האירוע, המקום או האנשים"
           }
         }
       }
