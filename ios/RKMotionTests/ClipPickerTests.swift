@@ -43,4 +43,19 @@ final class ClipPickerTests: XCTestCase {
         }
         XCTAssertEqual(ClipPicker.shuffled([clips[0]], using: &generator), [clips[0]])
     }
+    /// A new movie aims at 45 seconds; "all" keeps every suggested moment.
+    @MainActor func testTheMovieLengthChoosesTheClipsAgain() {
+        let clips = (0..<12).map {clip(Double($0) * 20, Double($0) * 20 + 10, 0.5 + Double($0 % 5) * 0.1)}
+        let model = EditorModel()
+        let fitted = model.fittedToLength(clips, settings: [:])
+        let length = fitted.filter {$0.selected != false}.reduce(0) {$0 + $1.duration}
+        XCTAssertEqual(model.targetLength, Edit.defaultLength)
+        XCTAssertGreaterThanOrEqual(length, 45); XCTAssertLessThanOrEqual(length, 54)
+        model.edit.clips = fitted
+        model.pickLength("all")
+        XCTAssertTrue(model.edit.clips.allSatisfy {$0.selected != false})
+        XCTAssertEqual(model.targetLength, "all")
+        model.pickLength("30")
+        XCTAssertLessThanOrEqual(model.edit.clips.filter {$0.selected != false}.reduce(0) {$0 + $1.duration}, 36)
+    }
 }

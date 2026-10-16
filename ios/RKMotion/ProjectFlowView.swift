@@ -126,8 +126,7 @@ private struct WorkingStage: View {
             .accessibilityElement().accessibilityLabel("התקדמות העיבוד")
             .accessibilityValue(String(format: NSLocalizedString("%@ אחוז", comment: "Progress percent"), "\(Int(model.percent))"))
             Text(LocalizedStringKey(model.message)).font(RK.font(17, 500)).foregroundStyle(RK.ink).multilineTextAlignment(.center)
-            Text("השאירו את האפליקציה פתוחה עד שהפעולה תסתיים.").font(RK.font(14)).foregroundStyle(RK.soft).multilineTextAlignment(.center)
-            Text(LocalizedStringKey(model.backgroundDescription)).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).multilineTextAlignment(.center)
+            Text(LocalizedStringKey(model.backgroundDescription)).font(RK.font(14)).foregroundStyle(RK.soft).multilineTextAlignment(.center)
             Spacer()
             Button(cancelTitle) {model.cancel()}.buttonStyle(SecondaryButtonStyle(height: 56)).disabled(!model.canCancel)
         }.padding(.horizontal, 28).padding(.bottom, 8)
@@ -257,17 +256,21 @@ private struct EditStep: View {
                 if (model.edit.settings["transition"]?.string ?? "cut") != "cut" {
                     ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
                 }
-                if model.project?.music.isEmpty == false, model.edit.settings["useMusic"]?.bool != false {
-                    Toggle(isOn: Binding(get: {model.edit.settings["beatSync"]?.bool ?? true}, set: {model.edit.settings["beatSync"] = .flag($0)})) {
-                        Label("חיתוך לפי קצב השיר", systemImage: "metronome").font(RK.font(14, 500)).foregroundStyle(RK.ink)
-                    }.tint(RK.accent)
-                }
+                ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
                 if model.project?.scores.isEmpty == false {
                     Toggle(isOn: Binding(get: {model.edit.settings["slowPeak"]?.bool ?? false}, set: {model.edit.settings["slowPeak"] = .flag($0)})) {
                         Label("האטה ברגע השיא", systemImage: "tortoise").font(RK.font(14, 500)).foregroundStyle(RK.ink)
                     }.tint(RK.accent).accessibilityIdentifier("edit.slowPeak")
                 }
             }.disabled(model.busy).rkRow(top: 10)
+            if model.edit.clips.count > 1, model.edit.settings["wholeVideo"]?.bool != true {
+                ChoiceGroup(title: "אורך הסרט", options: [
+                    (RK.seconds(30), "30"), (RK.seconds(45), "45"),
+                    (NSLocalizedString("דקה", comment: "One minute movie length"), "60"),
+                    (NSLocalizedString("הכל", comment: "Keep every suggested moment"), "all"),
+                ], selection: Binding(get: {model.targetLength}, set: {model.pickLength($0)}))
+                .disabled(model.busy).accessibilityIdentifier("edit.length").rkRow(top: 12)
+            }
             clipsHeader.rkRow(top: 12)
             if model.edit.clips.count > 1 {clipTools.rkRow(top: 0, bottom: 4)}
             ForEach($model.edit.clips) {$clip in
@@ -277,7 +280,7 @@ private struct EditStep: View {
             .onMove {if !model.busy {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}}
             .onDelete {if !model.busy {model.edit.clips.remove(atOffsets: $0)}}
             if model.edit.clips.isEmpty {
-                Text("לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני.").font(RK.font(14)).foregroundStyle(RK.soft).rkCard().rkRow()
+                Text("לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני.").font(RK.font(14)).foregroundStyle(RK.soft).rkCard().rkRow()
             } else {
                 Text("החזיקו וגררו קטע לשינוי הסדר, החליקו למחיקה.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).rkRow()
             }
@@ -351,11 +354,6 @@ private struct EditStep: View {
                 if let shuffled, shuffled == model.edit.clips, model.undoAvailable {
                     tool("ביטול ערבוב", symbol: "arrow.uturn.backward") {model.undo(); self.shuffled = nil}
                 }
-                Menu {
-                    Button("סרט של 30 שניות") {model.autoPick(seconds: 30)}
-                    Button("סרט של דקה") {model.autoPick(seconds: 60)}
-                    Button("סרט של 2 דקות") {model.autoPick(seconds: 120)}
-                } label: {toolLabel("בחירה אוטומטית", symbol: "wand.and.stars")}
             }
         }.disabled(model.busy)
     }
@@ -434,7 +432,7 @@ private struct ActivityCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("פעילות לאורך הסרטון").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                Text("רגעים בולטים לאורך הסרטון").font(RK.font(14, 500)).foregroundStyle(RK.ink)
                 Spacer()
                 Button(action: tune) {
                     Text(verbatim: String(format: NSLocalizedString("רגישות · %@", comment: "Detection sensitivity chip"), level))
@@ -449,7 +447,7 @@ private struct ActivityCard: View {
             }
             .frame(height: 52, alignment: .bottom)
             .environment(\.layoutDirection, .leftToRight)
-            .accessibilityElement().accessibilityLabel("גרף הפעילות לאורך הסרטון")
+            .accessibilityElement().accessibilityLabel("גרף הרגעים הבולטים לאורך הסרטון")
             HStack {
                 ForEach(0..<4) {i in
                     Text(verbatim: RK.clock(duration * Double(i) / 3))
@@ -503,7 +501,7 @@ private struct ClipRow: View {
                 Text(verbatim: RK.seconds(clip.duration)).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
             }
             Spacer(minLength: 0)
-            if let score = clip.score {Pill(text: "\(Int(score * 100))%")}
+            if let score = clip.score, score >= 0.8 {Pill(text: NSLocalizedString("רגע שיא", comment: "A clip among the video's strongest moments"))}
             else if clip.manual == true {Pill(text: NSLocalizedString("ידני", comment: "Manually added clip"), fill: RK.raised, ink: RK.soft)}
             if canTrim {
                 Button(action: trim) {
@@ -525,16 +523,16 @@ private struct SensitivitySheet: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("רגישות זיהוי הפעילות").font(RK.font(19, 700, style: .title3)).foregroundStyle(RK.ink)
+            Text("רגישות זיהוי הרגעים").font(RK.font(19, 700, style: .title3)).foregroundStyle(RK.ink)
             // Higher sensitivity is a lower activity threshold, so more clips.
             Slider(value: Binding(get: {1.15 - model.threshold}, set: {model.threshold = 1.15 - $0}), in: 0.25...0.9, step: 0.05) {
-                Text("רגישות זיהוי הפעילות")
+                Text("רגישות זיהוי הרגעים")
             } minimumValueLabel: {
                 Text("פחות קטעים").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
             } maximumValueLabel: {
                 Text("יותר קטעים").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
             }.tint(RK.accent)
-            Text("הצעות הפעילות יוחלפו; ניתן לבטל את השינוי.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+            Text("הרגעים המוצעים יוחלפו; ניתן לבטל את השינוי.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
             Spacer(minLength: 0)
             Button("הפקת הצעות מחדש") {model.retune(); dismiss()}.buttonStyle(PrimaryButtonStyle()).disabled(model.busy)
         }
@@ -542,6 +540,41 @@ private struct SensitivitySheet: View {
         .presentationBackground(RK.bg)
         .environment(\.layoutDirection, AppLanguage.direction)
     }
+}
+
+/// The movie as it will come out, with its music, framing and colour, on
+/// the steps after the edit. Any change clears it until it is built again.
+private struct EditPreviewCard: View {
+    @ObservedObject var model: EditorModel
+    @StateObject private var playback = PreviewPlayback()
+    @State private var built = false
+    var body: some View {
+        VStack(spacing: 8) {
+            if model.previewEdit != nil {
+                VideoPlayer(player: playback.player)
+                    .frame(height: upright ? 320 : 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .accessibilityIdentifier("preview.player")
+            } else {
+                Button {built = true; model.preview()} label: {
+                    if model.work == .previewing {ProgressView().tint(RK.accent)}
+                    else {Label(built ? LocalizedStringKey("עדכון התצוגה המקדימה") : LocalizedStringKey("צפייה בסרט לפני הייצוא"), systemImage: "play.rectangle")}
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(model.busy || model.editValidationMessage != nil)
+                .accessibilityIdentifier("preview.build")
+                if built {
+                    Text("הוחל שינוי מאז התצוגה האחרונה.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                }
+            }
+        }
+        .onAppear {if let preview = model.previewEdit {built = true; playback.showEdit(preview)}}
+        .onChange(of: model.previewEdit) {_, preview in
+            if let preview {playback.showEdit(preview, play: true)} else {playback.showSource(Optional<URL>.none)}
+        }
+        .onDisappear {playback.pause()}
+    }
+    private var upright: Bool {model.edit.settings["aspect"]?.string == "9:16"}
 }
 
 // MARK: - Music
@@ -617,11 +650,12 @@ private struct MusicStep: View {
     @State private var thinking = false
     var body: some View {
         List {
+            if !songs.isEmpty {EditPreviewCard(model: model).rkRow(top: 0)}
             HStack(spacing: 10) {
                 Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
                     .accessibilityIdentifier("music.youtube")
-            }.buttonStyle(.plain).disabled(model.busy).rkRow(top: 0)
+            }.buttonStyle(.plain).disabled(model.busy).rkRow()
             if let reading = model.project?.reading {
                 SongIdeasCard(reading: reading, named: named, thinking: thinking) {idea in
                     showYouTube = true; query = idea.query; go()
@@ -822,6 +856,7 @@ private struct ExportStep: View {
     @State private var naming = false
     var body: some View {
         List {
+            EditPreviewCard(model: model).rkRow(top: 0)
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: model.movieDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
@@ -834,7 +869,7 @@ private struct ExportStep: View {
                     Text(verbatim: model.expectedFormat).font(RK.font(12, 400, style: .caption1)).monospacedDigit().foregroundStyle(RK.soft)
                 }
                 Spacer(minLength: 0)
-            }.rkCard(padding: 16).rkRow(top: 0)
+            }.rkCard(padding: 16).rkRow()
             Group {
                 ChoiceGroup(title: "מסגרת", options: [(NSLocalizedString("מקור", comment: "Source framing"), "source"), (NSLocalizedString("סטורי 9:16", comment: "Story framing"), "9:16")], selection: setting("aspect", fallback: "source"))
                 if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
@@ -843,7 +878,6 @@ private struct ExportStep: View {
                 if model.project?.reading != nil {
                     ChoiceGroup(title: "צבע", options: [(NSLocalizedString("לפי האווירה ✨", comment: "Colour grade chosen for the content kind"), "auto"), (NSLocalizedString("מקורי", comment: "No colour grade"), "none")], selection: setting("look", fallback: "auto"))
                 }
-                ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
                 ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
             }.disabled(model.busy).rkRow()
             VStack(alignment: .leading, spacing: 10) {
@@ -859,7 +893,6 @@ private struct ExportStep: View {
                 .accessibilityIdentifier("export.suggestWords")
                 if let caption = model.edit.settings["caption"]?.string, !caption.isEmpty {CaptionRow(caption: caption)}
             }.rkCard(padding: 16).disabled(model.busy).rkRow(top: 10)
-            Text("כל הייצואים הם SDR ב־30fps. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).rkRow()
             if model.movieURL != nil {
                 Button(action: showMovie) {Label("לסרט האחרון שנוצר", systemImage: "play.rectangle")}
                     .buttonStyle(SecondaryButtonStyle()).disabled(model.busy).rkRow()

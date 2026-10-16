@@ -150,7 +150,8 @@ struct MusicStartView: View {
         drop = await model.dropStart(for: song)
         // A song whose start nobody chose yet starts where its drop meets the peak.
         if let drop, model.edit.settings["musicStart:" + song.id] == nil, !(project.music.first?.id == song.id && model.edit.settings["musicStart"].map({$0.string != "0"}) == true) {
-            setStart(drop.start)
+            // Kept even if the sheet is closed without confirming: no start was chosen to keep.
+            setStart(drop.start); model.edit.setMusicStart(drop.start, for: song.id)
         }
     }
     private func stop() {

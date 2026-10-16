@@ -61,6 +61,8 @@ extension Edit {
     /// The most clips one movie can hold. The editor, the activity
     /// suggestions and the engine all use this one number.
     static let clipLimit = 500
+    /// The movie length a new edit aims at, in seconds: short enough for a Reel or a status.
+    static let defaultLength = "45"
     /// A long ride can suggest more clips than one movie holds. All stay
     /// listed; only the strongest of the chosen ones stay chosen, so the
     /// default edit exports.

@@ -977,6 +977,22 @@
         }
       }
     },
+    "גרף הרגעים הבולטים לאורך הסרטון" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chart of the standout moments across the video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "גרף הרגעים הבולטים לאורך הסרטון"
+          }
+        }
+      }
+    },
     "דיבור ב־%d%% מהזמן" : {
       "localizations" : {
         "en" : {
@@ -1037,6 +1053,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "דעיכה"
+          }
+        }
+      }
+    },
+    "דקה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 minute"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "דקה"
           }
         }
       }
@@ -1261,6 +1293,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ההורדה מ־YouTube הגיעה שבורה ונעצרה. נסו שוב."
+          }
+        }
+      }
+    },
+    "הוחל שינוי מאז התצוגה האחרונה." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something changed since the last preview."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הוחל שינוי מאז התצוגה האחרונה."
           }
         }
       }
@@ -1537,6 +1585,22 @@
         }
       }
     },
+    "הייצוא הוא SDR בקצב 30 פריימים לשנייה. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exports are SDR at 30 frames per second. Original resolution does not keep HDR and is not a lossless export."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הייצוא הוא SDR בקצב 30 פריימים לשנייה. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן."
+          }
+        }
+      }
+    },
     "הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה." : {
       "localizations" : {
         "en" : {
@@ -1565,6 +1629,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הייצוא נכשל באייפון."
+          }
+        }
+      }
+    },
+    "הכל" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הכל"
           }
         }
       }
@@ -2289,6 +2369,38 @@
         }
       }
     },
+    "הרגעים הבולטים הוחזרו. ניתן לבטל את השינוי." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The standout moments are back. You can undo this."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרגעים הבולטים הוחזרו. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "הרגעים הבולטים נבחרים לפי תנועה, קולות, דיבור, צחוק ואנשים בפריים, לפי סוג הסרטון שזוהה. אפשר תמיד לשנות את הבחירה." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standout moments are chosen from motion, sound, speech, laughter and people in frame, weighted for the kind of video detected. You can always change the choice."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרגעים הבולטים נבחרים לפי תנועה, קולות, דיבור, צחוק ואנשים בפריים, לפי סוג הסרטון שזוהה. אפשר תמיד לשנות את הבחירה."
+          }
+        }
+      }
+    },
     "הרגעים החשובים" : {
       "localizations" : {
         "en" : {
@@ -2301,6 +2413,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "הרגעים החשובים"
+          }
+        }
+      }
+    },
+    "הרגעים המוצעים יוחלפו; ניתן לבטל את השינוי." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The suggested moments will be replaced; you can undo this."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הרגעים המוצעים יוחלפו; ניתן לבטל את השינוי."
           }
         }
       }
@@ -3309,6 +3437,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "לא נמצא בסרטון שמע שהאייפון יכול לנגן."
+          }
+        }
+      }
+    },
+    "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No standout moments found. Change the sensitivity or add a clip by hand."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני."
           }
         }
       }
@@ -4849,6 +4993,22 @@
         }
       }
     },
+    "עדכון התצוגה המקדימה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update the preview"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "עדכון התצוגה המקדימה"
+          }
+        }
+      }
+    },
     "עוד אין מוזיקה בפרויקט. הוסיפו שיר מהקבצים או מ־YouTube." : {
       "localizations" : {
         "en" : {
@@ -5297,6 +5457,22 @@
         }
       }
     },
+    "צפייה בסרט לפני הייצוא" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch the movie before exporting"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "צפייה בסרט לפני הייצוא"
+          }
+        }
+      }
+    },
     "קובץ המוזיקה אינו מכיל שמע." : {
       "localizations" : {
         "en" : {
@@ -5517,6 +5693,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "רגישות זיהוי הפעילות"
+          }
+        }
+      }
+    },
+    "רגישות זיהוי הרגעים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moment detection sensitivity"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגישות זיהוי הרגעים"
+          }
+        }
+      }
+    },
+    "רגע שיא" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peak moment"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגע שיא"
+          }
+        }
+      }
+    },
+    "רגעים בולטים לאורך הסרטון" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standout moments across the video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגעים בולטים לאורך הסרטון"
           }
         }
       }
