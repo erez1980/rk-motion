@@ -63,9 +63,11 @@ enum YouTubeMusic {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(fileName(for: title))
         try await fetch(stream.url, to: target, progress: progress)
-        // A song that keeps its silent tail is still a song, so a failed
-        // repair leaves the download as it came.
-        try? await trimToAudio(target)
+        // A song that keeps its silent stretch is still a song, so a failed
+        // repair leaves the download as it came; a cancel still cancels.
+        do {try await trimToAudio(target)}
+        catch is CancellationError {try? FileManager.default.removeItem(at: target); throw CancellationError()}
+        catch {}
         return target
     }
 
@@ -114,7 +116,11 @@ enum YouTubeMusic {
             while let sample = samples.copyNextSampleBuffer() {
                 let shift = gaps.shift(for: sample)
                 let moved = shift == .zero ? sample : try shifted(sample, by: shift)
-                while !input.isReadyForMoreMediaData {try await Task.sleep(nanoseconds: 2_000_000)}
+                while !input.isReadyForMoreMediaData {
+                    // A writer that fails (a full disk) never becomes ready again.
+                    guard writer.status == .writing else {throw writer.error ?? damaged}
+                    do {try await Task.sleep(nanoseconds: 2_000_000)} catch {writer.cancelWriting(); throw error}
+                }
                 guard input.append(moved) else {writer.cancelWriting(); throw writer.error ?? damaged}
             }
             guard reader.status == .completed else {writer.cancelWriting(); throw reader.error ?? damaged}
