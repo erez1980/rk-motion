@@ -397,6 +397,17 @@ actor LocalEngine {
         let audio: AVMutableAudioMix
         let length: Double
         let preset: String
+        /// GoPro ride readings to draw over the movie, twice a second; empty when off.
+        var overlay: [Telemetry.Frame] = []
+    }
+    private var telemetryCache: [String: [Telemetry.Sample]] = [:]
+    /// The project's GPS readings, read from its videos once.
+    func telemetry(_ project: LocalProject) async -> [Telemetry.Sample] {
+        let key = project.id + "|" + project.files.joined(separator: "|")
+        if let cached = telemetryCache[key] {return cached}
+        let samples = await Telemetry.load(project)
+        if !Task.isCancelled {telemetryCache[key] = samples}
+        return samples
     }
     /// One video of the edit, read once for all the clips taken from it.
     private struct Source {
@@ -651,7 +662,12 @@ actor LocalEngine {
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
-        return PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
+        var prepared = PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
+        if edit.settings["telemetry"]?.bool != false {
+            let samples = await telemetry(project)
+            prepared.overlay = Telemetry.frames(clips: clips, segments: segments, speed: speed, length: length, samples: samples)
+        }
+        return prepared
     }
     /// When the opening title shows: in after a beat, held, then out, all
     /// inside the movie even when it is only a few seconds long.
@@ -707,13 +723,13 @@ actor LocalEngine {
         guard let composition = prepared.composition.copy() as? AVComposition,
               let video = prepared.video.copy() as? AVVideoComposition,
               let audio = prepared.audio.copy() as? AVAudioMix else {throw AppError(message: "הרכבת הסרט נכשלה: ")}
-        return PreviewEdit(composition: composition, video: video, audio: audio)
+        return PreviewEdit(composition: composition, video: video, audio: audio, overlay: prepared.overlay)
     }
     /// A project's videos played one after another as they are, with their
     /// own sound, so its timeline's seconds are the player's seconds.
     func joinedSource(_ project: LocalProject) async throws -> PreviewEdit {
         var whole = Edit(clips: project.wholeClips)
-        whole.settings["useMusic"] = .flag(false); whole.settings["quality"] = .text("720")
+        whole.settings["useMusic"] = .flag(false); whole.settings["quality"] = .text("720"); whole.settings["telemetry"] = .flag(false)
         let prepared = try await prepare(project, edit: whole, closing: false) {_, _ in}
         guard let composition = prepared.composition.copy() as? AVComposition,
               let video = prepared.video.copy() as? AVVideoComposition,
@@ -731,10 +747,12 @@ actor LocalEngine {
         let card = Self.titleCard(title: opening.title, subtitle: opening.subtitle, size: size)
         // The colour grade that suits the footage, unless the rider turned it off.
         let grade = (edit.settings["look"]?.string ?? "auto") == "auto" ? project.reading.map {Look.grade(for: $0.kind)} : nil
-        // A title or a grade needs a second file for a moment, so twice the room.
+        // The GoPro ride computer, drawn once per distinct reading.
+        let rideFrames = prepared.overlay, panels = Telemetry.panels(rideFrames, render: size)
+        // A title, a grade or a ride computer needs a second file for a moment, so twice the room.
         let movieBytes = Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8)
-        try LocalStore.checkSpace(required: movieBytes * (card == nil && grade == nil ? 1 : 2) + 256 * 1024 * 1024)
-        guard card != nil || grade != nil else {
+        try LocalStore.checkSpace(required: movieBytes * (card == nil && grade == nil && panels.isEmpty ? 1 : 2) + 256 * 1024 * 1024)
+        guard card != nil || grade != nil || !panels.isEmpty else {
             try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.1 + $0 * 0.9, "ייצוא הסרט באייפון…")}
             return await finish(prepared.length, started: started, progress: progress)
         }
@@ -747,7 +765,8 @@ actor LocalEngine {
         let movie = AVURLAsset(url: untitled), length = prepared.length
         let overlay = card.map {CIImage(cgImage: $0)}
         let titled = try await AVMutableVideoComposition.videoComposition(with: movie) {request in
-            let frame = grade.map {Look.apply($0, to: request.sourceImage)} ?? request.sourceImage
+            let graded = grade.map {Look.apply($0, to: request.sourceImage)} ?? request.sourceImage
+            let frame = Telemetry.composite(graded, at: request.compositionTime.seconds, frames: rideFrames, panels: panels)
             let alpha = overlay == nil ? 0 : Self.titleOpacity(at: request.compositionTime.seconds, length: length)
             guard let overlay, alpha > 0 else {request.finish(with: frame, context: nil); return}
             let faded = overlay.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(alpha))])
@@ -756,7 +775,7 @@ actor LocalEngine {
         titled.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         titled.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
         titled.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
-        try await run(movie, video: titled, audio: nil, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.7 + $0 * 0.3, card == nil ? "צובעת את הסרט לפי האווירה…" : "הוספת הכותרת…")}
+        try await run(movie, video: titled, audio: nil, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.7 + $0 * 0.3, card != nil ? "הוספת הכותרת…" : grade != nil ? "צובעת את הסרט לפי האווירה…" : "הוספת נתוני הרכיבה…")}
         return await finish(prepared.length, started: started, progress: progress)
     }
     private func finish(_ length: Double, started: Date, progress: Progress) async -> Double {

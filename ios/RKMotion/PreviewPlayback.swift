@@ -9,6 +9,8 @@ struct PreviewEdit: Equatable {
     let composition: AVComposition
     let video: AVVideoComposition
     let audio: AVAudioMix
+    /// GoPro ride readings to show over the edit, twice a second of movie.
+    var overlay: [Telemetry.Frame] = []
     func makeItem() -> AVPlayerItem {
         let item = AVPlayerItem(asset: composition)
         item.videoComposition = video; item.audioMix = audio

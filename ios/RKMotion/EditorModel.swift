@@ -25,6 +25,19 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The prepared edit, played only through `PreviewPlayback`, which makes
     /// its own item from it.
     @Published var previewEdit: PreviewEdit?
+    /// Whether the project's videos carry GoPro GPS, so the ride computer can be offered.
+    @Published private(set) var hasTelemetry = false
+    func checkTelemetry() async {
+        guard let p = project else {hasTelemetry = false; return}
+        let found = !(await engine.telemetry(p)).isEmpty
+        if project?.id == p.id {hasTelemetry = found}
+    }
+    /// The ride reading shown over the edit preview at a moment of the movie.
+    func readout(at moment: Double) -> Telemetry.Readout? {
+        guard moment.isFinite, moment >= 0, edit.settings["telemetry"]?.bool != false, let frames = previewEdit?.overlay else {return nil}
+        let index = Int(moment / 0.5)
+        return index < frames.count ? frames[index].readout : nil
+    }
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
     /// A project of several videos, played one after another as its source.
@@ -238,7 +251,28 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
         // Undated videos keep their picked order; dated ones are compared by date.
         guard dated.allSatisfy({$0.date != nil}) else {return files}
-        return dated.sorted {($0.date!, $0.index) < ($1.date!, $1.index)}.map(\.url)
+        return ordered(dated.map {($0.url, $0.date!)})
+    }
+    /// Date first. GoPro stamps every chapter of one recording with the same
+    /// date, so those ties go by recording, placed where its first chapter was
+    /// picked, then by the chapter number in the name; anything else keeps its
+    /// picked place. One key per video, so the order is the same however the
+    /// sort compares them.
+    nonisolated static func ordered(_ dated: [(url: URL, date: Date)]) -> [URL] {
+        let chapters = dated.map {goProChapter($0.url)}
+        let keys = dated.indices.map {index -> (date: Date, group: Int, chapter: Int, index: Int) in
+            guard let mine = chapters[index] else {return (dated[index].date, index, 0, index)}
+            let first = dated.indices.first {chapters[$0]?.recording == mine.recording && dated[$0].date == dated[index].date} ?? index
+            return (dated[index].date, first, mine.chapter, index)
+        }
+        return keys.sorted {($0.date, $0.group, $0.chapter, $0.index) < ($1.date, $1.group, $1.chapter, $1.index)}.map {dated[$0.index].url}
+    }
+    /// GoPro names a recording's chapters GX01nnnn, GX02nnnn…: chapter, then recording number.
+    nonisolated static func goProChapter(_ url: URL) -> (recording: Int, chapter: Int)? {
+        let name = url.deletingPathExtension().lastPathComponent.uppercased()
+        guard name.count == 8, name.hasPrefix("G"), let kind = name.dropFirst().first, "HXL".contains(kind),
+              let chapter = Int(name.dropFirst(2).prefix(2)), let recording = Int(name.suffix(4)) else {return nil}
+        return (recording, chapter)
     }
     /// Writes a manifest, copies the videos into the new project's folder in
     /// pieces, and only then saves the project. An interruption leaves the
