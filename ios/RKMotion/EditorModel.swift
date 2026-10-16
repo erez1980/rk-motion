@@ -250,14 +250,22 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             dated.append((url, date, index))
         }
         // Undated videos keep their picked order; dated ones are compared by date.
-        // GoPro stamps every chapter of one recording with the same date, so
-        // the chapter number in its name settles those ties, not the tap order.
         guard dated.allSatisfy({$0.date != nil}) else {return files}
-        return dated.sorted {a, b in
-            if a.date! != b.date! {return a.date! < b.date!}
-            if let x = goProChapter(a.url), let y = goProChapter(b.url), x.recording == y.recording, x.chapter != y.chapter {return x.chapter < y.chapter}
-            return a.index < b.index
-        }.map(\.url)
+        return ordered(dated.map {($0.url, $0.date!)})
+    }
+    /// Date first. GoPro stamps every chapter of one recording with the same
+    /// date, so those ties go by recording, placed where its first chapter was
+    /// picked, then by the chapter number in the name; anything else keeps its
+    /// picked place. One key per video, so the order is the same however the
+    /// sort compares them.
+    nonisolated static func ordered(_ dated: [(url: URL, date: Date)]) -> [URL] {
+        let chapters = dated.map {goProChapter($0.url)}
+        let keys = dated.indices.map {index -> (date: Date, group: Int, chapter: Int, index: Int) in
+            guard let mine = chapters[index] else {return (dated[index].date, index, 0, index)}
+            let first = dated.indices.first {chapters[$0]?.recording == mine.recording && dated[$0].date == dated[index].date} ?? index
+            return (dated[index].date, first, mine.chapter, index)
+        }
+        return keys.sorted {($0.date, $0.group, $0.chapter, $0.index) < ($1.date, $1.group, $1.chapter, $1.index)}.map {dated[$0.index].url}
     }
     /// GoPro names a recording's chapters GX01nnnn, GX02nnnn…: chapter, then recording number.
     nonisolated static func goProChapter(_ url: URL) -> (recording: Int, chapter: Int)? {

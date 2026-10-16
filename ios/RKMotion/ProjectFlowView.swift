@@ -373,7 +373,7 @@ private struct EditStep: View {
         .fullScreenCover(isPresented: $fullScreen) {
             ZStack(alignment: .topTrailing) {
                 Color.black.ignoresSafeArea()
-                VideoPlayer(player: playback.player).ignoresSafeArea()
+                VideoPlayer(player: playback.player) {ReadoutOverlay(model: model, player: playback.player, active: playback.showingEdit)}.ignoresSafeArea()
                 Button {fullScreen = false} label: {
                     Image(systemName: "xmark").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                         .frame(width: 44, height: 44).background(.black.opacity(0.5), in: Circle())

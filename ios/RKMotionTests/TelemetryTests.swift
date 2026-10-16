@@ -14,11 +14,11 @@ final class TelemetryTests: XCTestCase {
     private func short(_ value: UInt16) -> [UInt8] {withUnsafeBytes(of: value.bigEndian) {Array($0)}}
     private let l = UInt8(ascii: "l"), L = UInt8(ascii: "L"), complex = UInt8(ascii: "?")
 
-    private func stream(fix: Int32, rows: [[Int32]], key: String = "GPS5", tail: [UInt8] = [], scale: [Int32] = [10_000_000, 10_000_000, 1000, 1000, 1000]) -> Data {
+    private func stream(fix: Int32?, rows: [[Int32]], key: String = "GPS5", tail: [UInt8] = [], tails: [[UInt8]]? = nil, scale: [Int32] = [10_000_000, 10_000_000, 1000, 1000, 1000]) -> Data {
         let size = key == "GPS9" ? 32 : 20
-        let readings = rows.flatMap {row in row.flatMap(long) + tail}
+        let readings = rows.indices.flatMap {rows[$0].flatMap(long) + (tails?[$0] ?? tail)}
         return Data(nest("DEVC", nest("STRM",
-            entry("GPSF", L, 4, 1, long(fix)) +
+            (fix.map {entry("GPSF", L, 4, 1, long($0))} ?? []) +
             entry("SCAL", l, 4, scale.count, scale.flatMap(long)) +
             entry(key, key == "GPS9" ? complex : l, size, rows.count, readings))))
     }
@@ -38,6 +38,13 @@ final class TelemetryTests: XCTestCase {
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0][3], 12.5, accuracy: 1e-6)
         XCTAssertEqual(rows[0][4], 126, accuracy: 1e-6)
+    }
+    func testGPS9KeepsOnlyReadingsWithTheirOwnLock() {
+        // No stream-wide GPSF: each GPS9 reading says whether it was locked.
+        let row: [Int32] = [321_234_567, 347_654_321, 100_000, 12_500, 12_600, 9000, 3600]
+        let rows = Telemetry.gps(stream(fix: nil, rows: [row, row, row], key: "GPS9", tails: [short(150) + short(0), short(150) + short(3), short(150) + short(2)],
+                                        scale: [10_000_000, 10_000_000, 1000, 1000, 100, 1, 1000, 100, 1]))
+        XCTAssertEqual(rows.count, 2)
     }
     func testIgnoresReadingsWithoutASatelliteLock() {
         XCTAssertTrue(Telemetry.gps(stream(fix: 0, rows: [[321_234_567, 347_654_321, 100_000, 12_500, 12_600]])).isEmpty)
@@ -95,6 +102,15 @@ final class TelemetryTests: XCTestCase {
         // No reading then, or past the end, leaves the frame as it was.
         XCTAssertTrue(Telemetry.composite(movie, at: 0.7, frames: frames, panels: panels) === movie)
         XCTAssertTrue(Telemetry.composite(movie, at: 9, frames: frames, panels: panels) === movie)
+    }
+    func testOrdersChaptersTheSameWhicheverWayTheSortLooks() {
+        // Both recordings share a date; recording 7 was picked first.
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let picked = ["GX020007.MP4", "GX010008.MP4", "GX010007.MP4"].map {(url: URL(fileURLWithPath: "/x/" + $0), date: date)}
+        XCTAssertEqual(EditorModel.ordered(picked).map(\.lastPathComponent), ["GX010007.MP4", "GX020007.MP4", "GX010008.MP4"])
+        // An earlier date still comes first, and other videos keep their place.
+        let mixed = [(url: URL(fileURLWithPath: "/x/IMG_2.MOV"), date: date), (url: URL(fileURLWithPath: "/x/IMG_1.MOV"), date: date.addingTimeInterval(-60))]
+        XCTAssertEqual(EditorModel.ordered(mixed).map(\.lastPathComponent), ["IMG_1.MOV", "IMG_2.MOV"])
     }
     func testReadsGoProChapterNames() {
         XCTAssertEqual(EditorModel.goProChapter(URL(fileURLWithPath: "/x/GX020482.MP4"))?.chapter, 2)

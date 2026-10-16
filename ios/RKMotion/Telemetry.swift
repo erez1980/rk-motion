@@ -59,8 +59,11 @@ enum Telemetry {
                 if type == 0 {walk(start, end)}
                 else if key == "SCAL" {scale = numbers(type, size, count, start)}
                 else if key == "GPSF" {fix = numbers(type, size, count, start).first ?? fix}
-                else if (key == "GPS5" || key == "GPS9"), size >= 20, fix >= 2 {
+                else if key == "GPS5" && size >= 20 && fix >= 2 || key == "GPS9" && size >= 32 {
                     for entry in 0..<count {
+                        // GPS9 carries each reading's own lock as its ninth field,
+                        // an unsigned short after seven longs and the precision.
+                        if key == "GPS9" && integer(start + entry * size + 30, 2, signed: false) < 2 {continue}
                         let row = (0..<5).map {field -> Double in
                             let divisor = scale.count > field ? scale[field] : (scale.first ?? 1)
                             return integer(start + entry * size + field * 4, 4, signed: true) / (divisor == 0 ? 1 : divisor)
