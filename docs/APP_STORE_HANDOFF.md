@@ -224,6 +224,27 @@ authorized. No Apple credentials are currently available.
   synthetic and click-track tests, and how the new transitions look on a
   device.
 
+- Checkpoint 10 (GoPro ride data, Claude): Erez asked to merge a branch that
+  had built multi-file rides, the drop, slow motion, smart framing and a
+  GUI pass. Meanwhile main had merged its own versions of all of those
+  (#4 to #13), and 13 files conflicted. At his choice only what main lacked
+  was ported. The old branch exists only as the local ref
+  `round-0.23-backup` (2242979) in that session.
+  - GoPro ride data (`Telemetry.swift`, setting `telemetry`): GPMF GPS5 and
+    GPS9 are read from each video at its place on the timeline. Readings
+    are scaled by SCAL, skipped without a lock, and distance is summed
+    across gaps.
+  - The export draws the panel in the existing Core Image second pass
+    rather than Core Animation, since Core Animation brings the simulator's
+    export down. The preview shows a matching SwiftUI badge.
+    `Clip.footage(atScreen:)` inverts `screenOffset`, slow motion included.
+  - GoPro chapters of one recording share a creation date, so
+    `chronological` breaks those ties by chapter number.
+  - The step action bar floats on Liquid Glass on iOS 26.
+
+  Version 0.29.0. Not verified: GPMF read from real GoPro files on a
+  device.
+
 ## Current release limits and next steps
 
 - PR remains draft; no merge, purchase, signed upload or public release occurred.

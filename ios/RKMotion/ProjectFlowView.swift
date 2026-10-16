@@ -116,12 +116,47 @@ struct ProjectFlowView: View {
 }
 
 /// The pinned area under a step: what to do next.
+/// The GoPro ride computer over the edit preview, in step with playback:
+/// a player item cannot draw the export's overlay, so the screen does.
+private struct ReadoutOverlay: View {
+    @ObservedObject var model: EditorModel
+    let player: AVPlayer
+    let active: Bool
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) {_ in
+            if active, let readout = model.readout(at: player.currentTime().seconds) {ReadoutBadge(readout: readout)}
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(10)
+        .environment(\.layoutDirection, .leftToRight)
+        .allowsHitTesting(false)
+    }
+}
+private struct ReadoutBadge: View {
+    let readout: Telemetry.Readout
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(verbatim: "\(readout.speed)").font(RK.font(28, 700)).monospacedDigit()
+                    .foregroundStyle(Color(red: 0.78, green: 0.96, blue: 0.26)).contentTransition(.numericText())
+                Text(verbatim: Telemetry.unit).font(RK.font(11, 500)).foregroundStyle(.white.opacity(0.85))
+            }
+            Text(verbatim: Telemetry.detail(readout)).font(RK.font(10)).foregroundStyle(.white.opacity(0.8))
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .animation(.snappy, value: readout)
+    }
+}
+
 private struct ActionBar<Content: View>: View {
     @ViewBuilder let content: Content
     var body: some View {
+        // Floats over the scrolling step on glass, so the work stays in view.
         VStack(spacing: 8) {content}
-            .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 8)
-            .background(RK.bg)
+            .padding(10)
+            .rkGlass(cornerRadius: 28)
+            .padding(.horizontal, 12).padding(.top, 6).padding(.bottom, 4)
     }
 }
 
@@ -255,7 +290,7 @@ private struct EditStep: View {
     var body: some View {
         List {
             VStack(spacing: 10) {
-                VideoPlayer(player: playback.player)
+                VideoPlayer(player: playback.player) {ReadoutOverlay(model: model, player: playback.player, active: playback.showingEdit)}
                     .accessibilityIdentifier("edit.player")
                 .frame(height: upright && showingEdit ? 300 : 210).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(alignment: .topTrailing) {
@@ -789,7 +824,7 @@ private struct EditPreviewCard: View {
     var body: some View {
         VStack(spacing: 8) {
             if model.previewEdit != nil {
-                VideoPlayer(player: playback.player)
+                VideoPlayer(player: playback.player) {ReadoutOverlay(model: model, player: playback.player, active: true)}
                     .frame(height: upright ? 320 : 200)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .accessibilityIdentifier("preview.player")
@@ -1158,6 +1193,9 @@ private struct ExportStep: View {
                 if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
                     ToggleRow(title: "מסגור חכם לפי האנשים", detail: "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז", isOn: flag("smartFrame", fallback: true))
                 }
+                if model.hasTelemetry {
+                    ToggleRow(title: "נתוני הרכיבה על הסרט", detail: "מהירות, גובה ומרחק מה־GPS של ה־GoPro", isOn: flag("telemetry", fallback: true))
+                }
                 if model.project?.reading != nil {
                     ChoiceGroup(title: "צבע", options: [(NSLocalizedString("לפי האווירה ✨", comment: "Colour grade chosen for the content kind"), "auto"), (NSLocalizedString("מקורי", comment: "No colour grade"), "none")], selection: setting("look", fallback: "auto"))
                 }
@@ -1195,6 +1233,7 @@ private struct ExportStep: View {
             MessageCard(model: model).rkRow()
         }
         .rkScreen()
+        .task(id: model.project?.id) {await model.checkTelemetry()}
         .task(id: model.project?.id) {await prepareSuggestion()}
         .safeAreaInset(edge: .bottom) {
             ActionBar {

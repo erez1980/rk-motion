@@ -113,6 +113,14 @@ struct IconButtonStyle: ButtonStyle {
 }
 
 extension View {
+    /// Liquid Glass where the system has it, frosted material before that.
+    @ViewBuilder func rkGlass(cornerRadius: CGFloat = 24) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            self.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
     func rkCard(padding: CGFloat = 14) -> some View {
         self.padding(padding).frame(maxWidth: .infinity, alignment: .leading)
             .background(RK.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))

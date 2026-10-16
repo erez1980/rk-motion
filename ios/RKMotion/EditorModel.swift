@@ -25,6 +25,19 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The prepared edit, played only through `PreviewPlayback`, which makes
     /// its own item from it.
     @Published var previewEdit: PreviewEdit?
+    /// Whether the project's videos carry GoPro GPS, so the ride computer can be offered.
+    @Published private(set) var hasTelemetry = false
+    func checkTelemetry() async {
+        guard let p = project else {hasTelemetry = false; return}
+        let found = !(await engine.telemetry(p)).isEmpty
+        if project?.id == p.id {hasTelemetry = found}
+    }
+    /// The ride reading shown over the edit preview at a moment of the movie.
+    func readout(at moment: Double) -> Telemetry.Readout? {
+        guard moment.isFinite, moment >= 0, edit.settings["telemetry"]?.bool != false, let frames = previewEdit?.overlay else {return nil}
+        let index = Int(moment / 0.5)
+        return index < frames.count ? frames[index].readout : nil
+    }
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
     /// A project of several videos, played one after another as its source.
@@ -237,8 +250,21 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             dated.append((url, date, index))
         }
         // Undated videos keep their picked order; dated ones are compared by date.
+        // GoPro stamps every chapter of one recording with the same date, so
+        // the chapter number in its name settles those ties, not the tap order.
         guard dated.allSatisfy({$0.date != nil}) else {return files}
-        return dated.sorted {($0.date!, $0.index) < ($1.date!, $1.index)}.map(\.url)
+        return dated.sorted {a, b in
+            if a.date! != b.date! {return a.date! < b.date!}
+            if let x = goProChapter(a.url), let y = goProChapter(b.url), x.recording == y.recording, x.chapter != y.chapter {return x.chapter < y.chapter}
+            return a.index < b.index
+        }.map(\.url)
+    }
+    /// GoPro names a recording's chapters GX01nnnn, GX02nnnn…: chapter, then recording number.
+    nonisolated static func goProChapter(_ url: URL) -> (recording: Int, chapter: Int)? {
+        let name = url.deletingPathExtension().lastPathComponent.uppercased()
+        guard name.count == 8, name.hasPrefix("G"), let kind = name.dropFirst().first, "HXL".contains(kind),
+              let chapter = Int(name.dropFirst(2).prefix(2)), let recording = Int(name.suffix(4)) else {return nil}
+        return (recording, chapter)
     }
     /// Writes a manifest, copies the videos into the new project's folder in
     /// pieces, and only then saves the project. An interruption leaves the
