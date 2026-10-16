@@ -84,6 +84,18 @@ actor LocalEngine {
         let seams = project.joinsVideos ? project.pieces.dropLast().map(\.end) : []
         return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total, seams: seams)
     }
+    /// When the movie's strongest moment plays, in movie seconds, on the
+    /// timeline `export` will make: slow motion and beat moves included.
+    func peakTime(_ project: LocalProject, edit: Edit) async -> Double? {
+        let clips = Self.shaped(edit.clips.filter {$0.selected != false}, project: project, edit: edit)
+        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let transition = edit.settings["transition"]?.string ?? "cut"
+        let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
+        guard !clips.isEmpty, speed > 0, speed.isFinite, !project.scores.isEmpty else {return nil}
+        let overlap = transition == "cut" ? 0 : (fade.isFinite ? fade : 0.5)
+        let planned = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: project.duration)
+        return Highlights.peakTime(planned, scores: project.scores, speed: speed, transition: overlap)
+    }
     /// The finished movie's length exactly as `export` will make it, beat
     /// moves included; nil when the edit cannot be exported as it stands.
     func plannedLength(_ project: LocalProject, edit: Edit) async -> Double? {

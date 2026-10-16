@@ -333,16 +333,24 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The start in `song` that lands its drop on the movie's strongest
     /// moment, with the drop and the moment in their own seconds; nil when
     /// the song has no clear drop or it comes too early to reach the moment.
+    /// Only the first song plays from the movie's first second, so only it
+    /// can be lined up this way.
     func dropStart(for song: LocalMusic) async -> (start: Double, drop: Double, peak: Double)? {
-        guard let p = project, !p.scores.isEmpty, song.duration > 8 else {return nil}
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
-        let clips = LocalEngine.shaped(selectedClips, project: p, edit: edit)
-        guard speed > 0, let peak = Highlights.peakTime(clips, scores: p.scores, speed: speed, transition: fade) else {return nil}
+        guard let p = project, !p.scores.isEmpty, song.duration > 8, p.music.first?.id == song.id else {return nil}
         let bins = Int(song.duration * 4)
         guard let levels = try? await LocalEngine.waveform(LocalStore.file(song.file, project: p.id), bins: bins), levels.count == bins,
-              let drop = Drop.find(levels, rate: Double(bins) / song.duration), let start = Drop.start(drop: drop, peak: peak) else {return nil}
-        return (start, drop, peak)
+              let drop = Drop.find(levels, rate: Double(bins) / song.duration) else {return nil}
+        // Beat moves follow the song's start and shift the moment, so the
+        // start is worked out on the exported timeline until it settles.
+        var trial = edit, result: (start: Double, drop: Double, peak: Double)?
+        trial.setMusicStart(0, for: song.id)
+        for _ in 0..<3 {
+            guard let peak = await engine.peakTime(p, edit: trial), let start = Drop.start(drop: drop, peak: peak) else {return result}
+            if let result, abs(result.start - start) < 0.02 {break}
+            result = (start, drop, peak)
+            trial.setMusicStart(start, for: song.id)
+        }
+        return result
     }
     /// Edits the video as another kind of content: scores the scan's saved
     /// signals with that kind's recipe, picks the moments again and sets its

@@ -105,6 +105,9 @@ final class LocalEngineTests: XCTestCase {
         let planned = await engine.plannedLength(scored, edit: slow)
         let slowLength = try XCTUnwrap(planned)
         XCTAssertEqual(slowLength, 2.8 + Clip.slowSpan, accuracy: 0.05)
+        // The strongest moment plays inside the slowed movie.
+        let peak = await engine.peakTime(scored, edit: slow)
+        XCTAssertTrue((0...slowLength).contains(try XCTUnwrap(peak)))
         let slowPreview = try await engine.preview(scored, edit: slow)
         let slowDuration = try await slowPreview.asset.load(.duration).seconds
         XCTAssertEqual(slowDuration, slowLength, accuracy: 0.1)
