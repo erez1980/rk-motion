@@ -7,26 +7,55 @@ The Mac is used only to sign/install the IPA. Photos stored only in iCloud
 may need to download through the system picker before they can be imported.
 Once the source is local, editing and exporting work offline.
 
-## Install using your Mac
+## Install from the iPhone (SideStore)
 
-1. Download the IPA artifact from a successful **iPhone standalone** Actions
-   run. Unzip the artifact ZIP to obtain `RK-Motion-unsigned.ipa`.
+Every green build of `main` is published as a public
+[GitHub Release](https://github.com/erez1980/rk-motion/releases) with the IPA
+and a SideStore/AltStore source at:
+
+```
+https://github.com/erez1980/rk-motion/releases/latest/download/source.json
+```
+
+SideStore signs the IPA on the iPhone with your own Apple Account, so installs
+and updates happen on the phone without a cable.
+
+One-time setup (the only step that needs a computer, once):
+
+1. Install SideStore with its installer as described at
+   [docs.sidestore.io](https://docs.sidestore.io/) and sign in with your Apple
+   Account. Enable Settings → Privacy & Security → **Developer Mode** when iOS
+   asks, and trust your account under Settings → General → VPN & Device
+   Management.
+2. In SideStore open **Sources → +** and paste the URL above.
+
+Then, from the iPhone only:
+
+3. Open the RK Motion source and tap **Get** (later **Update** when a new build
+   appears). The first install asks you to approve the Apple Account signing.
+4. A free Apple Account signs for seven days; SideStore's **Refresh All**
+   (or its automatic refresh) renews it on the phone. Updating over the
+   existing app keeps your local projects; deleting the app removes them.
+
+A paid Apple Developer account lasts a year per signing instead of seven days.
+
+## Install using your Mac (Sideloadly)
+
+1. Download the IPA from the newest
+   [Release](https://github.com/erez1980/rk-motion/releases/latest).
 2. Connect/unlock your iPhone by USB and accept **Trust This Computer**.
 3. Open [Sideloadly](https://sideloadly.io/), choose the iPhone, drag in the IPA,
    and enter/verify your Apple Account yourself. Start signing/installing.
 4. Follow iOS prompts to trust the developer under Settings → General →
    VPN & Device Management and enable Developer Mode if requested.
-5. Open RK Motion. There is no connection/pairing screen. Select a video and
-   allow Photos add access when saving a finished movie.
 
-The unsigned IPA must be signed before it can run on a standard iPhone.
-Free Personal Team profiles expire after seven days; renew/reinstall or
-configure installer refresh. Use the same signing account and bundle ID for
-updates, without deleting the app, to preserve your local projects.
+The IPA is unsigned and must be signed before it can run on a standard iPhone.
+Use the same signing account and bundle ID for updates, without deleting the
+app, to preserve your local projects.
 
 Sources: [Apple signing](https://support.apple.com/guide/security/app-code-signing-process-sec7c917bf14/web),
 [Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account),
-[Sideloadly FAQ](https://sideloadly.io/faq.html).
+[SideStore docs](https://docs.sidestore.io/), [Sideloadly FAQ](https://sideloadly.io/faq.html).
 
 ## On-device workflow
 
