@@ -231,6 +231,7 @@ enum LocalStore {
                 if playable.count > 1, let parts = await laidOut(playable, project: id) {
                     var p = LocalProject(name: manifest?.name ?? NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: playable[0])
                     p.id = id; p.wholeVideo = manifest?.wholeVideo ?? false; p.parts = parts
+                    p.edit.settings.merge(Edit.newMovieSettings(wholeVideo: p.wholeVideo)) {$1}
                     if (try? save(p)) != nil {finishImport(project: id); report.rescued.append(p); rescued = true}
                 }
                 if rescued {continue}
@@ -238,6 +239,7 @@ enum LocalStore {
             for name in candidates where await isPlayableVideo(folder.appendingPathComponent(name)) {
                 var p = LocalProject(name: manifest?.name ?? NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: name)
                 p.id = id; p.wholeVideo = manifest?.wholeVideo ?? false
+                p.edit.settings.merge(Edit.newMovieSettings(wholeVideo: p.wholeVideo)) {$1}
                 if (try? save(p)) != nil {finishImport(project: id); report.rescued.append(p); rescued = true}
                 break
             }

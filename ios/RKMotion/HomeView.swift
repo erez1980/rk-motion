@@ -7,6 +7,7 @@ struct HomeView: View {
     let newRide: () -> Void
     let open: (LocalProject) -> Void
     let about: () -> Void
+    @State private var deleting: LocalProject?
     var body: some View {
         ScrollView {
             // Lazy, so a long list asks only for the pictures on screen.
@@ -35,7 +36,7 @@ struct HomeView: View {
                             .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         VStack(alignment: .leading, spacing: 3) {
                             Text("סרטון חדש").font(RK.font(19, 700, style: .title3))
-                            Text("בחירת סרטון מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
+                            Text("סרטון אחד או כמה, מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
                         }
                         Spacer()
                     }
@@ -53,6 +54,13 @@ struct HomeView: View {
                 ForEach(model.projects) {project in
                     Button {open(project)} label: {ProjectRow(project: project)}
                         .buttonStyle(.plain).disabled(model.busy)
+                        .contextMenu {
+                            if let movie = project.exports.last {
+                                ShareLink(item: LocalStore.file(movie.file, project: project.id)) {Label("שיתוף הסרט האחרון", systemImage: "square.and.arrow.up")}
+                            }
+                            Button(role: .destructive) {deleting = project} label: {Label("מחיקת הפרויקט מהאייפון", systemImage: "trash")}
+                                .disabled(model.busy)
+                        }
                 }
                 MessageCard(model: model)
                 Text(AppVersion.line).font(RK.font(12, 400, style: .caption2)).monospacedDigit().foregroundStyle(RK.faint)
@@ -60,6 +68,9 @@ struct HomeView: View {
             }.padding(.horizontal, 20).padding(.bottom, 24)
         }
         .background(RK.bg.ignoresSafeArea())
+        .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: Binding(get: {deleting != nil}, set: {if !$0 {deleting = nil}}), titleVisibility: .visible, presenting: deleting) {project in
+            Button("מחיקה", role: .destructive) {Task {await model.delete(project)}}
+        }
         .navigationTitle("הפרויקטים")
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -93,10 +104,9 @@ private struct ProjectRow: View {
         }
         .padding(10).background(RK.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(Rectangle())
-        .task(id: project.source) {
-            guard image == nil else {return}
+        .task(id: project.exports.last?.file ?? project.source) {
             // A missing thumbnail must not block opening a saved project.
-            image = await Thumbnails.shared.image(for: project)
+            image = await Thumbnails.shared.cover(for: project)
         }
     }
     private var meta: String {

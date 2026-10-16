@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct AboutView: View {
+    /// Frees files an interrupted import or export left behind.
+    var clean: (() async -> Void)?
+    @State private var cleaning = false
     var body: some View {
         List {
             Section("פרטיות") {
@@ -11,10 +14,19 @@ struct AboutView: View {
             }.listRowBackground(RK.card)
             Section("עזרה ותמיכה") {
                 Text("יכולת העיבוד ברקע תלויה בגרסה, במכשיר ובהרשאות החתימה. iOS יכולה לעצור פעולה; המקור והעריכה נשמרים, ואפשר לנסות שוב.")
-                Text("הייצוא הנוכחי הוא SDR בקצב 30 פריימים לשנייה. זיהוי הפעילות מבוסס על תנועה ועוצמת שמע ומציע קטעים לבדיקה.")
+                Text("הייצוא הוא SDR בקצב 30 פריימים לשנייה. רזולוציית מקור אינה שימור HDR או ייצוא ללא אובדן.")
+                Text("הרגעים הבולטים נבחרים לפי תנועה, קולות, דיבור, צחוק ואנשים בפריים, לפי סוג הסרטון שזוהה. אפשר תמיד לשנות את הבחירה.")
                 Link("תמיכה ודיווח תקלה", destination: URL(string: "https://github.com/erez1980/rk-motion/issues")!)
                 Text("דיווחים ב־GitHub ציבוריים. אל תצרפו סרטונים פרטיים או מידע אישי.").font(.caption)
             }.listRowBackground(RK.card)
+            if let clean {
+                Section("אחסון") {
+                    Text("ייבוא או ייצוא שנקטעו עשויים להשאיר קבצים שאינם שייכים לאף סרט. הניקוי לא נוגע במקורות, בעריכות ובסרטים שנוצרו.")
+                    Button {cleaning = true; Task {await clean(); cleaning = false}} label: {
+                        Label("ניקוי קבצים זמניים שנותרו", systemImage: "sparkles")
+                    }.disabled(cleaning)
+                }.listRowBackground(RK.card)
+            }
             Section("גרסה") {
                 Text(verbatim: "RK Motion " + AppVersion.label).monospacedDigit()
             }.listRowBackground(RK.card)

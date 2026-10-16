@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import UIKit
 
 struct ClipTrimView: View {
     @Binding var clip: Clip
@@ -12,6 +13,7 @@ struct ClipTrimView: View {
     private var upper: Double {offset + duration}
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
+    @State private var strip: [UIImage?] = Array(repeating: nil, count: 10)
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -19,6 +21,7 @@ struct ClipTrimView: View {
                     Group {
                         if let player {VideoPlayer(player: player)} else {RK.card}
                     }.frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    filmstrip
                     VStack(alignment: .leading, spacing: 12) {
                         Text(String(format: NSLocalizedString("התחלה: %@ שניות", comment: "Clip start readout"), fixed(clip.start)))
                             .font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
@@ -46,6 +49,11 @@ struct ClipTrimView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {Button("בוצע") {player?.pause(); dismiss()}.font(RK.font(17, 500))}
             .task {
+                for index in strip.indices {
+                    strip[index] = await Thumbnails.shared.frame(source, at: (Double(index) + 0.5) / Double(strip.count) * duration)
+                }
+            }
+            .task {
                 clip.start = min(max(lower, clip.start), upper - 0.01)
                 clip.end = min(upper, max(clip.start + 0.01, clip.end))
                 player = AVPlayer(url: source)
@@ -55,6 +63,37 @@ struct ClipTrimView: View {
         }
         .tint(RK.accent)
         .environment(\.layoutDirection, AppLanguage.direction)
+    }
+    /// The clip's whole video as frames, the chosen part lit; dragging moves
+    /// whichever edge is nearer.
+    private var filmstrip: some View {
+        GeometryReader {geometry in
+            let width = max(1, geometry.size.width)
+            let x = {(time: Double) in CGFloat((time - lower) / max(duration, 0.01)) * width}
+            ZStack(alignment: .leading) {
+                HStack(spacing: 1) {
+                    ForEach(strip.indices, id: \.self) {index in
+                        Group {
+                            if let image = strip[index] {Image(uiImage: image).resizable().scaledToFill()} else {RK.raised}
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                    }
+                }
+                Rectangle().fill(.black.opacity(0.55)).frame(width: max(0, x(clip.start)))
+                Rectangle().fill(.black.opacity(0.55)).frame(width: max(0, width - x(clip.end))).offset(x: x(clip.end))
+                RoundedRectangle(cornerRadius: 6).stroke(RK.accent, lineWidth: 3)
+                    .frame(width: max(6, x(clip.end) - x(clip.start))).offset(x: x(clip.start))
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged {drag in
+                let time = min(upper, max(lower, lower + Double(drag.location.x / width) * duration))
+                if abs(time - clip.start) <= abs(time - clip.end) {clip.start = min(time, clip.end - 0.1)}
+                else {clip.end = max(time, clip.start + 0.1)}
+            })
+        }
+        .frame(height: 56)
+        .environment(\.layoutDirection, .leftToRight)
+        .accessibilityHidden(true)
     }
     private func field(_ title: LocalizedStringKey, value: Binding<Double>, label: LocalizedStringKey) -> some View {
         HStack(spacing: 8) {

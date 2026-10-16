@@ -200,7 +200,7 @@ actor LocalEngine {
                 }
                 previous = pixels
             }
-            await progress(0.7 * Double(last) / Double(frameCount), "מנתחת תנועה באייפון…")
+            await progress(0.7 * Double(last) / Double(frameCount), "ניתוח תנועה באייפון…")
         }
         for index in motion.indices where counts[index] > 0 {motion[index] /= Double(counts[index])}
         let seen = try await look(asset, duration: duration, count: count, progress: progress)
@@ -242,7 +242,7 @@ actor LocalEngine {
                     for label in classify.results ?? [] where label.confidence > 0.3 {labels[label.identifier, default: 0] += 1}
                 }
             }
-            if done % 4 == 0 {await progress(0.7 + 0.1 * Double(done) / Double(samples), "מזהה מה יש בסרטון…")}
+            if done % 4 == 0 {await progress(0.7 + 0.1 * Double(done) / Double(samples), "זיהוי מה יש בסרטון…")}
         }
         var people: [Double] = [], focus: [Double] = []
         if !counted.isEmpty {
@@ -353,7 +353,7 @@ actor LocalEngine {
                 }
             }
             let second = Int(start)
-            if second >= lastProgress + 5 {lastProgress = second; await progress(0.8 + 0.2 * min(1, Double(second) / duration), "מנתחת שמע באייפון…")}
+            if second >= lastProgress + 5 {lastProgress = second; await progress(0.8 + 0.2 * min(1, Double(second) / duration), "ניתוח שמע באייפון…")}
         }
         guard reader.status == .completed else {throw reader.error ?? AppError(message: "פענוח השמע הופסק.")}
         if let analyzer {
@@ -536,7 +536,7 @@ actor LocalEngine {
                 if segment.outgoing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing)))}
                 if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
             }
-            await progress(Double(index + 1) / Double(clips.count) * 0.1, "מכינה את העריכה באייפון…")
+            await progress(Double(index + 1) / Double(clips.count) * 0.1, "הכנת העריכה באייפון…")
         }
         var instructions: [AVMutableVideoCompositionInstruction] = []
         func layer(_ index: Int) -> AVMutableVideoCompositionLayerInstruction {
@@ -735,7 +735,7 @@ actor LocalEngine {
         let movieBytes = Int64(prepared.length * Double(size.width * size.height) * 30 * 0.35 / 8)
         try LocalStore.checkSpace(required: movieBytes * (card == nil && grade == nil ? 1 : 2) + 256 * 1024 * 1024)
         guard card != nil || grade != nil else {
-            try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.1 + $0 * 0.9, "מייצאת את הסרט באייפון…")}
+            try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.1 + $0 * 0.9, "ייצוא הסרט באייפון…")}
             return await finish(prepared.length, started: started, progress: progress)
         }
         // The title is laid over the finished movie in a second pass. Core
@@ -743,7 +743,7 @@ actor LocalEngine {
         // nothing could show the title works; Core Image is checked by tests.
         let untitled = output.deletingLastPathComponent().appendingPathComponent("untitled-\(UUID().uuidString).mp4")
         defer {try? FileManager.default.removeItem(at: untitled)}
-        try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: untitled) {await progress(0.1 + $0 * 0.6, "מייצאת את הסרט באייפון…")}
+        try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: untitled) {await progress(0.1 + $0 * 0.6, "ייצוא הסרט באייפון…")}
         let movie = AVURLAsset(url: untitled), length = prepared.length
         let overlay = card.map {CIImage(cgImage: $0)}
         let titled = try await AVMutableVideoComposition.videoComposition(with: movie) {request in
@@ -756,7 +756,7 @@ actor LocalEngine {
         titled.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         titled.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
         titled.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
-        try await run(movie, video: titled, audio: nil, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.7 + $0 * 0.3, card == nil ? "צובעת את הסרט לפי האווירה…" : "מוסיפה את הכותרת…")}
+        try await run(movie, video: titled, audio: nil, preset: prepared.preset, length: prepared.length, to: output) {await progress(0.7 + $0 * 0.3, card == nil ? "צובעת את הסרט לפי האווירה…" : "הוספת הכותרת…")}
         return await finish(prepared.length, started: started, progress: progress)
     }
     private func finish(_ length: Double, started: Date, progress: Progress) async -> Double {

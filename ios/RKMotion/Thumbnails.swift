@@ -19,7 +19,7 @@ actor Thumbnails {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         self.folder = folder ?? caches.appendingPathComponent("thumbnails", isDirectory: true)
         self.limit = max(1, limit); self.maker = maker
-        memory.countLimit = 64
+        memory.countLimit = 240
         try? FileManager.default.createDirectory(at: self.folder, withIntermediateDirectories: true)
     }
     static func firstFrame(_ url: URL) async throws -> CGImage {
@@ -43,6 +43,29 @@ actor Thumbnails {
         memory.setObject(image, forKey: key as NSString)
         if let data = image.jpegData(compressionQuality: 0.8) {try? data.write(to: file(key), options: .atomic)}
         return image
+    }
+    /// One moment of a video, small, for clip rows and the timeline strip.
+    /// Kept in memory only: an edit's moments change too often to store.
+    func frame(_ file: URL, at seconds: Double) async -> UIImage? {
+        let key = file.lastPathComponent + "@" + String(format: "%.1f", seconds.isFinite ? max(0, seconds) : 0)
+        if let hit = memory.object(forKey: key as NSString) {return hit}
+        guard await turn() else {return nil}
+        defer {done()}
+        if let hit = memory.object(forKey: key as NSString) {return hit}
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: file))
+        generator.maximumSize = CGSize(width: 160, height: 160); generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = CMTime(seconds: 0.5, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+        guard !Task.isCancelled, let frame = try? await generator.image(at: CMTime(seconds: max(0, seconds), preferredTimescale: 600)).image else {return nil}
+        let image = UIImage(cgImage: frame)
+        memory.setObject(image, forKey: key as NSString)
+        return image
+    }
+    /// The home row's picture: the newest movie made from the project, past
+    /// its first second, or the source's first frame before there is one.
+    func cover(for project: LocalProject) async -> UIImage? {
+        if let movie = project.exports.last, let image = await frame(LocalStore.file(movie.file, project: project.id), at: min(1.5, movie.duration / 2)) {return image}
+        return await image(for: project)
     }
     /// Removes a deleted project's pictures.
     func forget(_ projectID: String) {

@@ -247,11 +247,12 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func runImport(_ files: [URL]) async {
         guard await save() else {setBusy(false); return}
         guard let first = files.first else {setBusy(false); return}
-        let copying = files.count > 1 ? NSLocalizedString("מעתיקה את הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("מעתיקה את הסרטון לאחסון המקומי…", comment: "Copying the video")
+        let copying = files.count > 1 ? NSLocalizedString("העתקת הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("העתקת הסרטון לאחסון המקומי…", comment: "Copying the video")
         message = copying
         let name = UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
+        p.edit.settings.merge(Edit.newMovieSettings(wholeVideo: p.wholeVideo)) {$1}
         do {
             let size = files.reduce(Int64(0)) {$0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)}
             let targets = files.map {"source-" + UUID().uuidString + "." + ($0.pathExtension.isEmpty ? "mov" : $0.pathExtension)}
@@ -293,7 +294,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     func analyze() {
         guard !busy, var p = project else {return}
         p.wholeVideo = wholeVideo; project = p
-        setBusy(true, .analyzing); percent = 0; message = "מנתחת באייפון…"
+        setBusy(true, .analyzing); percent = 0; message = "ניתוח באייפון…"
         let whole = wholeVideo
         launchProcessing(title: "ניתוח סרטון") { [self] in
           operation = Task {
@@ -308,14 +309,14 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 let stored = result.signals.map {(try? LocalStore.writeSignals($0, project: p.id)) != nil} ?? false
                 current.duration = result.duration; current.scores = result.scores; current.analyzed = true; current.reading = stored ? result.reading : nil
                 if current.joinsVideos {current.parts = ProjectPart.laid(current.files, durations: result.durations)}
-                project = current; edit.clips = result.clips; edit.settings["wholeVideo"] = .flag(whole)
+                project = current; edit.clips = whole ? result.clips : fittedToLength(result.clips, settings: edit.settings); edit.settings["wholeVideo"] = .flag(whole)
                 if let kind = result.reading?.kind {
                     edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
                     // Slow motion on the strongest moment, except where people are talking.
                     edit.settings["slowPeak"] = .flag(kind != .talk)
                 }
                 previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
-                if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
+                if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
             setBusy(false)
@@ -326,7 +327,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     func retune() {
         guard let p = project, !busy else {return}
         let previous = edit
-        edit.clips = p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}
+        edit.clips = fittedToLength(p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}, settings: edit.settings)
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
     }
@@ -361,7 +362,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let previous = edit
         apply(kind, signals: signals)
         edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
-        edit.clips = p.fitted(LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}
+        edit.clips = fittedToLength(p.fitted(LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}, settings: edit.settings)
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
         message = String(format: NSLocalizedString("הסרט נערך מחדש כ%@. ניתן לבטל את השינוי.", comment: "Content kind changed"), kind.title)
@@ -384,9 +385,42 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// `seconds` is the finished movie's length, so playback speed counts.
     func autoPick(seconds: Double) {
         guard !busy, !edit.clips.isEmpty else {return}
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
-        let overlap = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
-        edit.clips = ClipPicker.autoPick(edit.clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
+        edit.clips = Self.picked(edit.clips, seconds: seconds, settings: edit.settings)
+    }
+    /// The movie length the clip choice aims at: "30", "45", "60" seconds,
+    /// or "all" for every suggested moment. A new movie aims at 45 seconds.
+    var targetLength: String {edit.settings["targetLength"]?.string ?? Edit.defaultLength}
+    /// Chooses the clips again for another length, as one change to undo.
+    func pickLength(_ length: String) {
+        guard !busy, !edit.clips.isEmpty else {return}
+        var next = edit
+        next.settings["targetLength"] = .text(length)
+        next.clips = fittedToLength(next.clips, settings: next.settings)
+        edit = next
+    }
+    /// Changes a setting that stretches or shortens the movie (speed, transitions)
+    /// and chooses the clips again so it still runs the chosen length.
+    func setTiming(_ key: String, _ value: String) {
+        var next = edit
+        next.settings[key] = .text(value)
+        if next.clips.count > 1, next.settings["wholeVideo"]?.bool != true, Double(next.settings["targetLength"]?.string ?? Edit.defaultLength) != nil {
+            next.clips = fittedToLength(next.clips, settings: next.settings)
+        }
+        edit = next
+    }
+    /// The clips chosen for the length in `settings`; "all" chooses every one.
+    func fittedToLength(_ clips: [Clip], settings: [String: Setting]) -> [Clip] {
+        let length = settings["targetLength"]?.string ?? Edit.defaultLength
+        guard let seconds = Double(length), seconds > 0 else {
+            return Edit.capped(clips.map {var clip = $0; clip.selected = true; return clip})
+        }
+        return Self.picked(clips, seconds: seconds, settings: settings)
+    }
+    private static func picked(_ clips: [Clip], seconds: Double, settings: [String: Setting]) -> [Clip] {
+        guard !clips.isEmpty else {return clips}
+        let speed = Double(settings["speed"]?.string ?? "1") ?? 1
+        let overlap = (settings["transition"]?.string ?? "cut") != "cut" ? (Double(settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
+        return ClipPicker.autoPick(clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0)
     }
     func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; followKind(); updateUndo(); scheduleSave()}
     func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; followKind(); updateUndo(); scheduleSave()}
@@ -397,7 +431,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         // Refresh the snapshot after flushing current edits.
         p = project ?? p
-        message = "מוסיפה מוזיקה מקומית…"
+        message = "הוספת מוזיקה מקומית…"
         var imported: String?
         do {
             let name = try await LocalStore.importFile(file, project: p.id, prefix: "music"); imported = name
@@ -419,11 +453,11 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     }
     func importYouTube(link: URL) {
         guard !busy, project != nil else {return}
-        setBusy(true, .downloading); percent = 0; message = "מורידה את השמע מ־YouTube…"
+        setBusy(true, .downloading); percent = 0; message = "הורדת השמע מ־YouTube…"
         operation = Task {
             do {
                 let file = try await YouTubeMusic.download(link, into: LocalStore.imports) {[weak self] fraction in
-                    await self?.progress(fraction, "מורידה את השמע מ־YouTube…")
+                    await self?.progress(fraction, "הורדת השמע מ־YouTube…")
                 }
                 setBusy(false)
                 await importMusic(file)
@@ -456,7 +490,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !busy, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit
-        setBusy(true, .exporting); percent = 0; message = "מייצאת באייפון…"
+        setBusy(true, .exporting); percent = 0; message = "ייצוא באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
         launchProcessing(title: "ייצוא סרטון") { [self] in
           operation = Task {
@@ -499,15 +533,33 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         } catch {message = error.localizedDescription}
         setBusy(false)
     }
+    /// Deletes a project from the home screen; the open one goes through `reset`.
+    func delete(_ target: LocalProject) async {
+        guard !busy else {return}
+        if target.id == project?.id {await reset(); return}
+        setBusy(true)
+        do {
+            try await persistence.deleteProject(target.id)
+            await Thumbnails.shared.forget(target.id)
+            projects.removeAll {$0.id == target.id}; message = "הפרויקט נמחק מהאייפון"
+        } catch {message = error.localizedDescription}
+        setBusy(false)
+    }
+    /// Gives the open project a name of the rider's own.
+    func rename(_ name: String) {
+        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        guard !busy, !trimmed.isEmpty, var p = project, p.name != trimmed else {return}
+        p.name = trimmed; project = p; refreshLibrary(p); scheduleSave(immediate: true)
+    }
     func applyWholeVideo() {
         guard !busy, let p = project, p.analyzed else {return}
         if !wholeVideo && p.scores.isEmpty {analyze(); return}
         var previous = edit; previous.settings["wholeVideo"] = .flag(p.wholeVideo)
         edit.settings["wholeVideo"] = .flag(wholeVideo)
-        edit.clips = wholeVideo ? p.wholeClips : p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold))
+        edit.clips = wholeVideo ? p.wholeClips : fittedToLength(p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold)), settings: edit.settings)
         project?.wholeVideo = wholeVideo
         changed(from: previous); suppressedEdit = edit
-        message = wholeVideo ? "כל הסרטון נבחר. ניתן לבטל את השינוי." : "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי."
+        message = wholeVideo ? "כל הסרטון נבחר. ניתן לבטל את השינוי." : "הרגעים הבולטים הוחזרו. ניתן לבטל את השינוי."
     }
     /// As with a song: out of the project in memory first, then on disk, and
     /// only then is the file removed.
