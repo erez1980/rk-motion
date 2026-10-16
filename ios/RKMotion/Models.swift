@@ -35,6 +35,17 @@ extension Edit {
     /// The most clips one movie can hold. The editor, the activity
     /// suggestions and the engine all use this one number.
     static let clipLimit = 500
+    /// A long ride can suggest more clips than one movie holds. All stay
+    /// listed; only the strongest of the chosen ones stay chosen, so the
+    /// default edit exports.
+    static func capped(_ clips: [Clip]) -> [Clip] {
+        let chosen = clips.indices.filter {clips[$0].selected != false}
+        guard chosen.count > clipLimit else {return clips}
+        let kept = Set(chosen.sorted {(clips[$0].score ?? 0, -$0) > (clips[$1].score ?? 0, -$1)}.prefix(clipLimit))
+        var result = clips
+        for index in result.indices {result[index].selected = kept.contains(index)}
+        return result
+    }
     /// Where in a song the movie starts playing it. Each song keeps its own
     /// point; an older project's single start still applies to its first song.
     func musicStart(for song: String, first: Bool) -> Double {
@@ -117,7 +128,8 @@ struct ProjectPart: Codable, Equatable {
     /// dropped unless it is the whole clip.
     static func fit(_ clips: [Clip], into parts: [ProjectPart], minimum: Double = 1) -> [Clip] {
         guard parts.count > 1 else {return clips}
-        return clips.flatMap {clip -> [Clip] in
+        // Splitting adds clips, so the cap on chosen clips applies again.
+        return Edit.capped(clips.flatMap {clip -> [Clip] in
             let pieces = parts.compactMap {part -> Clip? in
                 let start = max(clip.start, part.start), end = min(clip.end, part.end)
                 guard end > start else {return nil}
@@ -132,7 +144,7 @@ struct ProjectPart: Codable, Equatable {
                 if index > 0 {piece.uid = UUID().uuidString}
                 return piece
             }
-        }
+        })
     }
 }
 struct LocalProject: Codable, Identifiable {

@@ -43,6 +43,14 @@ import AVFoundation
         // One video: nothing changes.
         XCTAssertEqual(ProjectPart.fit([crossing], into: [parts[0]]), [crossing])
     }
+    func testSplittingKeepsTheChosenClipsWithinTheLimit() {
+        let parts = ProjectPart.laid(["a.mov", "b.mov"], durations: [Double(Edit.clipLimit) * 10 + 5, 100])
+        var clips = (0..<Edit.clipLimit).map {Clip(start: Double($0) * 10, end: Double($0) * 10 + 8, score: 0.6)}
+        clips[clips.count - 1] = Clip(start: parts[0].end - 3, end: parts[0].end + 3, score: 0.9)
+        let fitted = ProjectPart.fit(clips, into: parts)
+        XCTAssertEqual(fitted.count, Edit.clipLimit + 1)
+        XCTAssertEqual(fitted.filter {$0.selected != false}.count, Edit.clipLimit)
+    }
     func testSignalsJoinSecondBySecond() {
         let first = Signals(motion: [1, 2, 3], loudness: [0.1, 0.1, 0.1], people: [1, 1, 1], scenes: ["beach": 1])
         let second = Signals(motion: [7, 8], loudness: [0.2, 0.2], music: [0.9, 0.8], people: [3, 3], scenes: ["party": 1])

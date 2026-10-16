@@ -48,7 +48,7 @@ actor LocalEngine {
                 windows[windows.count - 1].1 = max(previous.1, end)
             } else {windows.append((start, end))}
         }
-        var clips = windows.flatMap {window -> [Clip] in
+        let clips = windows.flatMap {window -> [Clip] in
             let start = window.0, end = window.1
             let first = max(0, Int(start)), last = min(scores.count - 1, max(first, Int(ceil(end)) - 1))
             guard end - start >= min(5, duration) else {return []}
@@ -56,13 +56,7 @@ actor LocalEngine {
             // Split long activity spans so the editor stays useful for long rides.
             return stride(from: start, to: end, by: 30).map {Clip(start: $0, end: min(end, $0 + 30), score: score)}
         }.sorted {$0.start < $1.start}
-        // A long ride can suggest more clips than one movie holds. All stay
-        // listed; only the strongest are chosen, so the default edit exports.
-        if clips.count > Edit.clipLimit {
-            let kept = Set(clips.indices.sorted {(clips[$0].score ?? 0, -$0) > (clips[$1].score ?? 0, -$1)}.prefix(Edit.clipLimit))
-            for index in clips.indices {clips[index].selected = kept.contains(index)}
-        }
-        return clips
+        return Edit.capped(clips)
     }
     /// Whether cuts move to the song's beat. Never for a video kept whole:
     /// its one clip is the rider's own edit, and its end is the video's end.
