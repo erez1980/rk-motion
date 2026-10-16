@@ -86,24 +86,46 @@ enum YouTubeMusic {
     /// YouTube's audio is a fragmented MP4 whose header already states the
     /// song's whole length, and AVFoundation adds the fragments on top of it,
     /// so the song reads as twice as long with silence after the music. The
-    /// file is rewritten, without re-encoding, to end where its audio does.
+    /// samples are copied, without re-encoding, into a plain file that ends
+    /// where its audio does. An export session would keep the stated length.
     static func trimToAudio(_ file: URL) async throws {
         let asset = AVURLAsset(url: file)
         guard let track = try await asset.loadTracks(withMediaType: .audio).first else {return}
         let declared = try await asset.load(.duration)
         let audio = try audioEnd(asset, track: track)
         guard audio.seconds > 0, declared.seconds - audio.seconds > 0.5 else {return}
-        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {throw damaged}
         let output = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
-        export.outputURL = output; export.outputFileType = .m4a
-        export.timeRange = CMTimeRange(start: .zero, duration: audio)
-        await withCheckedContinuation {done in export.exportAsynchronously {done.resume()}}
-        guard export.status == .completed else {try? FileManager.default.removeItem(at: output); throw export.error ?? damaged}
-        _ = try FileManager.default.replaceItemAt(file, withItemAt: output)
+        do {
+            let reader = try AVAssetReader(asset: asset)
+            let samples = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            guard reader.canAdd(samples) else {throw damaged}
+            reader.add(samples)
+            let writer = try AVAssetWriter(outputURL: output, fileType: .m4a)
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: nil, sourceFormatHint: try await track.load(.formatDescriptions).first)
+            input.expectsMediaDataInRealTime = false
+            guard writer.canAdd(input) else {throw damaged}
+            writer.add(input)
+            guard reader.startReading() else {throw reader.error ?? damaged}
+            defer {reader.cancelReading()}
+            guard writer.startWriting() else {throw writer.error ?? damaged}
+            writer.startSession(atSourceTime: .zero)
+            while let sample = samples.copyNextSampleBuffer() {
+                while !input.isReadyForMoreMediaData {try await Task.sleep(nanoseconds: 2_000_000)}
+                guard input.append(sample) else {writer.cancelWriting(); throw writer.error ?? damaged}
+            }
+            guard reader.status == .completed else {writer.cancelWriting(); throw reader.error ?? damaged}
+            input.markAsFinished()
+            writer.endSession(atSourceTime: audio)
+            await writer.finishWriting()
+            guard writer.status == .completed else {throw writer.error ?? damaged}
+            _ = try FileManager.default.replaceItemAt(file, withItemAt: output)
+        } catch {
+            try? FileManager.default.removeItem(at: output); throw error
+        }
     }
     /// Where the last audio sample ends, read from the samples themselves
     /// rather than from the file's header.
-    private static func audioEnd(_ asset: AVAsset, track: AVAssetTrack) throws -> CMTime {
+    static func audioEnd(_ asset: AVAsset, track: AVAssetTrack) throws -> CMTime {
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
         guard reader.canAdd(output) else {throw damaged}
