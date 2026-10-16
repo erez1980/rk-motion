@@ -57,9 +57,9 @@ final class YouTubeMusicTests: XCTestCase {
         try await YouTubeMusic.trimToAudio(file)
         let asset = AVURLAsset(url: file)
         let after = try await asset.load(.duration).seconds
-        // The copy re-applies AAC's encoder delay, a few hundredths of a
-        // second at each end, so it may come out slightly shorter than the
-        // samples' own count.
+        // The copy trims AAC's encoder delay, about a tenth of a second at
+        // each end here, so it comes out slightly shorter than the samples'
+        // own count.
         XCTAssertEqual(after, music, accuracy: 0.25, "read as \(before) s before the repair")
         let tracks = try await asset.loadTracks(withMediaType: .audio)
         XCTAssertFalse(tracks.isEmpty)
