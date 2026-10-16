@@ -308,7 +308,11 @@ actor LocalEngine {
             if second >= lastProgress + 5 {lastProgress = second; await progress(0.8 + 0.2 * min(1, Double(second) / duration), "מנתחת שמע באייפון…")}
         }
         guard reader.status == .completed else {throw reader.error ?? AppError(message: "פענוח השמע הופסק.")}
-        analyzer?.completeAnalysis()
+        if let analyzer {
+            analyzer.completeAnalysis()
+            // Late results may still be on their way; the observer says when the last has landed.
+            _ = tally.finished.wait(timeout: .now() + 10)
+        }
         let heard = tally.snapshot()
         return (sums.indices.map {counts[$0] > 0 ? sqrt(sums[$0] / Double(counts[$0])) : 0}, heard.music, heard.speech, heard.cheer)
     }
@@ -683,6 +687,8 @@ final class SoundTally: NSObject, SNResultsObserving {
     private let lock = NSLock()
     private var music: [Double], speech: [Double], cheer: [Double]
     private var heard = false
+    /// Signaled once the request completes or fails, so no result is missed.
+    let finished = DispatchSemaphore(value: 0)
     init(count: Int) {
         music = [Double](repeating: 0, count: count); speech = music; cheer = music
     }
@@ -711,6 +717,8 @@ final class SoundTally: NSObject, SNResultsObserving {
             cheer[second] = max(cheer[second], found[.cheer] ?? 0)
         }
     }
+    func requestDidComplete(_ request: SNRequest) {finished.signal()}
+    func request(_ request: SNRequest, didFailWithError error: Error) {finished.signal()}
     /// Empty channels when the classifier never answered, so the recipes
     /// leave them out instead of reading silence.
     func snapshot() -> (music: [Double], speech: [Double], cheer: [Double]) {

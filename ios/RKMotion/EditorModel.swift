@@ -261,8 +261,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 }
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
-                if let signals = result.signals {try? LocalStore.writeSignals(signals, project: p.id)}
-                current.duration = result.duration; current.scores = result.scores; current.analyzed = true; current.reading = result.reading
+                // Without its saved signals a reading could not be switched to another kind, so it is not kept.
+                let stored = result.signals.map {(try? LocalStore.writeSignals($0, project: p.id)) != nil} ?? false
+                current.duration = result.duration; current.scores = result.scores; current.analyzed = true; current.reading = stored ? result.reading : nil
                 project = current; edit.clips = result.clips; edit.settings["wholeVideo"] = .flag(whole)
                 if let kind = result.reading?.kind {
                     edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
