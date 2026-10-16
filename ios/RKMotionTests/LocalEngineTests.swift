@@ -88,6 +88,13 @@ final class LocalEngineTests: XCTestCase {
         let preview = try await engine.preview(project, edit: edit)
         let previewDuration = try await preview.asset.load(.duration).seconds
         XCTAssertEqual(previewDuration, expected, accuracy: 0.1)
+        // Smart transitions pick each seam's own from the saved scan and keep the movie's length.
+        try LocalStore.writeSignals(try XCTUnwrap(analysis.signals), project: project.id)
+        var smart = edit
+        smart.settings["transition"] = .text(SmartTransitions.name)
+        let smartPreview = try await engine.preview(project, edit: smart)
+        let smartDuration = try await smartPreview.asset.load(.duration).seconds
+        XCTAssertEqual(smartDuration, expected, accuracy: 0.1)
         XCTAssertEqual(preview.videoComposition?.renderSize, CGSize(width: 134, height: 240))
         XCTAssertNotNil(preview.audioMix)
         // The music track takes the song from the chosen second, not from its beginning.

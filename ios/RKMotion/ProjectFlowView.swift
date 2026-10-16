@@ -241,13 +241,19 @@ private struct EditStep: View {
             }
             VStack(alignment: .leading, spacing: 12) {
                 ChoiceGroup(title: "מעבר בין קטעים", options: [
+                    (NSLocalizedString("חכם ✨", comment: "Smart transitions, chosen per seam"), SmartTransitions.name),
                     (NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"),
                     (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve"),
                     (NSLocalizedString("דעיכה", comment: "Dip-to-black transition"), "fade"),
                     (NSLocalizedString("הבזק", comment: "Flash-to-white transition"), "flash"),
                     (NSLocalizedString("החלקה", comment: "Push transition"), "slide"),
                     (NSLocalizedString("זום", comment: "Zoom transition"), "zoom"),
-                ], selection: setting("transition", fallback: "cut"), columns: 3)
+                ], selection: setting("transition", fallback: "cut"), columns: 4)
+                if model.edit.settings["transition"]?.string == SmartTransitions.name {
+                    Text("לכל חיבור אבחר מעבר לפי מה שקורה בו: זום כשהתנועה מאיצה, הבזק ברגע של שמחה, החלקה בין שני רגעים מהירים, המסה בין רגעים רגועים ודעיכה כשעוברים לסרטון או לזמן אחר.")
+                        .font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("edit.smartNote")
+                }
                 if (model.edit.settings["transition"]?.string ?? "cut") != "cut" {
                     ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
                 }
@@ -535,6 +541,59 @@ private struct SensitivitySheet: View {
 
 // MARK: - Music
 
+/// Songs to search for, chosen from what the scan found the video to be.
+private struct SongIdeasCard: View {
+    let reading: ContentReading
+    let named: [SongIdeas.Idea]
+    let thinking: Bool
+    let search: (SongIdeas.Idea) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").foregroundStyle(RK.accent).accessibilityHidden(true)
+                Text("שירים שמתאימים לסרטון").font(RK.font(16, 600, style: .headline)).foregroundStyle(RK.ink)
+                Spacer()
+                if thinking {ProgressView().tint(RK.accent)}
+            }
+            let tempo = SongIdeas.tempo(for: reading)
+            Text(verbatim: String(format: NSLocalizedString("לפי מה שזיהיתי: %@, בקצב של %ld–%ld פעימות לדקה", comment: "Why these songs are suggested"),
+                                  reading.kind.title, tempo.lowerBound, tempo.upperBound))
+                .font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+            if !named.isEmpty {
+                ForEach(named) {idea in
+                    Button {search(idea)} label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "music.note").foregroundStyle(RK.accent).accessibilityHidden(true)
+                            Text(verbatim: idea.title).font(RK.font(14, 500)).foregroundStyle(RK.ink).lineLimit(1)
+                            Spacer(minLength: 0)
+                            Image(systemName: "magnifyingglass").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
+                        }
+                        .padding(.horizontal, 12).frame(minHeight: 40)
+                        .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }.buttonStyle(.plain)
+                    .accessibilityLabel(String(format: NSLocalizedString("חיפוש %@ ב־YouTube", comment: "Search a suggested song"), idea.title))
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SongIdeas.ideas(for: reading)) {idea in
+                        Button {search(idea)} label: {
+                            Text(verbatim: idea.title).font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.accentSoftInk)
+                                .padding(.horizontal, 12).frame(minHeight: 34)
+                                .background(RK.accentSoft, in: Capsule())
+                        }.buttonStyle(.plain)
+                        .accessibilityLabel(String(format: NSLocalizedString("חיפוש %@ ב־YouTube", comment: "Search a suggested song"), idea.title))
+                    }
+                }
+            }
+            .accessibilityIdentifier("music.ideas")
+        }
+        .rkCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("music.ideasCard")
+    }
+}
+
 private struct MusicStep: View {
     @ObservedObject var model: EditorModel
     let next: () -> Void
@@ -549,6 +608,8 @@ private struct MusicStep: View {
     @State private var fetching: String?
     @State private var added: Set<String> = []
     @State private var choosing: LocalMusic?
+    @State private var named: [SongIdeas.Idea] = []
+    @State private var thinking = false
     var body: some View {
         List {
             HStack(spacing: 10) {
@@ -556,6 +617,11 @@ private struct MusicStep: View {
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
                     .accessibilityIdentifier("music.youtube")
             }.buttonStyle(.plain).disabled(model.busy).rkRow(top: 0)
+            if let reading = model.project?.reading {
+                SongIdeasCard(reading: reading, named: named, thinking: thinking) {idea in
+                    showYouTube = true; query = idea.query; go()
+                }.disabled(model.busy || searching).rkRow()
+            }
             if showYouTube || model.work == .downloading {
                 youTube.rkRow()
                 ForEach(results) {result in resultRow(result).rkRow(top: 4, bottom: 4)}
@@ -596,6 +662,13 @@ private struct MusicStep: View {
         }
         .onChange(of: model.busy) {_, busy in if !busy && model.addedSong == nil {fetching = nil}}
         .sheet(item: $choosing) {song in MusicStartView(model: model, song: song)}
+        // The on-device model names songs for what the scan found, once per kind.
+        .task(id: model.project?.reading?.kind) {
+            guard let reading = model.project?.reading else {named = []; return}
+            thinking = true
+            let found = await SongIdeas.named(for: reading, seconds: model.movieDuration)
+            if !Task.isCancelled {named = found; thinking = false}
+        }
         .onDisappear {searchTask?.cancel(); listening.stop()}
         // A song whose row goes away stops with it.
         .onChange(of: results) {listening.stop()}

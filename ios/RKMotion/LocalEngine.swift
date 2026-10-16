@@ -11,8 +11,9 @@ import Vision
 // Only native Apple frameworks: source files never leave the device.
 actor LocalEngine {
     private let logger = Logger(subsystem: "com.rkmotion", category: "MediaPerformance")
-    /// The transitions an edit may name, each drawn below in `prepare`.
-    static let transitions = ["cut", "dissolve", "fade", "flash", "slide", "zoom"]
+    /// The transitions an edit may name, each drawn below in `prepare`;
+    /// "smart" picks one of the others for each seam.
+    static let transitions = ["cut", "dissolve", "fade", "flash", "slide", "zoom", SmartTransitions.name]
     private var beatCache: [String: [Double]] = [:]
     /// Beats of the song's playing stretch, in movie seconds, worked out once.
     private func songBeats(_ file: URL, start: Double, length: Double) async -> [Double]? {
@@ -440,6 +441,10 @@ actor LocalEngine {
         clips = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: total)
         try Task.checkCancellation()
         let segments = Self.timeline(clips: clips, speed: speed, transition: overlap)
+        // Each seam's own transition, read from the clips around it when the edit asks for smart ones.
+        let styles = transition == SmartTransitions.name
+            ? SmartTransitions.styles(for: clips, signals: LocalStore.readSignals(project: project.id), kind: project.reading?.kind, pieces: project.pieces)
+            : Array(repeating: transition, count: max(0, clips.count - 1))
         // Beat moves stay inside each clip's own video, so this always finds it.
         let from = try clips.map {clip -> Int in
             guard let index = source(of: clip) else {throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")}
@@ -502,10 +507,11 @@ actor LocalEngine {
                 let transform = transforms[from[index]], incoming = transforms[from[index + 1]]
                 let range = instruction.timeRange
                 let middle = time(segment.end - segment.outgoing / 2)
-                switch transition {
+                let style = styles[index]
+                switch style {
                 case "fade", "flash":
                     // Out to a colour, then in from it.
-                    if transition == "flash" {instruction.backgroundColor = CGColor(red: 1, green: 1, blue: 1, alpha: 1)}
+                    if style == "flash" {instruction.backgroundColor = CGColor(red: 1, green: 1, blue: 1, alpha: 1)}
                     front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: range.start, end: middle))
                     back.setOpacity(0, at: range.start)
                     back.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: CMTimeRange(start: middle, end: range.end))
