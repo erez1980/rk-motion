@@ -3,8 +3,13 @@ import AVKit
 
 struct ClipTrimView: View {
     @Binding var clip: Clip
+    /// The clip's video, which begins `offset` seconds into the project's
+    /// timeline and runs `duration` seconds. The clip's times are the timeline's.
     let source: URL
+    var offset: Double = 0
     let duration: Double
+    private var lower: Double {offset}
+    private var upper: Double {offset + duration}
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     var body: some View {
@@ -17,11 +22,11 @@ struct ClipTrimView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(String(format: NSLocalizedString("התחלה: %@ שניות", comment: "Clip start readout"), fixed(clip.start)))
                             .font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
-                        Slider(value: $clip.start, in: 0...max(0.01, min(duration, clip.end) - 0.01), step: 0.01).tint(RK.accent)
+                        Slider(value: $clip.start, in: lower...max(lower + 0.01, min(upper, clip.end) - 0.01), step: 0.01).tint(RK.accent)
                             .accessibilityLabel("תחילת הקטע בשניות")
                         Text(String(format: NSLocalizedString("סיום: %@ שניות", comment: "Clip end readout"), fixed(clip.end)))
                             .font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
-                        Slider(value: $clip.end, in: min(duration - 0.01, max(0, clip.start) + 0.01)...duration, step: 0.01).tint(RK.accent)
+                        Slider(value: $clip.end, in: min(upper - 0.01, max(lower, clip.start) + 0.01)...upper, step: 0.01).tint(RK.accent)
                             .accessibilityLabel("סיום הקטע בשניות")
                         Text(String(format: NSLocalizedString("משך הקטע: %@ שניות", comment: "Clip length readout"), fixed(max(0, clip.end - clip.start))))
                             .font(RK.font(13, 400, style: .footnote)).monospacedDigit().foregroundStyle(RK.soft)
@@ -41,10 +46,10 @@ struct ClipTrimView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {Button("בוצע") {player?.pause(); dismiss()}.font(RK.font(17, 500))}
             .task {
-                clip.start = min(max(0, clip.start), duration - 0.01)
-                clip.end = min(duration, max(clip.start + 0.01, clip.end))
+                clip.start = min(max(lower, clip.start), upper - 0.01)
+                clip.end = min(upper, max(clip.start + 0.01, clip.end))
                 player = AVPlayer(url: source)
-                player?.seek(to: CMTime(seconds: clip.start, preferredTimescale: 600))
+                player?.seek(to: CMTime(seconds: clip.start - offset, preferredTimescale: 600))
             }
             .onDisappear {player?.pause()}
         }
@@ -66,8 +71,8 @@ struct ClipTrimView: View {
     private func fixed(_ value: Double) -> String {String(format: "%.2f", value)}
     private func play() {
         guard let player else {return}
-        player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: clip.end, preferredTimescale: 600)
-        player.seek(to: CMTime(seconds: clip.start, preferredTimescale: 600)) {finished in
+        player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: clip.end - offset, preferredTimescale: 600)
+        player.seek(to: CMTime(seconds: clip.start - offset, preferredTimescale: 600)) {finished in
             if finished {player.play()}
         }
     }
