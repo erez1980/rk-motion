@@ -50,10 +50,10 @@ final class YouTubeMusicTests: XCTestCase {
         let before = try await AVURLAsset(url: file).load(.duration).seconds
         let fixture = AVURLAsset(url: file)
         let fixtureTracks = try await fixture.loadTracks(withMediaType: .audio)
-        let samplesEnd = try YouTubeMusic.audioEnd(fixture, track: try XCTUnwrap(fixtureTracks.first)).seconds
-        print("YouTube-layout fixture reads as \(before) s; its samples end at \(samplesEnd) s")
+        let music = try YouTubeMusic.audioLength(fixture, track: try XCTUnwrap(fixtureTracks.first)).seconds
+        print("YouTube-layout fixture reads as \(before) s; its music lasts \(music) s")
         XCTAssertGreaterThan(before, 5, "the fixture no longer shows the doubled length")
-        XCTAssertEqual(samplesEnd, 3.05, accuracy: 0.1)
+        XCTAssertEqual(music, 3.05, accuracy: 0.1)
         try await YouTubeMusic.trimToAudio(file)
         let asset = AVURLAsset(url: file)
         let after = try await asset.load(.duration).seconds
