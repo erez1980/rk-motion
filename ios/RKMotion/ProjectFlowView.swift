@@ -774,7 +774,7 @@ private struct StyleSheet: View {
         return String(format: NSLocalizedString("בסרט הזה: %@", comment: "Which smart transitions this movie gets"), list)
     }
     private func setting(_ key: String, fallback: String) -> Binding<String> {
-        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
+        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.setTiming(key, $0)})
     }
 }
 

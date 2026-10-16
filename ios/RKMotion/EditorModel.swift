@@ -252,8 +252,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let name = UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
-        // A new movie is made for a phone screen: upright, with transitions picked per seam.
-        p.edit.settings["aspect"] = .text("9:16"); p.edit.settings["transition"] = .text(SmartTransitions.name)
+        p.edit.settings.merge(Edit.newMovieSettings(wholeVideo: p.wholeVideo)) {$1}
         do {
             let size = files.reduce(Int64(0)) {$0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)}
             let targets = files.map {"source-" + UUID().uuidString + "." + ($0.pathExtension.isEmpty ? "mov" : $0.pathExtension)}
@@ -397,6 +396,16 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         var next = edit
         next.settings["targetLength"] = .text(length)
         next.clips = fittedToLength(next.clips, settings: next.settings)
+        edit = next
+    }
+    /// Changes a setting that stretches or shortens the movie (speed, transitions)
+    /// and chooses the clips again so it still runs the chosen length.
+    func setTiming(_ key: String, _ value: String) {
+        var next = edit
+        next.settings[key] = .text(value)
+        if next.clips.count > 1, next.settings["wholeVideo"]?.bool != true, Double(next.settings["targetLength"]?.string ?? Edit.defaultLength) != nil {
+            next.clips = fittedToLength(next.clips, settings: next.settings)
+        }
         edit = next
     }
     /// The clips chosen for the length in `settings`; "all" chooses every one.

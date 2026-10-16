@@ -58,4 +58,13 @@ final class ClipPickerTests: XCTestCase {
         model.pickLength("30")
         XCTAssertLessThanOrEqual(model.edit.clips.filter {$0.selected != false}.reduce(0) {$0 + $1.duration}, 36)
     }
+    @MainActor func testAFasterSpeedChoosesMoreClipsForTheSameLength() {
+        let clips = (0..<12).map {clip(Double($0) * 20, Double($0) * 20 + 10, 0.5 + Double($0 % 5) * 0.1)}
+        let model = EditorModel()
+        model.edit.clips = model.fittedToLength(clips, settings: [:])
+        let before = model.edit.clips.filter {$0.selected != false}.count
+        model.setTiming("speed", "2")
+        XCTAssertEqual(model.edit.settings["speed"]?.string, "2")
+        XCTAssertGreaterThan(model.edit.clips.filter {$0.selected != false}.count, before)
+    }
 }
