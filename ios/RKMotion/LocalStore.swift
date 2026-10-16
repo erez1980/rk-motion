@@ -38,6 +38,16 @@ enum LocalStore {
         try JSONEncoder().encode(metadata).write(to: file("project.json", project: project.id), options: .atomic)
         return scoreName
     }
+    static let signalsName = "signals.json"
+    /// The scan's per-second signals, kept so another content kind can be
+    /// scored without scanning again.
+    static func writeSignals(_ signals: Signals, project: String) throws {
+        try JSONEncoder().encode(signals).write(to: file(signalsName, project: project), options: .atomic)
+    }
+    static func readSignals(project: String) -> Signals? {
+        guard let data = try? Data(contentsOf: file(signalsName, project: project)) else {return nil}
+        return try? JSONDecoder().decode(Signals.self, from: data)
+    }
     static func load() -> [LocalProject] {
         let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         return folders.compactMap {url in

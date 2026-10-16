@@ -19,7 +19,7 @@ struct ProjectFlowView: View {
             content
         }
         .background(RK.bg.ignoresSafeArea())
-        .navigationTitle(Text(verbatim: model.project?.name ?? NSLocalizedString("רכיבה חדשה", comment: "New ride title")))
+        .navigationTitle(Text(verbatim: model.project?.name ?? NSLocalizedString("סרטון חדש", comment: "New project title")))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {ToolbarItem(placement: .topBarTrailing) {menu}}
         .toolbar {
@@ -230,6 +230,9 @@ private struct EditStep: View {
                 .padding(3).background(RK.card, in: Capsule())
             }.rkRow(top: 0)
             if model.work == .previewing {ProgressCard(model: model).rkRow()}
+            if let reading = model.project?.reading {
+                ReadingCard(reading: reading) {model.setKind($0)}.disabled(model.busy).rkRow()
+            }
             if let project = model.project, !project.scores.isEmpty {
                 ActivityCard(scores: project.scores, duration: project.duration, clips: model.edit.clips, threshold: model.threshold) {tuning = true}
                     .disabled(model.busy).rkRow()
@@ -360,7 +363,48 @@ private struct EditStep: View {
     }
 }
 
-/// The ride's activity over time, with the chosen moments lit up.
+/// What the scan found the video to be and how it will be edited, with a
+/// way to pick another kind when it read the video wrong.
+private struct ReadingCard: View {
+    let reading: ContentReading
+    let pick: (ContentKind) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: reading.kind.symbol).font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
+                    .frame(width: 44, height: 44)
+                    .background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    (reading.kind == reading.detected ? Text("זיהיתי") : Text("נערך לפי הבחירה שלך"))
+                        .font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                    Text(verbatim: reading.kind.title).font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
+                }
+                Spacer()
+                Menu {
+                    ForEach(ContentKind.allCases) {kind in
+                        Button {pick(kind)} label: {Label(kind.title, systemImage: kind.symbol)}
+                    }
+                } label: {
+                    Text("שינוי").font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.ink)
+                        .padding(.horizontal, 12).frame(minHeight: 32).overlay(Capsule().stroke(RK.line))
+                }
+                .accessibilityLabel("שינוי סוג התוכן")
+                .accessibilityIdentifier("reading.change")
+            }
+            if !reading.facts.isEmpty {
+                Text(verbatim: reading.facts.joined(separator: " · "))
+                    .font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+            }
+            Text(verbatim: reading.kind.plan).font(RK.font(14)).foregroundStyle(RK.ink).fixedSize(horizontal: false, vertical: true)
+        }
+        .rkCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("reading.card")
+    }
+}
+
+/// The video's activity over time, with the chosen moments lit up.
 private struct ActivityCard: View {
     let scores: [Double]
     let duration: Double
@@ -370,7 +414,7 @@ private struct ActivityCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("פעילות לאורך הרכיבה").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                Text("פעילות לאורך הסרטון").font(RK.font(14, 500)).foregroundStyle(RK.ink)
                 Spacer()
                 Button(action: tune) {
                     Text(verbatim: String(format: NSLocalizedString("רגישות · %@", comment: "Detection sensitivity chip"), level))
@@ -385,7 +429,7 @@ private struct ActivityCard: View {
             }
             .frame(height: 52, alignment: .bottom)
             .environment(\.layoutDirection, .leftToRight)
-            .accessibilityElement().accessibilityLabel("גרף הפעילות לאורך הרכיבה")
+            .accessibilityElement().accessibilityLabel("גרף הפעילות לאורך הסרטון")
             HStack {
                 ForEach(0..<4) {i in
                     Text(verbatim: RK.clock(duration * Double(i) / 3))
@@ -521,7 +565,7 @@ private struct MusicStep: View {
                     ChoiceGroup(title: "עוצמת המוזיקה", options: [(NSLocalizedString("רקע", comment: "Quiet music"), "0.35"), (NSLocalizedString("מאוזן", comment: "Balanced music"), "0.65"), (NSLocalizedString("חזק", comment: "Loud music"), "1")], selection: setting("musicVolume", fallback: "0.65"))
                     ToggleRow(title: "חיתוך לפי קצב השיר", detail: "כל מעבר בין קטעים נופל על הביט של השיר הראשון", isOn: flag("beatSync", fallback: true))
                 }
-                ToggleRow(title: "השתקת שמע הרכיבה", isOn: flag("muteOriginal", fallback: false))
+                ToggleRow(title: "השתקת קול המקור", detail: "קולות, מוזיקה ורעשים מהצילום עצמו", isOn: flag("muteOriginal", fallback: false))
             }.rkCard().disabled(model.busy).rkRow(top: 12)
             MessageCard(model: model).rkRow()
         }
@@ -707,7 +751,7 @@ private struct ExportStep: View {
             }.disabled(model.busy).rkRow()
             VStack(alignment: .leading, spacing: 10) {
                 Text("כותרת פתיחה").font(RK.font(15, 500)).foregroundStyle(RK.ink)
-                titleField("שם הרוכב או הרכיבה", key: "titleText")
+                titleField("שם האירוע, המקום או האנשים", key: "titleText")
                 titleField("מקום ותאריך", key: "subtitleText")
                 Text("מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)
             }.rkCard(padding: 16).disabled(model.busy).rkRow(top: 10)

@@ -106,6 +106,9 @@ struct LocalProject: Codable, Identifiable {
     var scoresFile: String?
     var analyzed = false
     var wholeVideo = false
+    /// What the last scan found the video to be; nil before one, or when
+    /// the whole video was kept and nothing was scanned.
+    var reading: ContentReading?
     var edit = Edit(clips: [])
     var music: [LocalMusic] = []
     var exports: [LocalExport] = []

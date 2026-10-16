@@ -57,7 +57,11 @@ final class LocalEngineTests: XCTestCase {
         XCTAssertEqual(merger.status, .completed, merger.error?.localizedDescription ?? "")
         print("NATIVE: source merge completed")
         let engine = LocalEngine()
-        let (duration, scores, _) = try await engine.analyze(source, whole: false) {fraction, text in print("NATIVE ANALYSIS: \(fraction) \(text)")}
+        let analysis = try await engine.analyze(source, whole: false) {fraction, text in print("NATIVE ANALYSIS: \(fraction) \(text)")}
+        let duration = analysis.duration, scores = analysis.scores
+        // Whatever the simulator's classifiers manage, the scan reads the video as something.
+        XCTAssertNotNil(analysis.reading)
+        XCTAssertEqual(analysis.signals?.motion.count, 3)
         XCTAssertEqual(duration, 3, accuracy: 0.05)
         XCTAssertEqual(scores.count, 3)
         XCTAssertTrue(scores.allSatisfy {$0.isFinite})

@@ -5,6 +5,8 @@ import CoreMedia
 import CoreImage
 import UIKit
 import OSLog
+import SoundAnalysis
+import Vision
 
 // Only native Apple frameworks: source files never leave the device.
 actor LocalEngine {
@@ -99,7 +101,16 @@ actor LocalEngine {
         let bounds = CGRect(origin: .zero, size: natural).applying(preferred)
         return CGSize(width: abs(bounds.width), height: abs(bounds.height))
     }
-    func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> (Double, [Double], [Clip]) {
+    /// One scan's result. `signals` and `reading` are nil when the whole
+    /// video is kept as it is and nothing was scanned.
+    struct Analysis {
+        let duration: Double
+        let scores: [Double]
+        let clips: [Clip]
+        let signals: Signals?
+        let reading: ContentReading?
+    }
+    func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> Analysis {
         try Task.checkCancellation()
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration).seconds
@@ -107,7 +118,7 @@ actor LocalEngine {
               !(try await asset.loadTracks(withMediaType: .video)).isEmpty else {
             throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")
         }
-        if whole {return (duration, [], [Clip(start: 0, end: duration)])}
+        if whole {return Analysis(duration: duration, scores: [], clips: [Clip(start: 0, end: duration)], signals: nil, reading: nil)}
         let count = max(1, Int(ceil(duration)))
         var motion = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
         var previous: [UInt8]?
@@ -142,15 +153,61 @@ actor LocalEngine {
                 }
                 previous = pixels
             }
-            await progress(0.8 * Double(last) / Double(frameCount), "מנתחת תנועה באייפון…")
+            await progress(0.7 * Double(last) / Double(frameCount), "מנתחת תנועה באייפון…")
         }
         for index in motion.indices where counts[index] > 0 {motion[index] /= Double(counts[index])}
-        let audio = try await loudness(asset, duration: duration, progress: progress)
-        let m = Self.normalized(motion), a = Self.normalized(audio)
-        let scores = m.indices.map {0.65 * m[$0] + 0.35 * a[$0]}
-        logger.info("Analysis completed: sourceSeconds=\(duration, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public)")
+        let seen = try await look(asset, duration: duration, count: count, progress: progress)
+        let heard = try await loudness(asset, duration: duration, progress: progress)
+        let signals = Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
+                              cheer: heard.cheer, people: seen.people, scenes: seen.scenes)
+        let reading = ContentReading.read(signals)
+        let scores = signals.scores(for: reading.kind)
+        logger.info("Analysis completed: sourceSeconds=\(duration, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public), kind=\(reading.kind.rawValue, privacy: .public)")
         await progress(1, "הניתוח הושלם באייפון")
-        return (duration, scores, Self.ranges(scores: scores, duration: duration))
+        return Analysis(duration: duration, scores: scores, clips: Self.ranges(scores: scores, duration: duration), signals: signals, reading: reading)
+    }
+    /// Looks at a few dozen frames spread over the video: how many people
+    /// are in frame, and what kind of place it is. Vision runs on the device;
+    /// a frame it cannot read is skipped, and if none can be read both come
+    /// back empty so the scan still finishes on motion and sound.
+    private func look(_ asset: AVAsset, duration: Double, count: Int, progress: Progress) async throws -> (people: [Double], scenes: [String: Double]) {
+        let samples = min(48, max(4, Int(duration / 5)))
+        let times = (0..<samples).map {time(min(max(0, duration - 0.05), (Double($0) + 0.5) * duration / Double(samples)))}
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 384, height: 384)
+        generator.requestedTimeToleranceBefore = time(1)
+        generator.requestedTimeToleranceAfter = time(1)
+        defer {generator.cancelAllCGImageGeneration()}
+        var counted: [(time: Double, people: Double)] = [], labels: [String: Int] = [:], looked = 0, done = 0
+        for await result in generator.images(for: times) {
+            try Task.checkCancellation()
+            done += 1
+            if case .success(let requested, let image, _) = result {
+                let handler = VNImageRequestHandler(cgImage: image)
+                let humans = VNDetectHumanRectanglesRequest()
+                humans.upperBodyOnly = false
+                if (try? handler.perform([humans])) != nil {
+                    counted.append((requested.seconds, Double((humans.results ?? []).filter {$0.confidence > 0.5}.count)))
+                }
+                let classify = VNClassifyImageRequest()
+                if (try? handler.perform([classify])) != nil {
+                    looked += 1
+                    for label in classify.results ?? [] where label.confidence > 0.3 {labels[label.identifier, default: 0] += 1}
+                }
+            }
+            if done % 4 == 0 {await progress(0.7 + 0.1 * Double(done) / Double(samples), "מזהה מה יש בסרטון…")}
+        }
+        var people: [Double] = []
+        if !counted.isEmpty {
+            // Each second takes the count of the nearest looked-at frame.
+            people = (0..<count).map {second in
+                let at = Double(second) + 0.5
+                return counted.min {abs($0.time - at) < abs($1.time - at)}!.people
+            }
+        }
+        let scenes = looked == 0 ? [:] : labels.mapValues {Double($0) / Double(looked)}
+        return (people, scenes)
     }
     private static func gray(_ image: CGImage) throws -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: 160 * 90)
@@ -197,14 +254,25 @@ actor LocalEngine {
         let loudest = peaks.max() ?? 0
         return loudest > 0 ? peaks.map {$0 / loudest} : peaks
     }
-    private func loudness(_ asset: AVAsset, duration: Double, progress: Progress) async throws -> [Double] {
+    /// The sound, second by second: how loud, and how sure the built-in
+    /// sound classifier is that it hears music, speech, or laughter and
+    /// cheering. The classifier's channels stay empty when it is unavailable.
+    private func loudness(_ asset: AVAsset, duration: Double, progress: Progress) async throws -> (loudness: [Double], music: [Double], speech: [Double], cheer: [Double]) {
         let count = max(1, Int(ceil(duration)))
         var sums = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
         let tracks = try await asset.loadTracks(withMediaType: .audio)
-        guard !tracks.isEmpty else {return sums}
+        guard !tracks.isEmpty else {return (sums, [], [], [])}
+        let rate = 16000.0
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 1, interleaved: false)
+        let tally = SoundTally(count: count)
+        var analyzer: SNAudioStreamAnalyzer?
+        if let format, let request = try? SNClassifySoundRequest(classifierIdentifier: .version1) {
+            let candidate = SNAudioStreamAnalyzer(format: format)
+            if (try? candidate.add(request, withObserver: tally)) != nil {analyzer = candidate}
+        }
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: 8000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
+            AVSampleRateKey: rate, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false])
         guard reader.canAdd(output) else {throw AppError(message: "לא ניתן לפענח את השמע בסרטון.")}
         reader.add(output)
@@ -222,9 +290,17 @@ actor LocalEngine {
                 let status = data.withUnsafeMutableBytes {CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: size, destination: $0.baseAddress!)}
                 guard status == kCMBlockBufferNoErr else {throw AppError(message: "קריאת דגימות השמע נכשלה.")}
                 data.withUnsafeBytes {bytes in
-                    for (index, value) in bytes.bindMemory(to: Float.self).enumerated() {
-                        let bucket = min(count - 1, max(0, Int(start + Double(index) / 8000)))
+                    let floats = bytes.bindMemory(to: Float.self)
+                    for (index, value) in floats.enumerated() {
+                        let bucket = min(count - 1, max(0, Int(start + Double(index) / rate)))
                         if value.isFinite {sums[bucket] += Double(value * value); counts[bucket] += 1}
+                    }
+                    if let analyzer, let format, !floats.isEmpty,
+                       let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(floats.count)),
+                       let channel = buffer.floatChannelData?[0] {
+                        buffer.frameLength = AVAudioFrameCount(floats.count)
+                        for (index, value) in floats.enumerated() {channel[index] = value.isFinite ? value : 0}
+                        analyzer.analyze(buffer, atAudioFramePosition: AVAudioFramePosition(start * rate))
                     }
                 }
             }
@@ -232,7 +308,13 @@ actor LocalEngine {
             if second >= lastProgress + 5 {lastProgress = second; await progress(0.8 + 0.2 * min(1, Double(second) / duration), "מנתחת שמע באייפון…")}
         }
         guard reader.status == .completed else {throw reader.error ?? AppError(message: "פענוח השמע הופסק.")}
-        return sums.indices.map {counts[$0] > 0 ? sqrt(sums[$0] / Double(counts[$0])) : 0}
+        if let analyzer {
+            analyzer.completeAnalysis()
+            // Late results may still be on their way; the observer says when the last has landed.
+            _ = tally.finished.wait(timeout: .now() + 10)
+        }
+        let heard = tally.snapshot()
+        return (sums.indices.map {counts[$0] > 0 ? sqrt(sums[$0] / Double(counts[$0])) : 0}, heard.music, heard.speech, heard.cheer)
     }
 
     struct Segment {
@@ -595,5 +677,52 @@ final class CompositionCheck: NSObject, AVVideoCompositionValidationHandling {
                           shouldContinueValidatingAfterFindingInvalidTrackIDIn instruction: any AVVideoCompositionInstructionProtocol,
                           layerInstruction: AVVideoCompositionLayerInstruction, asset: AVAsset) -> Bool {
         note(String(format: NSLocalizedString("ערוץ לא תקין %@ בטווח %@", comment: "Invalid composition track"), "\(layerInstruction.trackID)", seconds(instruction.timeRange)))
+    }
+}
+
+/// Collects the sound classifier's verdicts into one value per second for
+/// each of the three sounds the recipes use. Results may arrive on the
+/// analyzer's own thread, so every access takes the lock.
+final class SoundTally: NSObject, SNResultsObserving {
+    private let lock = NSLock()
+    private var music: [Double], speech: [Double], cheer: [Double]
+    private var heard = false
+    /// Signaled once the request completes or fails, so no result is missed.
+    let finished = DispatchSemaphore(value: 0)
+    init(count: Int) {
+        music = [Double](repeating: 0, count: count); speech = music; cheer = music
+    }
+    static func channel(_ identifier: String) -> Signals.Channel? {
+        if identifier == "music" || identifier == "singing" {return .music}
+        if identifier == "speech" || identifier == "conversation" {return .speech}
+        let cheering = ["laugh", "giggl", "chuckle", "cheer", "applause", "clapping", "crowd"]
+        return cheering.contains {identifier.contains($0)} ? .cheer : nil
+    }
+    func request(_ request: SNRequest, didProduce result: SNResult) {
+        guard let result = result as? SNClassificationResult else {return}
+        let start = result.timeRange.start.seconds, end = CMTimeRangeGetEnd(result.timeRange).seconds
+        guard start.isFinite, end.isFinite else {return}
+        var found: [Signals.Channel: Double] = [:]
+        for item in result.classifications {
+            if let channel = Self.channel(item.identifier) {found[channel] = max(found[channel] ?? 0, item.confidence)}
+        }
+        lock.lock(); defer {lock.unlock()}
+        heard = true
+        let count = music.count
+        guard count > 0 else {return}
+        let first = min(count - 1, max(0, Int(start))), last = min(count - 1, max(first, Int(ceil(end)) - 1))
+        for second in first...last {
+            music[second] = max(music[second], found[.music] ?? 0)
+            speech[second] = max(speech[second], found[.speech] ?? 0)
+            cheer[second] = max(cheer[second], found[.cheer] ?? 0)
+        }
+    }
+    func requestDidComplete(_ request: SNRequest) {finished.signal()}
+    func request(_ request: SNRequest, didFailWithError error: Error) {finished.signal()}
+    /// Empty channels when the classifier never answered, so the recipes
+    /// leave them out instead of reading silence.
+    func snapshot() -> (music: [Double], speech: [Double], cheer: [Double]) {
+        lock.lock(); defer {lock.unlock()}
+        return heard ? (music, speech, cheer) : ([], [], [])
     }
 }
