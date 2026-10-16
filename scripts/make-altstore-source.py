@@ -6,9 +6,10 @@ release also carries this source.json, so the stable URL
 https://github.com/<repo>/releases/latest/download/source.json always serves
 the newest list.
 
-Usage: make-altstore-source.py IPA RELEASES_JSON OUT --repo owner/name --tag TAG
+Usage: make-altstore-source.py IPA RELEASES_JSON OUT --repo owner/name --tag TAG [--previous SOURCE]
 RELEASES_JSON is `gh api repos/<repo>/releases` output (may be []); the new
-release named by --tag is added from the IPA itself.
+release named by --tag is added from the IPA itself. --previous is the last
+published source.json, which keeps each older build's own minimum iOS.
 """
 import argparse
 import json
@@ -35,6 +36,7 @@ def main():
     p.add_argument('out', type=Path)
     p.add_argument('--repo', required=True)
     p.add_argument('--tag', required=True)
+    p.add_argument('--previous', type=Path)
     a = p.parse_args()
 
     info = ipa_info(a.ipa)
@@ -49,6 +51,11 @@ def main():
         'size': a.ipa.stat().st_size,
         'minOSVersion': info.get('MinimumOSVersion', '17.0'),
     }
+    known_min_os = {}
+    if a.previous and a.previous.is_file():
+        for app in json.loads(a.previous.read_text()).get('apps', []):
+            for v in app.get('versions', []):
+                known_min_os[v.get('buildVersion')] = v.get('minOSVersion')
     versions = []
     for rel in json.loads(a.releases.read_text()):
         if rel.get('draft') or rel.get('prerelease') or rel.get('tag_name') == a.tag:
@@ -63,7 +70,7 @@ def main():
                     'localizedDescription': f"Build {m['build']}",
                     'downloadURL': asset['browser_download_url'],
                     'size': asset['size'],
-                    'minOSVersion': current['minOSVersion'],
+                    'minOSVersion': known_min_os.get(m['build']) or current['minOSVersion'],
                 })
                 break
     versions.sort(key=lambda v: int(v['buildVersion']), reverse=True)
