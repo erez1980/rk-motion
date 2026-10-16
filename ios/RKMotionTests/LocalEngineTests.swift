@@ -102,7 +102,8 @@ final class LocalEngineTests: XCTestCase {
         var slow = Edit(clips: [Clip(start: 0.1, end: 2.9)])
         slow.settings["slowPeak"] = .flag(true)
         slow.settings["aspect"] = .text("9:16")
-        let slowLength = try XCTUnwrap(await engine.plannedLength(scored, edit: slow))
+        let planned = await engine.plannedLength(scored, edit: slow)
+        let slowLength = try XCTUnwrap(planned)
         XCTAssertEqual(slowLength, 2.8 + Clip.slowSpan, accuracy: 0.05)
         let slowPreview = try await engine.preview(scored, edit: slow)
         let slowDuration = try await slowPreview.asset.load(.duration).seconds
