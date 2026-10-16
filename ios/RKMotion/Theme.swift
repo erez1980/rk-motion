@@ -11,7 +11,8 @@ enum RK {
         static let raised = pair(0x1b231c, 0xeef4ec)
         static let ink = pair(0xf0f6f0, 0x17211a)
         static let soft = pair(0x9fb4a7, 0x586b5e)
-        static let faint = pair(0x6f8577, 0x7d8f82)
+        // Day text at 4.6:1 on the background, the floor for small type.
+        static let faint = pair(0x6f8577, 0x617467)
         static let line = pair(0x263029, 0xdce5da)
         static let accent = pair(0xc8f542, 0x3f6d0a)
         static let accentInk = pair(0x182505, 0xffffff)
@@ -204,6 +205,7 @@ struct StepBar: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain).disabled(!reachable(step) || here)
                 .accessibilityAddTraits(here ? .isSelected : [])
+                .accessibilityValue(String(format: NSLocalizedString("שלב %1$@ מתוך %2$@", comment: "Which step of the movie flow"), "\(step.rawValue + 1)", "4"))
                 .accessibilityIdentifier("step.\(step.rawValue)")
             }
         }

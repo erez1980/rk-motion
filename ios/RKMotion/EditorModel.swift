@@ -247,7 +247,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     private func runImport(_ files: [URL]) async {
         guard await save() else {setBusy(false); return}
         guard let first = files.first else {setBusy(false); return}
-        let copying = files.count > 1 ? NSLocalizedString("מעתיקה את הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("מעתיקה את הסרטון לאחסון המקומי…", comment: "Copying the video")
+        let copying = files.count > 1 ? NSLocalizedString("העתקת הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("העתקת הסרטון לאחסון המקומי…", comment: "Copying the video")
         message = copying
         let name = UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
@@ -295,7 +295,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     func analyze() {
         guard !busy, var p = project else {return}
         p.wholeVideo = wholeVideo; project = p
-        setBusy(true, .analyzing); percent = 0; message = "מנתחת באייפון…"
+        setBusy(true, .analyzing); percent = 0; message = "ניתוח באייפון…"
         let whole = wholeVideo
         launchProcessing(title: "ניתוח סרטון") { [self] in
           operation = Task {
@@ -363,7 +363,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let previous = edit
         apply(kind, signals: signals)
         edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
-        edit.clips = p.fitted(LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}
+        edit.clips = fittedToLength(p.fitted(LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}, settings: edit.settings)
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
         message = String(format: NSLocalizedString("הסרט נערך מחדש כ%@. ניתן לבטל את השינוי.", comment: "Content kind changed"), kind.title)
@@ -422,7 +422,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         // Refresh the snapshot after flushing current edits.
         p = project ?? p
-        message = "מוסיפה מוזיקה מקומית…"
+        message = "הוספת מוזיקה מקומית…"
         var imported: String?
         do {
             let name = try await LocalStore.importFile(file, project: p.id, prefix: "music"); imported = name
@@ -444,11 +444,11 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     }
     func importYouTube(link: URL) {
         guard !busy, project != nil else {return}
-        setBusy(true, .downloading); percent = 0; message = "מורידה את השמע מ־YouTube…"
+        setBusy(true, .downloading); percent = 0; message = "הורדת השמע מ־YouTube…"
         operation = Task {
             do {
                 let file = try await YouTubeMusic.download(link, into: LocalStore.imports) {[weak self] fraction in
-                    await self?.progress(fraction, "מורידה את השמע מ־YouTube…")
+                    await self?.progress(fraction, "הורדת השמע מ־YouTube…")
                 }
                 setBusy(false)
                 await importMusic(file)
@@ -481,7 +481,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !busy, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit
-        setBusy(true, .exporting); percent = 0; message = "מייצאת באייפון…"
+        setBusy(true, .exporting); percent = 0; message = "ייצוא באייפון…"
         let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
         launchProcessing(title: "ייצוא סרטון") { [self] in
           operation = Task {
@@ -523,6 +523,24 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
         setBusy(false)
+    }
+    /// Deletes a project from the home screen; the open one goes through `reset`.
+    func delete(_ target: LocalProject) async {
+        guard !busy else {return}
+        if target.id == project?.id {await reset(); return}
+        setBusy(true)
+        do {
+            try await persistence.deleteProject(target.id)
+            await Thumbnails.shared.forget(target.id)
+            projects.removeAll {$0.id == target.id}; message = "הפרויקט נמחק מהאייפון"
+        } catch {message = error.localizedDescription}
+        setBusy(false)
+    }
+    /// Gives the open project a name of the rider's own.
+    func rename(_ name: String) {
+        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        guard !busy, !trimmed.isEmpty, var p = project, p.name != trimmed else {return}
+        p.name = trimmed; project = p; refreshLibrary(p); scheduleSave(immediate: true)
     }
     func applyWholeVideo() {
         guard !busy, let p = project, p.analyzed else {return}

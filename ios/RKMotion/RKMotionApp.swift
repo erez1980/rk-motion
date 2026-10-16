@@ -36,7 +36,7 @@ struct RootView: View {
             .navigationDestination(for: Route.self) {route in
                 switch route {
                 case .project: ProjectFlowView(model: model)
-                case .about: AboutView()
+                case .about: AboutView(clean: {await model.cleanTemporaryFiles()})
                 }
             }
         }

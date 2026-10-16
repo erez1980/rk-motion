@@ -12,6 +12,9 @@ struct ProjectFlowView: View {
     @State private var confirmDelete = false
     @State private var showAbout = false
     @State private var placed = false
+    @State private var revealing = false
+    @State private var renaming = false
+    @State private var newName = ""
     var body: some View {
         VStack(spacing: 0) {
             StepBar(current: step, reachable: reachable) {step = $0}
@@ -21,7 +24,17 @@ struct ProjectFlowView: View {
         .background(RK.bg.ignoresSafeArea())
         .navigationTitle(Text(verbatim: model.project?.name ?? NSLocalizedString("סרטון חדש", comment: "New project title")))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {ToolbarItem(placement: .topBarTrailing) {menu}}
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if model.project?.analyzed == true {
+                    Button {model.undo()} label: {Image(systemName: "arrow.uturn.backward")}
+                        .disabled(!model.undoAvailable || model.busy).accessibilityLabel("ביטול שינוי")
+                    Button {model.redo()} label: {Image(systemName: "arrow.uturn.forward")}
+                        .disabled(!model.redoAvailable || model.busy).accessibilityLabel("שחזור שינוי")
+                }
+                menu
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("בוצע") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
         }
@@ -31,14 +44,27 @@ struct ProjectFlowView: View {
             guard !placed else {return}
             placed = true; step = model.project?.analyzed == true ? .edit : .video
         }
-        .onChange(of: model.project?.analyzed) {old, new in if new == true && old == false {step = .edit}}
+        .onChange(of: model.project?.analyzed) {old, new in
+            if new == true && old == false {step = .edit; revealing = model.project?.reading != nil && !Self.underUITest}
+        }
         .onChange(of: model.project?.exports.count) {old, new in if let old, let new, new > old {step = .done}}
         .onChange(of: model.movieURL) {_, movie in if movie == nil && step == .done {step = .export}}
         .onChange(of: model.project?.id) {old, new in if old != nil && new == nil {dismiss()}}
         .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("מחיקה", role: .destructive) {Task {await model.reset()}}
         }
-        .sheet(isPresented: $showAbout) {NavigationStack {AboutView()}}
+        .sheet(isPresented: $showAbout) {NavigationStack {AboutView(clean: {await model.cleanTemporaryFiles()})}}
+        .sheet(isPresented: $revealing) {
+            RevealSheet(model: model, quick: {
+                revealing = false; step = model.project?.music.isEmpty == false ? .export : .music
+            }, control: {revealing = false; step = .edit})
+            .presentationDetents([.large]).interactiveDismissDisabled(model.busy)
+        }
+        .alert("שם הפרויקט", isPresented: $renaming) {
+            TextField("שם הפרויקט", text: $newName)
+            Button("שמירה") {model.rename(newName)}
+            Button("ביטול", role: .cancel) {}
+        }
     }
     @ViewBuilder private var content: some View {
         if let work = model.work, [.importing, .analyzing, .exporting].contains(work) {
@@ -53,6 +79,14 @@ struct ProjectFlowView: View {
             }
         }
     }
+    /// UI tests drive the edit step straight after the scan.
+    private static var underUITest: Bool {
+        #if DEBUG
+        UITestFixture.requested
+        #else
+        false
+        #endif
+    }
     private func reachable(_ target: FlowStep) -> Bool {
         guard !model.busy else {return false}
         switch target {
@@ -63,10 +97,10 @@ struct ProjectFlowView: View {
     }
     private var menu: some View {
         Menu {
-            Button {model.redo()} label: {Label("שחזור שינוי", systemImage: "arrow.uturn.forward")}
-                .disabled(!model.redoAvailable || model.busy)
-            Button {Task {await model.cleanTemporaryFiles()}} label: {Label("ניקוי קבצים זמניים שנותרו", systemImage: "sparkles")}
-                .disabled(model.busy)
+            if model.project != nil {
+                Button {newName = model.project?.name ?? ""; renaming = true} label: {Label("שינוי שם הפרויקט", systemImage: "pencil")}
+                    .disabled(model.busy)
+            }
             Button {showAbout = true} label: {Label("אודות ועזרה", systemImage: "questionmark.circle")}
             if model.project != nil {
                 Section {
@@ -214,13 +248,22 @@ private struct EditStep: View {
     private var showingEdit: Bool {playback.showingEdit}
     @State private var trimming: TrimSelection?
     @State private var tuning = false
+    @State private var styling = false
+    @State private var fullScreen = false
     @State private var shuffled: [Clip]?
+    private var upright: Bool {model.edit.settings["aspect"]?.string == "9:16"}
     var body: some View {
         List {
             VStack(spacing: 10) {
                 VideoPlayer(player: playback.player)
                     .accessibilityIdentifier("edit.player")
-                .frame(height: 210).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .frame(height: upright && showingEdit ? 300 : 210).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    Button {fullScreen = true} label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                            .frame(width: 32, height: 32).background(.black.opacity(0.45), in: Circle())
+                    }.buttonStyle(.plain).padding(8).accessibilityLabel("מסך מלא")
+                }
                 HStack(spacing: 0) {
                     viewChoice("המקור", picked: !showingEdit) {showSource()}
                         .accessibilityIdentifier("edit.showSource")
@@ -235,34 +278,22 @@ private struct EditStep: View {
                 ReadingCard(reading: reading) {model.setKind($0)}.disabled(model.busy).rkRow()
             }
             if let project = model.project, !project.scores.isEmpty {
-                ActivityCard(scores: project.scores, duration: project.duration, clips: model.edit.clips, threshold: model.threshold) {tuning = true}
+                ActivityCard(project: project, clips: model.edit.clips, threshold: model.threshold, tune: {tuning = true}, seek: seek)
                     .disabled(model.busy).rkRow()
             }
-            VStack(alignment: .leading, spacing: 12) {
-                ChoiceGroup(title: "מעבר בין קטעים", options: [
-                    (NSLocalizedString("חכם ✨", comment: "Smart transitions, chosen per seam"), SmartTransitions.name),
-                    (NSLocalizedString("חיתוך", comment: "Cut transition"), "cut"),
-                    (NSLocalizedString("המסה", comment: "Dissolve transition"), "dissolve"),
-                    (NSLocalizedString("דעיכה", comment: "Dip-to-black transition"), "fade"),
-                    (NSLocalizedString("הבזק", comment: "Flash-to-white transition"), "flash"),
-                    (NSLocalizedString("החלקה", comment: "Push transition"), "slide"),
-                    (NSLocalizedString("זום", comment: "Zoom transition"), "zoom"),
-                ], selection: setting("transition", fallback: "cut"), columns: 4)
-                if model.edit.settings["transition"]?.string == SmartTransitions.name {
-                    Text("לכל חיבור אבחר מעבר לפי מה שקורה בו: זום כשהתנועה מאיצה, הבזק ברגע של שמחה, החלקה בין שני רגעים מהירים, המסה בין רגעים רגועים ודעיכה כשעוברים לסרטון או לזמן אחר.")
-                        .font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("edit.smartNote")
-                }
-                if (model.edit.settings["transition"]?.string ?? "cut") != "cut" {
-                    ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
-                }
-                ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
-                if model.project?.scores.isEmpty == false {
-                    Toggle(isOn: Binding(get: {model.edit.settings["slowPeak"]?.bool ?? false}, set: {model.edit.settings["slowPeak"] = .flag($0)})) {
-                        Label("האטה ברגע השיא", systemImage: "tortoise").font(RK.font(14, 500)).foregroundStyle(RK.ink)
-                    }.tint(RK.accent).accessibilityIdentifier("edit.slowPeak")
-                }
-            }.disabled(model.busy).rkRow(top: 10)
+            Button {styling = true} label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "wand.and.stars").font(.system(size: 17, weight: .medium)).foregroundStyle(RK.accent)
+                        .frame(width: 40, height: 40).background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("סגנון").font(RK.font(15, 500)).foregroundStyle(RK.ink)
+                        Text(verbatim: styleSummary).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft).lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
+                }.padding(10).background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).disabled(model.busy).accessibilityIdentifier("edit.style").rkRow(top: 10)
             if model.edit.clips.count > 1, model.edit.settings["wholeVideo"]?.bool != true {
                 ChoiceGroup(title: "אורך הסרט", options: [
                     (RK.seconds(30), "30"), (RK.seconds(45), "45"),
@@ -274,7 +305,7 @@ private struct EditStep: View {
             clipsHeader.rkRow(top: 12)
             if model.edit.clips.count > 1 {clipTools.rkRow(top: 0, bottom: 4)}
             ForEach($model.edit.clips) {$clip in
-                ClipRow(clip: $clip, canTrim: (model.project?.duration ?? 0) > 0.01) {trimming = TrimSelection(id: clip.id)}
+                ClipRow(clip: $clip, canTrim: (model.project?.duration ?? 0) > 0.01, moment: moment(of: clip), video: videoTag(of: clip)) {trimming = TrimSelection(id: clip.id)}
                     .disabled(model.busy).rkRow(top: 4, bottom: 4)
             }
             .onMove {if !model.busy {model.edit.clips.move(fromOffsets: $0, toOffset: $1)}}
@@ -292,11 +323,7 @@ private struct EditStep: View {
                 if let problem = model.editValidationMessage {
                     Text(LocalizedStringKey(problem)).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.danger).frame(maxWidth: .infinity, alignment: .leading)
                 }
-                HStack(spacing: 10) {
-                    Button {model.undo()} label: {Image(systemName: "arrow.uturn.backward")}
-                        .buttonStyle(IconButtonStyle()).disabled(!model.undoAvailable || model.busy).accessibilityLabel("ביטול שינוי")
-                    Button("המשך למוזיקה", action: next).buttonStyle(PrimaryButtonStyle()).disabled(model.busy)
-                }
+                Button("המשך למוזיקה", action: next).buttonStyle(PrimaryButtonStyle()).disabled(model.busy)
             }
         }
         .sheet(item: $trimming) {selection in
@@ -307,6 +334,17 @@ private struct EditStep: View {
             }
         }
         .sheet(isPresented: $tuning) {SensitivitySheet(model: model).presentationDetents([.height(320)])}
+        .sheet(isPresented: $styling) {StyleSheet(model: model).presentationDetents([.medium, .large])}
+        .fullScreenCover(isPresented: $fullScreen) {
+            ZStack(alignment: .topTrailing) {
+                Color.black.ignoresSafeArea()
+                VideoPlayer(player: playback.player).ignoresSafeArea()
+                Button {fullScreen = false} label: {
+                    Image(systemName: "xmark").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                        .frame(width: 44, height: 44).background(.black.opacity(0.5), in: Circle())
+                }.buttonStyle(.plain).padding(16).accessibilityLabel("סגירת המסך המלא")
+            }
+        }
         .onAppear {
             if let preview = model.previewEdit {playback.showEdit(preview)}
             else if !showingEdit {showSource()}
@@ -323,6 +361,31 @@ private struct EditStep: View {
             Text(title).font(RK.font(14, picked ? 500 : 400)).foregroundStyle(picked ? RK.accentInk : RK.soft)
                 .frame(maxWidth: .infinity, minHeight: 36).background(picked ? RK.accent : Color.clear, in: Capsule()).contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(picked ? .isSelected : [])
+    }
+    /// Where the activity graph was tapped, shown in the source.
+    private func seek(_ time: Double) {
+        if showingEdit {showSource()}
+        playback.player.seek(to: CMTime(seconds: max(0, time), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+    /// The video file and the second in it that a clip's picture comes from.
+    private func moment(of clip: Clip) -> (URL, Double)? {
+        guard let project = model.project, clip.duration.isFinite, clip.duration > 0 else {return nil}
+        let middle = (clip.start + clip.end) / 2
+        let part = project.part(at: middle)
+        return (LocalStore.file(part.file, project: project.id), middle - part.start)
+    }
+    /// "Video 2" on a clip, in a project made of several videos.
+    private func videoTag(of clip: Clip) -> String? {
+        guard let project = model.project, project.joinsVideos, let index = project.pieces.firstIndex(of: project.part(at: clip.start)) else {return nil}
+        return String(format: NSLocalizedString("סרטון %@", comment: "Which of a project's videos a clip comes from"), "\(index + 1)")
+    }
+    private var styleSummary: String {
+        let settings = model.edit.settings
+        let transition = settings["transition"]?.string ?? "cut"
+        var parts = [String(format: NSLocalizedString("מעברים: %@", comment: "Style summary: the transitions"), StyleSheet.transitionName(transition))]
+        if let speed = settings["speed"]?.string, speed != "1" {parts.append(speed + "×")}
+        if settings["slowPeak"]?.bool == true, model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בשיא", comment: "Style summary: slow motion on the peak"))}
+        return parts.joined(separator: " · ")
     }
     private func showSource() {
         if let joined = model.joinedSource {playback.showSource(joined)} else {playback.showSource(model.sourceURL)}
@@ -422,13 +485,19 @@ private struct ReadingCard: View {
     }
 }
 
-/// The video's activity over time, with the chosen moments lit up.
+/// The video's standout moments over time, on a strip of its own frames,
+/// with the chosen ones lit up and a line where one video meets the next.
+/// A tap shows that moment in the source.
 private struct ActivityCard: View {
-    let scores: [Double]
-    let duration: Double
+    let project: LocalProject
     let clips: [Clip]
     let threshold: Double
     let tune: () -> Void
+    let seek: (Double) -> Void
+    private static let frames = 8
+    @State private var strip: [UIImage?] = Array(repeating: nil, count: ActivityCard.frames)
+    private var scores: [Double] {project.scores}
+    private var duration: Double {project.duration}
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -440,14 +509,34 @@ private struct ActivityCard: View {
                         .padding(.horizontal, 10).frame(minHeight: 32).overlay(Capsule().stroke(RK.line))
                 }.buttonStyle(.plain)
             }
-            HStack(alignment: .bottom, spacing: 2) {
-                ForEach(Array(bars.enumerated()), id: \.offset) {_, bar in
-                    RoundedRectangle(cornerRadius: 2).fill(bar.color).frame(maxWidth: .infinity).frame(height: 6 + bar.value * 46)
+            GeometryReader {geometry in
+                let width = max(1, geometry.size.width)
+                ZStack(alignment: .bottomLeading) {
+                    HStack(spacing: 1) {
+                        ForEach(0..<Self.frames, id: \.self) {index in
+                            Group {
+                                if let image = strip[index] {Image(uiImage: image).resizable().scaledToFill()} else {RK.raised}
+                            }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                        }
+                    }
+                    .opacity(0.45)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    HStack(alignment: .bottom, spacing: 2) {
+                        ForEach(Array(bars.enumerated()), id: \.offset) {_, bar in
+                            RoundedRectangle(cornerRadius: 2).fill(bar.color).frame(maxWidth: .infinity).frame(height: 6 + bar.value * 46)
+                        }
+                    }.padding(.horizontal, 2)
+                    ForEach(seams, id: \.self) {seam in
+                        Rectangle().fill(RK.ink.opacity(0.7)).frame(width: 2).offset(x: CGFloat(seam / max(duration, 0.01)) * width - 1)
+                    }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture {location in seek(Double(location.x / width) * duration)}
             }
-            .frame(height: 52, alignment: .bottom)
+            .frame(height: 60)
             .environment(\.layoutDirection, .leftToRight)
             .accessibilityElement().accessibilityLabel("גרף הרגעים הבולטים לאורך הסרטון")
+            .accessibilityValue(summary)
             HStack {
                 ForEach(0..<4) {i in
                     Text(verbatim: RK.clock(duration * Double(i) / 3))
@@ -457,6 +546,23 @@ private struct ActivityCard: View {
             .environment(\.layoutDirection, .leftToRight)
         }
         .rkCard()
+        .task(id: project.id + "\(duration)") {
+            for index in 0..<Self.frames {
+                let time = (Double(index) + 0.5) / Double(Self.frames) * duration
+                let part = project.part(at: time)
+                let image = await Thumbnails.shared.frame(LocalStore.file(part.file, project: project.id), at: time - part.start)
+                if Task.isCancelled {return}
+                strip[index] = image
+            }
+        }
+    }
+    private var seams: [Double] {project.joinsVideos ? project.pieces.dropFirst().map(\.start) : []}
+    /// "3 moments chosen, the strongest at 1:42", for VoiceOver.
+    private var summary: String {
+        let chosen = clips.filter {$0.selected != false}.count
+        guard let peak = scores.indices.max(by: {scores[$0] < scores[$1]}), !scores.isEmpty else {return clipCount(chosen)}
+        let time = (Double(peak) + 0.5) / Double(scores.count) * duration
+        return String(format: NSLocalizedString("%1$@ נבחרו, הרגע החזק ביותר ב־%2$@", comment: "Activity graph summary for VoiceOver"), clipCount(chosen), RK.clock(time))
     }
     private var level: String {
         threshold <= 0.45 ? NSLocalizedString("גבוהה", comment: "High sensitivity")
@@ -480,7 +586,12 @@ private struct ActivityCard: View {
 private struct ClipRow: View {
     @Binding var clip: Clip
     let canTrim: Bool
+    /// The video file and second the row's picture comes from.
+    let moment: (URL, Double)?
+    /// Which video the clip comes from, in a project of several.
+    let video: String?
     let trim: () -> Void
+    @State private var image: UIImage?
     var body: some View {
         let selected = clip.selected != false
         HStack(spacing: 10) {
@@ -495,10 +606,18 @@ private struct ClipRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(selected ? "הסרת הקטע מהסרט" : "הוספת הקטע לסרט")
+            Group {
+                if let image {Image(uiImage: image).resizable().scaledToFill()} else {RK.raised}
+            }
+            .frame(width: 56, height: 42).clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous)).accessibilityHidden(true)
+            .task(id: moment.map {$0.0.lastPathComponent + "\($0.1)"}) {
+                guard let moment else {image = nil; return}
+                image = await Thumbnails.shared.frame(moment.0, at: moment.1)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 // Isolated, so "0:36–1:12" keeps its order inside Hebrew text.
                 Text(verbatim: "\u{2066}\(RK.clock(clip.start))–\(RK.clock(clip.end))\u{2069}").font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
-                Text(verbatim: RK.seconds(clip.duration)).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                Text(verbatim: [RK.seconds(clip.duration), video].compactMap {$0}.joined(separator: " · ")).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
             }
             Spacer(minLength: 0)
             if let score = clip.score, score >= 0.8 {Pill(text: NSLocalizedString("רגע שיא", comment: "A clip among the video's strongest moments"))}
@@ -542,10 +661,129 @@ private struct SensitivitySheet: View {
     }
 }
 
+/// The moment the scan finishes: what it found, what it made of it, and
+/// two ways on, to the finished movie or into the edit.
+private struct RevealSheet: View {
+    @ObservedObject var model: EditorModel
+    let quick: () -> Void
+    let control: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let reading = model.project?.reading {
+                Spacer(minLength: 12)
+                Image(systemName: reading.kind.symbol).font(.system(size: 30, weight: .semibold)).foregroundStyle(RK.accent)
+                    .frame(width: 72, height: 72)
+                    .background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .accessibilityHidden(true)
+                (reading.kind == reading.detected ? Text("זיהיתי") : Text("נערך לפי הבחירה שלך"))
+                    .font(RK.font(15)).foregroundStyle(RK.soft)
+                Text(verbatim: reading.kind.title).font(RK.font(28, 700, style: .title1)).foregroundStyle(RK.ink)
+                    .accessibilityIdentifier("reveal.kind")
+                if !reading.facts.isEmpty {
+                    Text(verbatim: reading.facts.joined(separator: " · ")).font(RK.font(14)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+                }
+                Text(verbatim: reading.kind.plan).font(RK.font(16)).foregroundStyle(RK.ink).fixedSize(horizontal: false, vertical: true)
+                Menu {
+                    ForEach(ContentKind.allCases) {kind in
+                        Button {model.setKind(kind)} label: {Label(kind.title, systemImage: kind.symbol)}
+                    }
+                } label: {
+                    Text("לא זה? בחירת סוג אחר").font(RK.font(14, 500)).foregroundStyle(RK.accent)
+                }.disabled(model.busy)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("מה הכנתי").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                    Text(verbatim: prepared).font(RK.font(15, 500)).foregroundStyle(RK.ink).fixedSize(horizontal: false, vertical: true)
+                }.frame(maxWidth: .infinity, alignment: .leading).rkCard()
+            }
+            Spacer()
+            Button("קדימה, לסרט", action: quick).buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("reveal.quick")
+            Button("עריכה ידנית", action: control).buttonStyle(SecondaryButtonStyle()).accessibilityIdentifier("reveal.control")
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RK.bg.ignoresSafeArea())
+        .environment(\.layoutDirection, AppLanguage.direction)
+    }
+    /// "0:45 · 6 clips · smart transitions · 9:16".
+    private var prepared: String {
+        let chosen = model.selectedClips
+        let length = model.movieDuration ?? chosen.reduce(0) {$0 + $1.duration}
+        var parts = [RK.clock(length), clipCount(chosen.count)]
+        parts.append(String(format: NSLocalizedString("מעברים: %@", comment: "Style summary: the transitions"), StyleSheet.transitionName(model.edit.settings["transition"]?.string ?? "cut")))
+        if model.edit.settings["aspect"]?.string == "9:16" {parts.append(NSLocalizedString("סטורי 9:16", comment: "Story framing"))}
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// How the movie moves: transitions, speed and slow motion, behind one row
+/// of the edit step so the clips stay in view.
+private struct StyleSheet: View {
+    @ObservedObject var model: EditorModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var plan: String?
+    static let transitions = [SmartTransitions.name, "cut", "dissolve", "fade", "flash", "slide", "zoom"]
+    static func transitionName(_ value: String) -> String {
+        switch value {
+        case SmartTransitions.name: return NSLocalizedString("חכם ✨", comment: "Smart transitions, chosen per seam")
+        case "dissolve": return NSLocalizedString("המסה", comment: "Dissolve transition")
+        case "fade": return NSLocalizedString("דעיכה", comment: "Dip-to-black transition")
+        case "flash": return NSLocalizedString("הבזק", comment: "Flash-to-white transition")
+        case "slide": return NSLocalizedString("החלקה", comment: "Push transition")
+        case "zoom": return NSLocalizedString("זום", comment: "Zoom transition")
+        default: return NSLocalizedString("חיתוך", comment: "Cut transition")
+        }
+    }
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ChoiceGroup(title: "מעבר בין קטעים", options: Self.transitions.map {(Self.transitionName($0), $0)}, selection: setting("transition", fallback: "cut"), columns: 4)
+                    if transition == SmartTransitions.name {
+                        Text("לכל חיבור אבחר מעבר לפי מה שקורה בו.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                            .accessibilityIdentifier("edit.smartNote")
+                        if let plan {Text(verbatim: plan).font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.ink).fixedSize(horizontal: false, vertical: true)}
+                    }
+                    if transition != "cut" {
+                        ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
+                    }
+                    ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
+                    if model.project?.scores.isEmpty == false {
+                        Toggle(isOn: Binding(get: {model.edit.settings["slowPeak"]?.bool ?? false}, set: {model.edit.settings["slowPeak"] = .flag($0)})) {
+                            Label("האטה ברגע השיא", systemImage: "tortoise").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                        }.tint(RK.accent).accessibilityIdentifier("edit.slowPeak")
+                    }
+                }.padding(20).disabled(model.busy)
+            }
+            .background(RK.bg.ignoresSafeArea())
+            .navigationTitle("סגנון").navigationBarTitleDisplayMode(.inline)
+            .toolbar {ToolbarItem(placement: .confirmationAction) {Button("בוצע") {dismiss()}}}
+        }
+        .tint(RK.accent)
+        .environment(\.layoutDirection, AppLanguage.direction)
+        .task(id: model.edit.clips) {plan = smartPlan()}
+    }
+    private var transition: String {model.edit.settings["transition"]?.string ?? "cut"}
+    /// "In this movie: 3 zoom, 2 dissolve", from the same choice the export makes.
+    private func smartPlan() -> String? {
+        guard let p = model.project else {return nil}
+        let clips = model.edit.clips.filter {$0.selected != false}
+        guard clips.count > 1 else {return nil}
+        let styles = SmartTransitions.styles(for: clips, signals: LocalStore.readSignals(project: p.id), kind: p.reading?.kind, pieces: p.pieces)
+        let counts = Dictionary(grouping: styles, by: {$0}).map {($0.key, $0.value.count)}.sorted {($0.1, $1.0) > ($1.1, $0.0)}
+        let list = counts.map {"\($0.1) " + Self.transitionName($0.0)}.joined(separator: ", ")
+        return String(format: NSLocalizedString("בסרט הזה: %@", comment: "Which smart transitions this movie gets"), list)
+    }
+    private func setting(_ key: String, fallback: String) -> Binding<String> {
+        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.edit.settings[key] = .text($0)})
+    }
+}
+
 /// The movie as it will come out, with its music, framing and colour, on
 /// the steps after the edit. Any change clears it until it is built again.
 private struct EditPreviewCard: View {
     @ObservedObject var model: EditorModel
+    /// Builds the preview as soon as the card shows, as on the export step.
+    var automatic = false
     @StateObject private var playback = PreviewPlayback()
     @State private var built = false
     var body: some View {
@@ -568,7 +806,10 @@ private struct EditPreviewCard: View {
                 }
             }
         }
-        .onAppear {if let preview = model.previewEdit {built = true; playback.showEdit(preview)}}
+        .onAppear {
+            if let preview = model.previewEdit {built = true; playback.showEdit(preview)}
+            else if automatic, !model.busy, model.editValidationMessage == nil {built = true; model.preview()}
+        }
         .onChange(of: model.previewEdit) {_, preview in
             if let preview {playback.showEdit(preview, play: true)} else {playback.showSource(Optional<URL>.none)}
         }
@@ -584,7 +825,10 @@ private struct SongIdeasCard: View {
     let reading: ContentReading
     let named: [SongIdeas.Idea]
     let thinking: Bool
+    /// The idea whose top search result is being added, if any.
+    let adding: String?
     let search: (SongIdeas.Idea) -> Void
+    let add: (SongIdeas.Idea) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -599,17 +843,28 @@ private struct SongIdeasCard: View {
                 .font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
             if !named.isEmpty {
                 ForEach(named) {idea in
-                    Button {search(idea)} label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "music.note").foregroundStyle(RK.accent).accessibilityHidden(true)
-                            Text(verbatim: idea.title).font(RK.font(14, 500)).foregroundStyle(RK.ink).lineLimit(1)
-                            Spacer(minLength: 0)
-                            Image(systemName: "magnifyingglass").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
+                    HStack(spacing: 8) {
+                        Button {search(idea)} label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "music.note").foregroundStyle(RK.accent).accessibilityHidden(true)
+                                Text(verbatim: idea.title).font(RK.font(14, 500)).foregroundStyle(RK.ink).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Image(systemName: "magnifyingglass").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
+                            }
+                            .padding(.horizontal, 12).frame(minHeight: 44)
+                            .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }.buttonStyle(.plain)
+                        .accessibilityLabel(String(format: NSLocalizedString("חיפוש %@ ב־YouTube", comment: "Search a suggested song"), idea.title))
+                        Button {add(idea)} label: {
+                            Group {
+                                if adding == idea.id {ProgressView().tint(RK.accentSoftInk)}
+                                else {Image(systemName: "plus").font(.system(size: 17, weight: .bold)).foregroundStyle(RK.accentSoftInk)}
+                            }
+                            .frame(width: 44, height: 44).background(RK.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
-                        .padding(.horizontal, 12).frame(minHeight: 40)
-                        .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }.buttonStyle(.plain)
-                    .accessibilityLabel(String(format: NSLocalizedString("חיפוש %@ ב־YouTube", comment: "Search a suggested song"), idea.title))
+                        .buttonStyle(.plain).disabled(adding != nil)
+                        .accessibilityLabel(String(format: NSLocalizedString("הוספת %@ לפרויקט", comment: "Add a found song"), idea.title))
+                    }
                 }
             }
             ScrollView(.horizontal, showsIndicators: false) {
@@ -648,19 +903,21 @@ private struct MusicStep: View {
     @State private var choosing: LocalMusic?
     @State private var named: [SongIdeas.Idea] = []
     @State private var thinking = false
+    @State private var adding: String?
     var body: some View {
         List {
             if !songs.isEmpty {EditPreviewCard(model: model).rkRow(top: 0)}
+            if let reading = model.project?.reading {
+                SongIdeasCard(reading: reading, named: named, thinking: thinking, adding: adding, search: {idea in
+                    showYouTube = true; query = idea.query; go()
+                }, add: addIdea).disabled(model.busy || searching).rkRow()
+                Text("שיר אחר").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).rkRow(top: 10, bottom: 0)
+            }
             HStack(spacing: 10) {
                 Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 Button {showYouTube.toggle()} label: {SourceTile(title: "מ־YouTube", symbol: "play.rectangle.fill", picked: showYouTube)}
                     .accessibilityIdentifier("music.youtube")
             }.buttonStyle(.plain).disabled(model.busy).rkRow()
-            if let reading = model.project?.reading {
-                SongIdeasCard(reading: reading, named: named, thinking: thinking) {idea in
-                    showYouTube = true; query = idea.query; go()
-                }.disabled(model.busy || searching).rkRow()
-            }
             if showYouTube || model.work == .downloading {
                 youTube.rkRow()
                 ForEach(results) {result in resultRow(result).rkRow(top: 4, bottom: 4)}
@@ -761,6 +1018,20 @@ private struct MusicStep: View {
             }
         }.rkCard()
     }
+    /// One tap from a suggestion to the song in the project: its top search result is added.
+    private func addIdea(_ idea: SongIdeas.Idea) {
+        guard !model.busy, adding == nil else {return}
+        adding = idea.id; searchNote = nil
+        Task {
+            defer {adding = nil}
+            do {
+                guard let top = try await YouTubeSearch.search(idea.query).first else {
+                    searchNote = NSLocalizedString("לא נמצאו תוצאות. נסו שם אחר.", comment: "YouTube search found nothing"); showYouTube = true; return
+                }
+                listening.stop(); fetching = top.id; model.importYouTube(link: top.link)
+            } catch {searchNote = error.localizedDescription; showYouTube = true}
+        }
+    }
     private func go() {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !model.busy else {return}
@@ -854,9 +1125,11 @@ private struct ExportStep: View {
     @ObservedObject var model: EditorModel
     let showMovie: () -> Void
     @State private var naming = false
+    @State private var advanced = false
+    @State private var suggestion: MovieWords.Words?
     var body: some View {
         List {
-            EditPreviewCard(model: model).rkRow(top: 0)
+            EditPreviewCard(model: model, automatic: true).rkRow(top: 0)
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: model.movieDuration.map(RK.clock) ?? "–").font(RK.font(34, 700, style: .largeTitle)).monospacedDigit().foregroundStyle(RK.ink)
@@ -871,20 +1144,41 @@ private struct ExportStep: View {
                 Spacer(minLength: 0)
             }.rkCard(padding: 16).rkRow()
             Group {
-                ChoiceGroup(title: "מסגרת", options: [(NSLocalizedString("מקור", comment: "Source framing"), "source"), (NSLocalizedString("סטורי 9:16", comment: "Story framing"), "9:16")], selection: setting("aspect", fallback: "source"))
+                ChoiceGroup(title: "יעד", options: [("Instagram", "instagram"), ("WhatsApp", "whatsapp"), (NSLocalizedString("מקורי", comment: "Keep the source's frame and resolution"), "original")],
+                            selection: Binding(get: {destination}, set: setDestination))
+                    .accessibilityIdentifier("export.destination")
+                DisclosureGroup(isExpanded: $advanced) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ChoiceGroup(title: "מסגרת", options: [(NSLocalizedString("מקור", comment: "Source framing"), "source"), (NSLocalizedString("סטורי 9:16", comment: "Story framing"), "9:16")], selection: setting("aspect", fallback: "source"))
+                        ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
+                    }.padding(.top, 10)
+                } label: {
+                    Text("מסגרת ואיכות").font(RK.font(14, 500)).foregroundStyle(RK.ink)
+                }.tint(RK.soft)
                 if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
                     ToggleRow(title: "מסגור חכם לפי האנשים", detail: "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז", isOn: flag("smartFrame", fallback: true))
                 }
                 if model.project?.reading != nil {
                     ChoiceGroup(title: "צבע", options: [(NSLocalizedString("לפי האווירה ✨", comment: "Colour grade chosen for the content kind"), "auto"), (NSLocalizedString("מקורי", comment: "No colour grade"), "none")], selection: setting("look", fallback: "auto"))
                 }
-                ChoiceGroup(title: "איכות", options: [("1080p", "1080"), ("720p", "720"), (NSLocalizedString("רזולוציית מקור", comment: "Original resolution"), "original"), ("WhatsApp", "whatsapp")], selection: setting("quality", fallback: "1080"))
             }.disabled(model.busy).rkRow()
             VStack(alignment: .leading, spacing: 10) {
                 Text("כותרת פתיחה").font(RK.font(15, 500)).foregroundStyle(RK.ink)
                 titleField("שם האירוע, המקום או האנשים", key: "titleText")
                 titleField("מקום ותאריך", key: "subtitleText")
                 Text("מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint)
+                if let suggestion, (model.edit.settings["titleText"]?.string ?? "").isEmpty {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("הצעה").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                            Text(verbatim: [suggestion.title, suggestion.subtitle].filter {!$0.isEmpty}.joined(separator: " · ")).font(RK.font(14, 500)).foregroundStyle(RK.ink).lineLimit(2)
+                        }
+                        Spacer(minLength: 0)
+                        Button("שימוש") {use(suggestion)}.font(RK.font(14, 500)).foregroundStyle(RK.accent).buttonStyle(.plain)
+                            .accessibilityIdentifier("export.useSuggestion")
+                    }
+                    .padding(12).background(RK.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
                 Button(action: suggestWords) {
                     if naming {ProgressView().tint(RK.accent)}
                     else {Label("הצעה לכותרת ולכיתוב ✨", systemImage: "sparkles")}
@@ -901,6 +1195,7 @@ private struct ExportStep: View {
             MessageCard(model: model).rkRow()
         }
         .rkScreen()
+        .task(id: model.project?.id) {await prepareSuggestion()}
         .safeAreaInset(edge: .bottom) {
             ActionBar {
                 if let problem = model.editValidationMessage {
@@ -911,6 +1206,30 @@ private struct ExportStep: View {
                     .disabled(model.busy || model.selectedClips.isEmpty || model.editValidationMessage != nil)
             }
         }
+    }
+    /// The one choice most movies need: where it is going.
+    private var destination: String {
+        let aspect = model.edit.settings["aspect"]?.string ?? "source", quality = model.edit.settings["quality"]?.string ?? "1080"
+        if quality == "whatsapp" && aspect == "9:16" {return "whatsapp"}
+        if quality == "1080" && aspect == "9:16" {return "instagram"}
+        if quality == "original" && aspect != "9:16" {return "original"}
+        return ""
+    }
+    private func setDestination(_ value: String) {
+        var settings = model.edit.settings
+        switch value {
+        case "instagram": settings["aspect"] = .text("9:16"); settings["quality"] = .text("1080")
+        case "whatsapp": settings["aspect"] = .text("9:16"); settings["quality"] = .text("whatsapp")
+        default: settings["aspect"] = .text("source"); settings["quality"] = .text("original")
+        }
+        model.edit.settings = settings
+    }
+    private func use(_ words: MovieWords.Words) {
+        var settings = model.edit.settings
+        settings["titleText"] = .text(String(words.title.prefix(Edit.titleLimit)))
+        settings["subtitleText"] = .text(String(words.subtitle.prefix(Edit.titleLimit)))
+        settings["caption"] = .text(words.caption)
+        model.edit.settings = settings
     }
     private var contents: String {
         let clips = clipCount(model.selectedClips.count)
@@ -923,6 +1242,12 @@ private struct ExportStep: View {
     }
     private func flag(_ key: String, fallback: Bool) -> Binding<Bool> {
         Binding(get: {model.edit.settings[key]?.bool ?? fallback}, set: {model.edit.settings[key] = .flag($0)})
+    }
+    /// A title waits beside an empty field, from what the scan found, for one tap to use.
+    private func prepareSuggestion() async {
+        guard suggestion == nil, let project = model.project, let reading = project.reading,
+              (model.edit.settings["titleText"]?.string ?? "").isEmpty else {return}
+        suggestion = await MovieWords.suggest(for: reading, date: project.created, language: Bundle.main.preferredLocalizations.first)
     }
     /// Fills the opening title and a post caption from what the scan found.
     private func suggestWords() {
@@ -995,13 +1320,20 @@ private struct DoneStep: View {
                 Button {Task {await model.saveToPhotos(movie)}} label: {Label("שמירה בתמונות", systemImage: "square.and.arrow.down")}
                     .buttonStyle(PrimaryButtonStyle()).disabled(model.busy).rkRow()
                 HStack(spacing: 10) {
+                    // The caption rides along: it is on the clipboard by the time the post is written.
                     ShareLink(item: movie) {Label("שיתוף", systemImage: "square.and.arrow.up")}.buttonStyle(SecondaryButtonStyle())
+                        .simultaneousGesture(TapGesture().onEnded {if let caption, !caption.isEmpty {UIPasteboard.general.string = caption}})
                     Button(action: backToEdit) {Label("חזרה לעריכה", systemImage: "slider.horizontal.3")}.buttonStyle(SecondaryButtonStyle())
+                    if let current {
+                        Menu {
+                            Button(role: .destructive) {Task {await model.deleteExport(current)}} label: {Label("מחיקת הסרט", systemImage: "trash")}
+                        } label: {Image(systemName: "ellipsis")}
+                        .buttonStyle(IconButtonStyle()).accessibilityLabel("עוד פעולות על הסרט")
+                    }
                 }.disabled(model.busy).rkRow()
-                if let caption = model.edit.settings["caption"]?.string, !caption.isEmpty {CaptionRow(caption: caption).rkCard(padding: 16).rkRow()}
-                if let current {
-                    Button(role: .destructive) {Task {await model.deleteExport(current)}} label: {Label("מחיקת הסרט", systemImage: "trash")}
-                        .buttonStyle(SecondaryButtonStyle()).disabled(model.busy).rkRow()
+                if let caption, !caption.isEmpty {
+                    CaptionRow(caption: caption).rkCard(padding: 16).rkRow()
+                    Text("הכיתוב מועתק לבד כשמשתפים, מוכן להדבקה.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.faint).rkRow(top: 0)
                 }
             }
             if model.busy {ProgressCard(model: model).rkRow()}
@@ -1035,11 +1367,13 @@ private struct DoneStep: View {
                 .frame(maxWidth: .infinity).rkRow(top: 16)
         }
         .rkScreen()
-        .onAppear {player = model.movieURL.map(AVPlayer.init(url:))}
-        .onChange(of: model.movieURL) {_, movie in player?.pause(); player = movie.map(AVPlayer.init(url:))}
+        // The finished movie plays as soon as it is ready.
+        .onAppear {player = model.movieURL.map(AVPlayer.init(url:)); player?.play()}
+        .onChange(of: model.movieURL) {_, movie in player?.pause(); player = movie.map(AVPlayer.init(url:)); player?.play()}
         .onDisappear {player?.pause()}
     }
     private var current: LocalExport? {model.project?.exports.first {$0.file == model.movieURL?.lastPathComponent}}
+    private var caption: String? {model.edit.settings["caption"]?.string}
     private var earlier: [LocalExport] {(model.project?.exports ?? []).filter {$0.file != model.movieURL?.lastPathComponent}.reversed()}
     private func play(_ result: LocalExport) {
         guard let project = model.project else {return}

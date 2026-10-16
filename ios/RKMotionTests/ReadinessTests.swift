@@ -53,6 +53,20 @@ final class ReadinessTests: XCTestCase {
         XCTAssertFalse(model.wholeVideo)
         let saved = await model.save(); XCTAssertTrue(saved)
     }
+    @MainActor func testRenameNamesTheProjectAndIgnoresABlankName() async throws {
+        var p = LocalProject(name: "Video 1", source: "source.mov")
+        try FileManager.default.createDirectory(at: LocalStore.folder(p.id), withIntermediateDirectories: true)
+        defer {try? FileManager.default.removeItem(at: LocalStore.folder(p.id))}
+        try Data([0]).write(to: LocalStore.file(p.source, project: p.id))
+        p.duration = 10; p.analyzed = true
+        let model = EditorModel(); model.project = p; model.edit = p.edit
+        model.rename("  Beach day  ")
+        XCTAssertEqual(model.project?.name, "Beach day")
+        XCTAssertEqual(model.projects.first?.name, "Beach day")
+        model.rename("   ")
+        XCTAssertEqual(model.project?.name, "Beach day")
+        await model.settleSaves()
+    }
     func testTemporaryCleanupPreservesSourceAndReferencedExports() async throws {
         var p = LocalProject(name: "cleanup", source: "source.mov")
         try FileManager.default.createDirectory(at: LocalStore.folder(p.id), withIntermediateDirectories: true)
