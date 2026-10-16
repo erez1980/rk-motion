@@ -381,6 +381,8 @@ actor LocalEngine {
     }
     /// One video of the edit, read once for all the clips taken from it.
     private struct Source {
+        /// Held for as long as the edit is built: a track does not keep its asset alive.
+        let asset: AVURLAsset
         let start: Double
         let duration: Double
         let video: AVAssetTrack
@@ -409,7 +411,7 @@ actor LocalEngine {
             let audio = try await asset.loadTracks(withMediaType: .audio).first
             let audioRange: CMTimeRange?
             if let audio {audioRange = try await audio.load(.timeRange)} else {audioRange = nil}
-            result.append(Source(start: cursor, duration: duration, video: video, audio: audio, audioRange: audioRange,
+            result.append(Source(asset: asset, start: cursor, duration: duration, video: video, audio: audio, audioRange: audioRange,
                                  preferred: preferred, bounds: CGRect(origin: .zero, size: natural).applying(preferred)))
             cursor += duration
         }
