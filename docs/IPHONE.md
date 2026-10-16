@@ -85,6 +85,6 @@ out-of-range edits. Separate tests check local persistence and timeline math.
 Physical installation, Photos saving, signing renewal, and device performance
 still require actual iPhone verification.
 
-The desktop Python editor remains available separately; it is not part of
-the iPhone runtime. Projects from the earlier Mac companion are not migrated
-or downloaded automatically into the standalone app.
+RK Motion is iPhone-only: the earlier Mac/Windows desktop editor was removed
+from this repository in October 2026, and its projects are not migrated into
+the app.
