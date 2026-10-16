@@ -33,6 +33,22 @@
         }
       }
     },
+    "%@ סרטונים" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ videos"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ סרטונים"
+          }
+        }
+      }
+    },
     "%@ סרטים" : {
       "localizations" : {
         "en" : {
@@ -561,22 +577,6 @@
         }
       }
     },
-    "בחרו את הסרטון" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose the video"
-          }
-        },
-        "he" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "בחרו את הסרטון"
-          }
-        }
-      }
-    },
     "בחרו לפחות קטע אחד" : {
       "localizations" : {
         "en" : {
@@ -589,6 +589,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "בחרו לפחות קטע אחד"
+          }
+        }
+      }
+    },
+    "בחרו סרטון אחד או כמה" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose one video or several"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "בחרו סרטון אחד או כמה"
           }
         }
       }
@@ -2753,6 +2769,38 @@
         }
       }
     },
+    "כל קטע צריך להיות מתוך סרטון אחד" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each clip has to come from a single video"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "כל קטע צריך להיות מתוך סרטון אחד"
+          }
+        }
+      }
+    },
+    "כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several videos join into one movie, in the order they were filmed."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום."
+          }
+        }
+      }
+    },
     "לא זוהו קטעי פעילות. שנו רגישות או הוסיפו קטע ידני." : {
       "localizations" : {
         "en" : {
@@ -3549,6 +3597,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "מעתיקה את הסרטון לאחסון המקומי…"
+          }
+        }
+      }
+    },
+    "מעתיקה את הסרטונים לאחסון המקומי…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copying the videos to local storage…"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מעתיקה את הסרטונים לאחסון המקומי…"
           }
         }
       }

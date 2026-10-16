@@ -53,8 +53,8 @@ enum LocalStore {
         return folders.compactMap {url in
             guard let data = try? Data(contentsOf: url.appendingPathComponent("project.json")),
                   var p = try? JSONDecoder().decode(LocalProject.self, from: data),
-                  UUID(uuidString: p.id) != nil, p.source == URL(fileURLWithPath: p.source).lastPathComponent,
-                  FileManager.default.fileExists(atPath: file(p.source, project: p.id).path) else {return nil}
+                  UUID(uuidString: p.id) != nil, p.parts?.isEmpty != true, p.parts.map({$0[0].file == p.source}) ?? true,
+                  p.files.allSatisfy({$0 == URL(fileURLWithPath: $0).lastPathComponent && FileManager.default.fileExists(atPath: file($0, project: p.id).path)}) else {return nil}
             let scoreName = p.scoresFile ?? "scores.json"
             if scoreName == URL(fileURLWithPath: scoreName).lastPathComponent,
                let scoreData = try? Data(contentsOf: url.appendingPathComponent(scoreName)),
@@ -162,6 +162,8 @@ enum LocalStore {
     struct ImportManifest: Codable {
         var name: String
         var source: String
+        /// Every video being imported, in order, when there are several.
+        var sources: [String]? = nil
         var bytes: Int64
         var wholeVideo: Bool
         var started = Date()
@@ -179,11 +181,23 @@ enum LocalStore {
         let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
         return folders.filter {(try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && UUID(uuidString: $0.lastPathComponent) != nil}
     }
-    static func isPlayableVideo(_ url: URL) async -> Bool {
+    static func isPlayableVideo(_ url: URL) async -> Bool {await playableLength(url) != nil}
+    /// A video's length, or nil when it cannot be played.
+    static func playableLength(_ url: URL) async -> Double? {
         let asset = AVURLAsset(url: url)
         guard let duration = try? await asset.load(.duration).seconds, duration.isFinite, duration > 0,
-              let tracks = try? await asset.loadTracks(withMediaType: .video) else {return false}
-        return !tracks.isEmpty
+              let tracks = try? await asset.loadTracks(withMediaType: .video), !tracks.isEmpty else {return nil}
+        return duration
+    }
+    /// The project's videos laid end to end by their real lengths; nil when
+    /// one cannot be played.
+    static func laidOut(_ files: [String], project: String) async -> [ProjectPart]? {
+        var durations: [Double] = []
+        for name in files {
+            guard let length = await playableLength(file(name, project: project)) else {return nil}
+            durations.append(length)
+        }
+        return ProjectPart.laid(files, durations: durations)
     }
     struct Recovery {
         var rescued: [LocalProject] = []
@@ -208,6 +222,19 @@ enum LocalStore {
             let candidates = ([manifest?.source].compactMap {$0} + files.filter {$0.hasPrefix("source-") && !$0.hasSuffix(".part")}.sorted())
                 .filter {files.contains($0)}
             var rescued = false
+            // Several videos: the ones copied whole stay together, in order.
+            if let names = manifest?.sources, names.count > 1 {
+                var playable: [String] = []
+                for name in names where files.contains(name) {
+                    if await isPlayableVideo(folder.appendingPathComponent(name)) {playable.append(name)}
+                }
+                if playable.count > 1, let parts = await laidOut(playable, project: id) {
+                    var p = LocalProject(name: manifest?.name ?? NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: playable[0])
+                    p.id = id; p.wholeVideo = manifest?.wholeVideo ?? false; p.parts = parts
+                    if (try? save(p)) != nil {finishImport(project: id); report.rescued.append(p); rescued = true}
+                }
+                if rescued {continue}
+            }
             for name in candidates where await isPlayableVideo(folder.appendingPathComponent(name)) {
                 var p = LocalProject(name: manifest?.name ?? NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import"), source: name)
                 p.id = id; p.wholeVideo = manifest?.wholeVideo ?? false

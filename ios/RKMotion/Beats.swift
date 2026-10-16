@@ -101,14 +101,17 @@ enum Beats {
     /// footage no other clip uses: never past the source's end, nor into the
     /// next clip along the source, so no moment plays twice. A clip that
     /// already overlaps another (the rider's choice) only ever shrinks.
-    static func synced(_ clips: [Clip], beats: [Double], speed: Double, transition: Double, sourceDuration: Double, minimum: Double = 1) -> [Clip] {
+    /// `seams` are where one joined video ends and the next begins; a clip
+    /// never grows across one.
+    static func synced(_ clips: [Clip], beats: [Double], speed: Double, transition: Double, sourceDuration: Double, seams: [Double] = [], minimum: Double = 1) -> [Clip] {
         guard clips.count > 0, beats.count > 1, speed > 0 else {return clips}
         var result = clips
         let ceilings = clips.indices.map {index -> Double in
             let clip = clips[index]
             let others = clips.indices.filter {$0 != index}.map {clips[$0]}
             if others.contains(where: {$0.start < clip.end && clip.start < $0.end}) {return clip.end}
-            return others.map(\.start).filter {$0 >= clip.end}.min().map {min($0, sourceDuration)} ?? sourceDuration
+            let limit = seams.filter {$0 >= clip.end - 0.0001}.min().map {min($0, sourceDuration)} ?? sourceDuration
+            return others.map(\.start).filter {$0 >= clip.end}.min().map {min($0, limit)} ?? limit
         }
         for index in result.indices {
             // Two passes: a shorter clip can also shorten its transition.

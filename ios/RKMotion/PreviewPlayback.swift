@@ -22,7 +22,8 @@ struct PreviewEdit: Equatable {
 /// choice again, or coming back to the step, cannot hand an item to a
 /// second player.
 @MainActor final class PreviewPlayback: ObservableObject {
-    enum Showing: Equatable {case nothing, source(URL), edit(UUID)}
+    /// `joined` is a project's several videos shown as its source.
+    enum Showing: Equatable {case nothing, source(URL), joined(UUID), edit(UUID)}
     let player = AVPlayer()
     @Published private(set) var showing: Showing = .nothing
     var showingEdit: Bool {if case .edit = showing {return true}; return false}
@@ -33,6 +34,13 @@ struct PreviewEdit: Equatable {
         player.pause()
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         showing = .source(url)
+    }
+    /// Shows several joined videos as the source.
+    func showSource(_ joined: PreviewEdit) {
+        guard showing != .joined(joined.id) else {return}
+        player.pause()
+        player.replaceCurrentItem(with: joined.makeItem())
+        showing = .joined(joined.id)
     }
     /// Shows the edit; asking again for the same edit leaves playback alone.
     func showEdit(_ preview: PreviewEdit, play: Bool = false) {

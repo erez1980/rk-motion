@@ -142,7 +142,7 @@ private struct WorkingStage: View {
 private struct VideoStep: View {
     @ObservedObject var model: EditorModel
     let next: () -> Void
-    @State private var picked: PhotosPickerItem?
+    @State private var picked: [PhotosPickerItem] = []
     @State private var showImporter = false
     var body: some View {
         List {
@@ -156,9 +156,10 @@ private struct VideoStep: View {
                     }
                 }.rkCard(padding: 12).rkRow()
             } else {
-                Text("בחרו את הסרטון").font(RK.font(22, 700, style: .title2)).foregroundStyle(RK.ink).rkRow(top: 4)
+                Text("בחרו סרטון אחד או כמה").font(RK.font(22, 700, style: .title2)).foregroundStyle(RK.ink).rkRow(top: 4)
+                Text("כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).rkRow(top: 0)
                 HStack(spacing: 10) {
-                    PhotosPicker(selection: $picked, matching: .videos, preferredItemEncoding: .current) {SourceTile(title: "מהתמונות", symbol: "photo.on.rectangle")}
+                    PhotosPicker(selection: $picked, maxSelectionCount: 30, selectionBehavior: .ordered, matching: .videos, preferredItemEncoding: .current) {SourceTile(title: "מהתמונות", symbol: "photo.on.rectangle")}
                     Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 }.buttonStyle(.plain).disabled(model.busy).rkRow()
             }
@@ -183,19 +184,20 @@ private struct VideoStep: View {
                 }.disabled(model.busy)
             }
         }
-        .onChange(of: picked) {_, item in
-            guard let item else {return}
-            model.importPickedVideo(item); picked = nil
+        .onChange(of: picked) {_, items in
+            guard !items.isEmpty else {return}
+            model.importPickedVideos(items); picked = []
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.movie]) {result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.movie], allowsMultipleSelection: true) {result in
             switch result {
-            case .success(let source): Task {await model.importVideo(source)}
+            case .success(let sources): Task {await model.importVideos(sources)}
             case .failure(let error): model.message = error.localizedDescription
             }
         }
     }
     private func details(_ project: LocalProject) -> String {
         var parts: [String] = []
+        if project.joinsVideos {parts.append(String(format: NSLocalizedString("%@ סרטונים", comment: "How many videos a project joins"), "\(project.files.count)"))}
         if project.duration > 0 {parts.append(RK.clock(project.duration))}
         if model.sourceDimensions.width > 0 {parts.append("\(Int(model.sourceDimensions.width))×\(Int(model.sourceDimensions.height))")}
         if model.projectBytes > 0 {parts.append(ByteCountFormatter.string(fromByteCount: model.projectBytes, countStyle: .file))}
@@ -284,16 +286,18 @@ private struct EditStep: View {
             }
         }
         .sheet(item: $trimming) {selection in
-            if let index = model.edit.clips.firstIndex(where: {$0.id == selection.id}),
-               let source = model.sourceURL, let duration = model.project?.duration, duration > 0.01 {
-                ClipTrimView(clip: $model.edit.clips[index], source: source, duration: duration)
+            if let index = model.edit.clips.firstIndex(where: {$0.id == selection.id}), let project = model.project, project.duration > 0.01 {
+                // A clip is trimmed within its own video.
+                let part = project.joinsVideos ? project.part(at: model.edit.clips[index].start) : ProjectPart(file: project.source, start: 0, duration: project.duration)
+                ClipTrimView(clip: $model.edit.clips[index], source: LocalStore.file(part.file, project: project.id), offset: part.start, duration: part.duration)
             }
         }
         .sheet(isPresented: $tuning) {SensitivitySheet(model: model).presentationDetents([.height(320)])}
         .onAppear {
             if let preview = model.previewEdit {playback.showEdit(preview)}
-            else if !showingEdit {playback.showSource(model.sourceURL)}
+            else if !showingEdit {showSource()}
         }
+        .onChange(of: model.joinedSource) {_, _ in if !showingEdit {showSource()}}
         .onChange(of: model.previewEdit) {_, preview in
             if let preview {playback.showEdit(preview, play: true)}
             else if showingEdit {showSource()}
@@ -306,7 +310,9 @@ private struct EditStep: View {
                 .frame(maxWidth: .infinity, minHeight: 36).background(picked ? RK.accent : Color.clear, in: Capsule()).contentShape(Capsule())
         }.buttonStyle(.plain).accessibilityAddTraits(picked ? .isSelected : [])
     }
-    private func showSource() {playback.showSource(model.sourceURL)}
+    private func showSource() {
+        if let joined = model.joinedSource {playback.showSource(joined)} else {playback.showSource(model.sourceURL)}
+    }
     private func showEdit() {
         if let preview = model.previewEdit {playback.showEdit(preview)}
         else {model.preview()}
@@ -356,9 +362,12 @@ private struct EditStep: View {
     private func addClip() {
         // Edited-preview time is not a timestamp in the original.
         let playhead = showingEdit ? 0 : playback.player.currentTime().seconds
-        let duration = model.project?.duration ?? 0
-        let start = min(playhead.isFinite ? max(0, playhead) : 0, max(0, duration - 1))
-        var clip = Clip(start: max(0, start), end: min(duration, start + 5)); clip.manual = true
+        guard let project = model.project else {return}
+        // The joined source plays the project's own timeline; a clip stays inside one video.
+        let at = playhead.isFinite ? max(0, playhead) : 0
+        let part = project.joinsVideos ? project.part(at: at) : ProjectPart(file: project.source, start: 0, duration: project.duration)
+        let start = min(max(part.start, at), max(part.start, part.end - 1))
+        var clip = Clip(start: start, end: min(part.end, start + 5)); clip.manual = true
         model.edit.clips.append(clip)
     }
 }

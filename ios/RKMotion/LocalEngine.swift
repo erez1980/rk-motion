@@ -80,7 +80,8 @@ actor LocalEngine {
         // Rounded up to half minutes, so small edits reuse the same beats.
         let window = min(max(0, song.duration - start), ceil((estimate + 15) / 30) * 30)
         guard let beats = await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window) else {return clips}
-        return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total)
+        let seams = project.joinsVideos ? project.pieces.dropLast().map(\.end) : []
+        return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total, seams: seams)
     }
     /// The finished movie's length exactly as `export` will make it, beat
     /// moves included; nil when the edit cannot be exported as it stands.
@@ -90,7 +91,7 @@ actor LocalEngine {
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
         guard !clips.isEmpty, speed > 0, speed.isFinite, project.duration > 0,
-              clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= project.duration}) else {return nil}
+              clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= project.duration && project.part(for: $0) != nil}) else {return nil}
         let overlap = transition == "cut" ? 0 : (fade.isFinite ? fade : 0.5)
         let planned = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: project.duration)
         return Self.timeline(clips: planned, speed: speed, transition: overlap).last?.end
@@ -102,30 +103,63 @@ actor LocalEngine {
         return CGSize(width: abs(bounds.width), height: abs(bounds.height))
     }
     /// One scan's result. `signals` and `reading` are nil when the whole
-    /// video is kept as it is and nothing was scanned.
+    /// video is kept as it is and nothing was scanned. `durations` holds
+    /// each scanned video's length, in order.
     struct Analysis {
         let duration: Double
         let scores: [Double]
         let clips: [Clip]
         let signals: Signals?
         let reading: ContentReading?
+        var durations: [Double] = []
     }
-    func analyze(_ source: URL, whole: Bool, progress: Progress) async throws -> Analysis {
+    func analyze(_ source: URL, whole: Bool, progress: @escaping Progress) async throws -> Analysis {
+        try await analyze([source], whole: whole, progress: progress)
+    }
+    /// Scans the videos one after another and reads them as one timeline,
+    /// in the order given. Clips never run from one video into the next.
+    func analyze(_ sources: [URL], whole: Bool, progress: @escaping Progress) async throws -> Analysis {
         try Task.checkCancellation()
-        let asset = AVURLAsset(url: source)
-        let duration = try await asset.load(.duration).seconds
-        guard duration.isFinite, duration > 0, duration <= 24 * 3600,
-              !(try await asset.loadTracks(withMediaType: .video)).isEmpty else {
-            throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")
+        guard !sources.isEmpty else {throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")}
+        var assets: [AVURLAsset] = [], durations: [Double] = []
+        for source in sources {
+            let asset = AVURLAsset(url: source)
+            let duration = try await asset.load(.duration).seconds
+            guard duration.isFinite, duration > 0, !(try await asset.loadTracks(withMediaType: .video)).isEmpty else {
+                throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")
+            }
+            assets.append(asset); durations.append(duration)
         }
-        if whole {return Analysis(duration: duration, scores: [], clips: [Clip(start: 0, end: duration)], signals: nil, reading: nil)}
+        let total = durations.reduce(0, +)
+        guard total <= 24 * 3600 else {throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")}
+        let parts = ProjectPart.laid(sources.map(\.lastPathComponent), durations: durations)
+        if whole {
+            return Analysis(duration: total, scores: [], clips: parts.map {Clip(start: $0.start, end: $0.end)}, signals: nil, reading: nil, durations: durations)
+        }
+        let scanStarted = Date()
+        var measured: [(signals: Signals, start: Double, duration: Double)] = []
+        for (index, asset) in assets.enumerated() {
+            let part = parts[index], share = part.duration / total, base = part.start / total
+            let signals = try await measure(asset, duration: part.duration) {fraction, text in await progress(base + fraction * share, text)}
+            measured.append((signals, part.start, part.duration))
+        }
+        let signals = Signals.joined(measured)
+        let reading = ContentReading.read(signals)
+        let scores = signals.scores(for: reading.kind)
+        logger.info("Analysis completed: sourceSeconds=\(total, privacy: .public), videos=\(sources.count, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public), kind=\(reading.kind.rawValue, privacy: .public)")
+        await progress(1, "הניתוח הושלם באייפון")
+        let clips = ProjectPart.fit(Self.ranges(scores: scores, duration: total), into: parts)
+        return Analysis(duration: total, scores: scores, clips: clips, signals: signals, reading: reading, durations: durations)
+    }
+    /// One video's per-second signals: motion from small frames, then what
+    /// is in frame, then the sound.
+    private func measure(_ asset: AVURLAsset, duration: Double, progress: Progress) async throws -> Signals {
         let count = max(1, Int(ceil(duration)))
         var motion = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
         var previous: [UInt8]?
         let frameCount = Int(ceil(duration * 2))
         // Reuse the decoder while keeping only a bounded batch of tiny images.
         // Measure on real HEVC sources before claiming a speed improvement.
-        let scanStarted = Date()
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 160, height: 90)
@@ -158,13 +192,8 @@ actor LocalEngine {
         for index in motion.indices where counts[index] > 0 {motion[index] /= Double(counts[index])}
         let seen = try await look(asset, duration: duration, count: count, progress: progress)
         let heard = try await loudness(asset, duration: duration, progress: progress)
-        let signals = Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
-                              cheer: heard.cheer, people: seen.people, scenes: seen.scenes)
-        let reading = ContentReading.read(signals)
-        let scores = signals.scores(for: reading.kind)
-        logger.info("Analysis completed: sourceSeconds=\(duration, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public), kind=\(reading.kind.rawValue, privacy: .public)")
-        await progress(1, "הניתוח הושלם באייפון")
-        return Analysis(duration: duration, scores: scores, clips: Self.ranges(scores: scores, duration: duration), signals: signals, reading: reading)
+        return Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
+                       cheer: heard.cheer, people: seen.people, scenes: seen.scenes)
     }
     /// Looks at a few dozen frames spread over the video: how many people
     /// are in frame, and what kind of place it is. Vision runs on the device;
@@ -350,26 +379,64 @@ actor LocalEngine {
         let length: Double
         let preset: String
     }
-    func prepare(_ project: LocalProject, edit: Edit, progress: Progress) async throws -> PreparedEdit {
-        let source = LocalStore.file(project.source, project: project.id)
-        let asset = AVURLAsset(url: source)
-        let total = try await asset.load(.duration).seconds
+    /// One video of the edit, read once for all the clips taken from it.
+    private struct Source {
+        let start: Double
+        let duration: Double
+        let video: AVAssetTrack
+        let audio: AVAssetTrack?
+        let audioRange: CMTimeRange?
+        let preferred: CGAffineTransform
+        let bounds: CGRect
+        var end: Double {start + duration}
+        var displayed: CGSize {CGSize(width: abs(bounds.width), height: abs(bounds.height))}
+        /// Upright, scaled to fill `size` and centred in it.
+        func transform(filling size: CGSize) -> CGAffineTransform {
+            let base = preferred.concatenating(CGAffineTransform(translationX: -bounds.minX, y: -bounds.minY))
+            let scale = max(size.width / displayed.width, size.height / displayed.height)
+            return base.concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                .concatenating(CGAffineTransform(translationX: (size.width - displayed.width * scale) / 2, y: (size.height - displayed.height * scale) / 2))
+        }
+    }
+    private func sources(_ project: LocalProject) async throws -> [Source] {
+        var result: [Source] = [], cursor = 0.0
+        for file in project.files {
+            let asset = AVURLAsset(url: LocalStore.file(file, project: project.id))
+            let duration = try await asset.load(.duration).seconds
+            guard duration.isFinite, duration > 0 else {throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")}
+            guard let video = try await asset.loadTracks(withMediaType: .video).first else {throw AppError(message: "אין ערוץ וידאו.")}
+            let natural = try await video.load(.naturalSize), preferred = try await video.load(.preferredTransform)
+            let audio = try await asset.loadTracks(withMediaType: .audio).first
+            let audioRange: CMTimeRange?
+            if let audio {audioRange = try await audio.load(.timeRange)} else {audioRange = nil}
+            result.append(Source(start: cursor, duration: duration, video: video, audio: audio, audioRange: audioRange,
+                                 preferred: preferred, bounds: CGRect(origin: .zero, size: natural).applying(preferred)))
+            cursor += duration
+        }
+        return result
+    }
+    /// `closing` fades the end out; the joined videos shown as the source do not.
+    func prepare(_ project: LocalProject, edit: Edit, closing fadesOut: Bool = true, progress: Progress) async throws -> PreparedEdit {
+        let sources = try await sources(project)
+        let total = sources.last!.end
         var clips = edit.clips.filter {$0.selected != false}
         let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
+        // Each clip comes from one video.
+        func source(of clip: Clip) -> Int? {
+            sources.firstIndex {clip.start >= $0.start - 0.0001 && clip.end <= $0.end + 0.0001}
+        }
         guard !clips.isEmpty, clips.count <= Edit.clipLimit, [1.0, 1.25, 1.5, 2.0].contains(speed),
               Self.transitions.contains(transition), fade.isFinite, 0.1...3 ~= fade,
-              clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= total}) else {
+              clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= total && source(of: $0) != nil}) else {
             throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")
         }
-        guard let video = try await asset.loadTracks(withMediaType: .video).first else {throw AppError(message: "אין ערוץ וידאו.")}
-        let natural = try await video.load(.naturalSize), preferred = try await video.load(.preferredTransform)
-        let bounds = CGRect(origin: .zero, size: natural).applying(preferred)
-        let displayed = CGSize(width: abs(bounds.width), height: abs(bounds.height))
+        let displayed = sources[0].displayed
         let quality = edit.settings["quality"]?.string ?? "1080"
         guard displayed.width.isFinite, displayed.height.isFinite, displayed.width > 0, displayed.height > 0,
               displayed.width <= 16384, displayed.height <= 16384,
+              sources.allSatisfy({$0.displayed.width > 0 && $0.displayed.height > 0}),
               ["720", "1080", "original", "whatsapp"].contains(quality) else {throw AppError(message: "ממדי הסרטון או איכות הייצוא אינם תקינים.")}
         let cap: Double? = ["720", "whatsapp"].contains(quality) ? 720 : quality == "original" ? nil : 1080
         let size = Self.frame(source: displayed, cap: cap, portrait: edit.settings["aspect"]?.string == "9:16")
@@ -377,27 +444,34 @@ actor LocalEngine {
         clips = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: total)
         try Task.checkCancellation()
         let segments = Self.timeline(clips: clips, speed: speed, transition: overlap)
+        // Beat moves stay inside each clip's own video, so this always finds it.
+        let from = try clips.map {clip -> Int in
+            guard let index = source(of: clip) else {throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")}
+            return index
+        }
+        let transforms = sources.map {$0.transform(filling: size)}
         let length = segments.last!.end
         guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
         let composition = AVMutableComposition()
         let videos = (0..<2).map {_ in composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!}
-        let original = try await asset.loadTracks(withMediaType: .audio).first
-        let originalAudioRange: CMTimeRange?
-        if let original {originalAudioRange = try await original.load(.timeRange)} else {originalAudioRange = nil}
         let muted = edit.settings["muteOriginal"]?.bool ?? false
-        let audios = original != nil && !muted ? (0..<2).map {_ in composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!} : []
+        let audios = sources.contains(where: {$0.audio != nil}) && !muted ? (0..<2).map {_ in composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!} : []
         let audioParams = audios.map {AVMutableAudioMixInputParameters(track: $0)}
-        let base = preferred.concatenating(CGAffineTransform(translationX: -bounds.minX, y: -bounds.minY))
-        let scale = max(size.width / displayed.width, size.height / displayed.height)
-        let transform = base.concatenating(CGAffineTransform(scaleX: scale, y: scale))
-            .concatenating(CGAffineTransform(translationX: (size.width - displayed.width * scale) / 2, y: (size.height - displayed.height * scale) / 2))
-        let closing = min(1, segments.last!.duration / 2)
+        let closing = fadesOut ? min(1, segments.last!.duration / 2) : 0
         for (index, segment) in segments.enumerated() {
             try Task.checkCancellation()
-            let range = CMTimeRange(start: time(clips[index].start), duration: time(clips[index].duration))
-            try videos[segment.track].insertTimeRange(range, of: video, at: time(segment.start))
+            let piece = sources[from[index]]
+            // The clip's own seconds inside its video.
+            let local = max(0, clips[index].start - piece.start)
+            let range = CMTimeRange(start: time(local), duration: time(min(clips[index].duration, piece.duration - local)))
+            try videos[segment.track].insertTimeRange(range, of: piece.video, at: time(segment.start))
             videos[segment.track].scaleTimeRange(CMTimeRange(start: time(segment.start), duration: range.duration), toDuration: time(segment.duration))
-            if let original, let audioRange = originalAudioRange, !muted {
+            if !audios.isEmpty {
+                let params = audioParams[segment.track]
+                params.audioTimePitchAlgorithm = .spectral
+                params.setVolume(1, at: time(segment.start))
+            }
+            if let original = piece.audio, let audioRange = piece.audioRange, !muted {
                 // Camera audio may be slightly shorter than video; preserve silence in the tail.
                 let available = CMTimeRangeGetIntersection(range, otherRange: audioRange)
                 if available.duration.seconds > 0 {
@@ -406,31 +480,30 @@ actor LocalEngine {
                     audios[segment.track].scaleTimeRange(CMTimeRange(start: time(audioStart), duration: available.duration), toDuration: time(available.duration.seconds / speed))
                 }
                 let params = audioParams[segment.track]
-                params.audioTimePitchAlgorithm = .spectral
-                params.setVolume(1, at: time(segment.start))
                 if segment.incoming > 0 {params.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1, timeRange: CMTimeRange(start: time(segment.start), duration: time(segment.incoming)))}
                 if segment.outgoing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing)))}
-                if index == segments.count - 1 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
+                if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
             }
             await progress(Double(index + 1) / Double(clips.count) * 0.1, "מכינה את העריכה באייפון…")
         }
         var instructions: [AVMutableVideoCompositionInstruction] = []
-        func layer(_ track: Int) -> AVMutableVideoCompositionLayerInstruction {
-            let l = AVMutableVideoCompositionLayerInstruction(assetTrack: videos[track]); l.setTransform(transform, at: .zero); return l
+        func layer(_ index: Int) -> AVMutableVideoCompositionLayerInstruction {
+            let l = AVMutableVideoCompositionLayerInstruction(assetTrack: videos[segments[index].track]); l.setTransform(transforms[from[index]], at: .zero); return l
         }
         for (index, segment) in segments.enumerated() {
             let passStart = segment.start + segment.incoming, passEnd = segment.end - segment.outgoing
             if passEnd > passStart {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(passStart), duration: time(passEnd - passStart))
-                let l = layer(segment.track)
-                if index == segments.count - 1 {l.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
+                let l = layer(index)
+                if index == segments.count - 1 && closing > 0 {l.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
                 instruction.layerInstructions = [l]; instructions.append(instruction)
             }
             if segment.outgoing > 0 {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing))
-                let front = layer(segment.track), back = layer(segments[index + 1].track)
+                let front = layer(index), back = layer(index + 1)
+                let transform = transforms[from[index]], incoming = transforms[from[index + 1]]
                 let range = instruction.timeRange
                 let middle = time(segment.end - segment.outgoing / 2)
                 switch transition {
@@ -443,7 +516,7 @@ actor LocalEngine {
                 case "slide":
                     // The next clip pushes the current one off to the side.
                     front.setTransformRamp(fromStart: transform, toEnd: transform.concatenating(CGAffineTransform(translationX: -size.width, y: 0)), timeRange: range)
-                    back.setTransformRamp(fromStart: transform.concatenating(CGAffineTransform(translationX: size.width, y: 0)), toEnd: transform, timeRange: range)
+                    back.setTransformRamp(fromStart: incoming.concatenating(CGAffineTransform(translationX: size.width, y: 0)), toEnd: incoming, timeRange: range)
                 case "zoom":
                     // The current clip rushes towards the viewer as it fades.
                     let grow = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
@@ -572,6 +645,17 @@ actor LocalEngine {
     func previewEdit(_ project: LocalProject, edit: Edit) async throws -> PreviewEdit {
         let prepared = try await prepare(project, edit: edit) {_, _ in}
         try Task.checkCancellation()
+        guard let composition = prepared.composition.copy() as? AVComposition,
+              let video = prepared.video.copy() as? AVVideoComposition,
+              let audio = prepared.audio.copy() as? AVAudioMix else {throw AppError(message: "הרכבת הסרט נכשלה: ")}
+        return PreviewEdit(composition: composition, video: video, audio: audio)
+    }
+    /// A project's videos played one after another as they are, with their
+    /// own sound, so its timeline's seconds are the player's seconds.
+    func joinedSource(_ project: LocalProject) async throws -> PreviewEdit {
+        var whole = Edit(clips: project.wholeClips)
+        whole.settings["useMusic"] = .flag(false); whole.settings["quality"] = .text("720")
+        let prepared = try await prepare(project, edit: whole, closing: false) {_, _ in}
         guard let composition = prepared.composition.copy() as? AVComposition,
               let video = prepared.video.copy() as? AVVideoComposition,
               let audio = prepared.audio.copy() as? AVAudioMix else {throw AppError(message: "הרכבת הסרט נכשלה: ")}

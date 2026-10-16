@@ -27,6 +27,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var previewEdit: PreviewEdit?
     @Published var projectBytes: Int64 = 0
     @Published var sourceDimensions: CGSize = .zero
+    /// A project of several videos, played one after another as its source.
+    @Published private(set) var joinedSource: PreviewEdit?
     var editValidationMessage: String? {
         guard let p = project else {return nil}
         let clips = edit.clips.filter {$0.selected != false}
@@ -37,6 +39,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         if clips.contains(where: {!$0.start.isFinite || !$0.end.isFinite || $0.start < 0 || $0.end <= $0.start || $0.end > p.duration}) {
             return "זמני הקטעים צריכים להיות בתוך הסרטון, והסיום אחרי ההתחלה"
         }
+        if clips.contains(where: {p.part(for: $0) == nil}) {return "כל קטע צריך להיות מתוך סרטון אחד"}
         return nil
     }
     var selectedClips: [Clip] {edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}}
@@ -128,6 +131,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
         sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(value.source, project: value.id))) ?? .zero
+        await joinSource(value)
         previewEdit = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
@@ -137,7 +141,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(true)
         guard await save() else {setBusy(false); return}
         project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewEdit = nil; projectBytes = 0
-        sourceDimensions = .zero; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
+        sourceDimensions = .zero; joinedSource = nil; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
         UserDefaults.standard.removeObject(forKey: "localProject")
         setBusy(false)
     }
@@ -190,45 +194,78 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     }
     /// One operation from the picker to a saved project, so "cancel" reaches
     /// whichever part is running: the picker's hand-over or the copy.
-    func importPickedVideo(_ item: PhotosPickerItem) {
-        guard !busy else {return}
+    func importPickedVideo(_ item: PhotosPickerItem) {importPickedVideos([item])}
+    /// Several picked videos become one project, in the order they were filmed.
+    func importPickedVideos(_ items: [PhotosPickerItem]) {
+        guard !busy, !items.isEmpty else {return}
         setBusy(true, .importing); percent = 0; message = "האייפון מכין את הקובץ…"
         operation = Task {
-            var staged: URL?
+            var staged: [URL] = []
             do {
-                guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
-                staged = picked.url; try Task.checkCancellation()
-                await runImport(picked.url)
+                for item in items {
+                    guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
+                    staged.append(picked.url); try Task.checkCancellation()
+                }
+                await runImport(await Self.chronological(staged))
             } catch is CancellationError {finishImport(nil, cancelled: true)}
             catch {finishImport(nil, error: error)}
             // Moved into the project when the import succeeded; otherwise it
             // is this operation's own copy and goes with it.
-            if let staged, FileManager.default.fileExists(atPath: staged.path) {try? FileManager.default.removeItem(at: staged)}
+            for url in staged where FileManager.default.fileExists(atPath: url.path) {try? FileManager.default.removeItem(at: url)}
         }
     }
-    func importVideo(_ file: URL) async {
+    func importVideo(_ file: URL) async {await importVideos([file])}
+    func importVideos(_ files: [URL]) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
+        guard !files.isEmpty else {return}
         setBusy(true, .importing); percent = 0
-        let task = Task {await runImport(file)}
+        let task = Task {await runImport(await Self.chronological(files))}
         operation = task
         await task.value
     }
-    /// Writes a manifest, copies the video into the new project's folder in
+    /// The videos in the order they were filmed; one without a date keeps
+    /// its place among the order they were picked in.
+    nonisolated static func chronological(_ files: [URL]) async -> [URL] {
+        guard files.count > 1 else {return files}
+        var dated: [(url: URL, date: Date?, index: Int)] = []
+        for (index, url) in files.enumerated() {
+            let access = url.startAccessingSecurityScopedResource()
+            defer {if access {url.stopAccessingSecurityScopedResource()}}
+            var date: Date?
+            if let item = try? await AVURLAsset(url: url).load(.creationDate) {date = try? await item.load(.dateValue)}
+            dated.append((url, date, index))
+        }
+        // Undated videos keep their picked order; dated ones are compared by date.
+        guard dated.allSatisfy({$0.date != nil}) else {return files}
+        return dated.sorted {($0.date!, $0.index) < ($1.date!, $1.index)}.map(\.url)
+    }
+    /// Writes a manifest, copies the videos into the new project's folder in
     /// pieces, and only then saves the project. An interruption leaves the
     /// manifest behind for `restore` to find; a cancellation removes this
     /// import's own partial copy and nothing else.
-    private func runImport(_ file: URL) async {
+    private func runImport(_ files: [URL]) async {
         guard await save() else {setBusy(false); return}
-        message = "מעתיקה את הסרטון לאחסון המקומי…"
-        let name = UUID(uuidString: file.deletingPathExtension().lastPathComponent) == nil ? file.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
+        guard let first = files.first else {setBusy(false); return}
+        let copying = files.count > 1 ? NSLocalizedString("מעתיקה את הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("מעתיקה את הסרטון לאחסון המקומי…", comment: "Copying the video")
+        message = copying
+        let name = UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         do {
-            let size = Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            let target = "source-" + UUID().uuidString + "." + (file.pathExtension.isEmpty ? "mov" : file.pathExtension)
-            try LocalStore.writeManifest(.init(name: name, source: target, bytes: size, wholeVideo: p.wholeVideo), project: p.id)
-            p.source = try await LocalStore.importFile(file, project: p.id, prefix: "source", named: target) {[weak self] fraction in
-                await self?.progress(fraction, "מעתיקה את הסרטון לאחסון המקומי…")
+            let size = files.reduce(Int64(0)) {$0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)}
+            let targets = files.map {"source-" + UUID().uuidString + "." + ($0.pathExtension.isEmpty ? "mov" : $0.pathExtension)}
+            try LocalStore.writeManifest(.init(name: name, source: targets[0], sources: files.count > 1 ? targets : nil, bytes: size, wholeVideo: p.wholeVideo), project: p.id)
+            for (index, file) in files.enumerated() {
+                let share = 1 / Double(files.count), base = Double(index) * share
+                let copied = try await LocalStore.importFile(file, project: p.id, prefix: "source", named: targets[index]) {[weak self] fraction in
+                    await self?.progress(base + fraction * share, copying)
+                }
+                if index == 0 {p.source = copied}
+                try Task.checkCancellation()
+            }
+            if files.count > 1 {
+                guard let parts = await LocalStore.laidOut(targets, project: p.id) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
+                p.parts = parts
             }
             try Task.checkCancellation()
             revision += 1; try await persistence.save(p, revision: revision)
@@ -237,10 +274,15 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             undoStack = []; redoStack = []; updateUndo(); refreshLibrary(p)
             UserDefaults.standard.set(p.id, forKey: "localProject")
             sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
+            await joinSource(p)
             previewEdit = nil; projectBytes = await persistence.bytes(p)
             processingSucceeded = true; setBusy(false); analyze()
         } catch is CancellationError {finishImport(p.id, cancelled: true)}
         catch {finishImport(p.id, error: error)}
+    }
+    /// Prepares the joined videos to play as the source; nothing for one video.
+    private func joinSource(_ p: LocalProject) async {
+        if p.joinsVideos {joinedSource = try? await engine.joinedSource(p)} else {joinedSource = nil}
     }
     private func finishImport(_ id: String?, cancelled: Bool = false, error: Error? = nil) {
         if let id {LocalStore.abandonImport(project: id)}
@@ -256,7 +298,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
           operation = Task {
             guard await save() else {setBusy(false); return}
             do {
-                let result = try await engine.analyze(LocalStore.file(p.source, project: p.id), whole: whole) {[weak self] fraction, text in
+                let result = try await engine.analyze(p.files.map {LocalStore.file($0, project: p.id)}, whole: whole) {[weak self] fraction, text in
                     await self?.progress(fraction, text)
                 }
                 try Task.checkCancellation()
@@ -264,6 +306,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 // Without its saved signals a reading could not be switched to another kind, so it is not kept.
                 let stored = result.signals.map {(try? LocalStore.writeSignals($0, project: p.id)) != nil} ?? false
                 current.duration = result.duration; current.scores = result.scores; current.analyzed = true; current.reading = stored ? result.reading : nil
+                if current.joinsVideos {current.parts = ProjectPart.laid(current.files, durations: result.durations)}
                 project = current; edit.clips = result.clips; edit.settings["wholeVideo"] = .flag(whole)
                 if let kind = result.reading?.kind {
                     edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
@@ -280,7 +323,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     func retune() {
         guard let p = project, !busy else {return}
         let previous = edit
-        edit.clips = LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold) + edit.clips.filter {$0.manual == true}
+        edit.clips = p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
     }
@@ -293,7 +336,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let previous = edit
         apply(kind, signals: signals)
         edit.settings["contentKind"] = .text(kind.rawValue); edit.settings["muteOriginal"] = .flag(kind.mutesOriginal)
-        edit.clips = LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold) + edit.clips.filter {$0.manual == true}
+        edit.clips = p.fitted(LocalEngine.ranges(scores: project?.scores ?? [], duration: p.duration, threshold: threshold)) + edit.clips.filter {$0.manual == true}
         wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
         changed(from: previous); suppressedEdit = edit
         message = String(format: NSLocalizedString("הסרט נערך מחדש כ%@. ניתן לבטל את השינוי.", comment: "Content kind changed"), kind.title)
@@ -426,7 +469,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         do {
             try await persistence.deleteProject(p.id)
             await Thumbnails.shared.forget(p.id)
-            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
+            projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; joinedSource = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
         setBusy(false)
@@ -436,7 +479,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         if !wholeVideo && p.scores.isEmpty {analyze(); return}
         var previous = edit; previous.settings["wholeVideo"] = .flag(p.wholeVideo)
         edit.settings["wholeVideo"] = .flag(wholeVideo)
-        edit.clips = wholeVideo ? [Clip(start: 0, end: p.duration)] : LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold)
+        edit.clips = wholeVideo ? p.wholeClips : p.fitted(LocalEngine.ranges(scores: p.scores, duration: p.duration, threshold: threshold))
         project?.wholeVideo = wholeVideo
         changed(from: previous); suppressedEdit = edit
         message = wholeVideo ? "כל הסרטון נבחר. ניתן לבטל את השינוי." : "הצעות הפעילות הוחזרו. ניתן לבטל את השינוי."

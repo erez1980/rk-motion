@@ -79,6 +79,34 @@ struct Signals: Codable, Equatable {
         case .people: return people.map {min(1, $0 / 4)}
         }
     }
+    /// Several videos' signals as one timeline of `pieces` laid end to end,
+    /// second by second. A channel only some videos measured reads as zero
+    /// in the others; a channel none measured stays empty. Scene shares are
+    /// weighed by how long each video runs.
+    static func joined(_ pieces: [(signals: Signals, start: Double, duration: Double)]) -> Signals {
+        guard pieces.count > 1 else {return pieces.first?.signals ?? Signals()}
+        let total = pieces.reduce(0) {$0 + $1.duration}
+        let count = max(1, Int(ceil(total)))
+        // Each second takes its middle moment's video and that video's own second.
+        let place = (0..<count).map {second -> (piece: Int, local: Int) in
+            let at = min(Double(second) + 0.5, max(0, total - 0.0001))
+            let piece = pieces.lastIndex {$0.start <= at} ?? 0
+            return (piece, max(0, Int(at - pieces[piece].start)))
+        }
+        func join(_ channel: KeyPath<Signals, [Double]>) -> [Double] {
+            guard pieces.contains(where: {!$0.signals[keyPath: channel].isEmpty}) else {return []}
+            return place.map {
+                let values = pieces[$0.piece].signals[keyPath: channel]
+                return values.isEmpty ? 0 : values[min(values.count - 1, $0.local)]
+            }
+        }
+        var scenes: [String: Double] = [:]
+        for piece in pieces where total > 0 {
+            for (label, share) in piece.signals.scenes {scenes[label, default: 0] += share * piece.duration / total}
+        }
+        return Signals(motion: join(\.motion), loudness: join(\.loudness), music: join(\.music), speech: join(\.speech),
+                       cheer: join(\.cheer), people: join(\.people), scenes: scenes)
+    }
     /// Each second's score for `kind`. Channels that were not measured drop
     /// out and the rest are scaled back up, so a missing one never sinks
     /// every score below the threshold.
