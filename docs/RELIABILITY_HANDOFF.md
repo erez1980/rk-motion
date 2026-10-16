@@ -28,8 +28,6 @@ PR #6. App version on the branch: **0.20.1**.
 | F07 one clip limit | fixed | 168fbe9 | `Edit.clipLimit = 500` | `ClipLimitTests` |
 | F08 thumbnails | fixed | 9cece70 | `Thumbnails.swift`, lazy Home list | `ThumbnailTests` |
 | F09 layout direction by language | fixed | a0e28cf | `AppLanguage.swift` | `LanguageDirectionTests`, UI `testLayoutFollowsTheLanguage` |
-| F10 action-render pixel format (desktop) | fixed | b6f0424 | `src/sofit/action.py` | `test_action_render_writes_yuv420p_from_a_444_source` |
-| F11 concurrent download cache (desktop) | fixed | d51b177 | `src/sofit/feed.py` | three tests in `tests/test_feed.py` |
 
 Also: 9613a5e makes the "New ride" and "From YouTube" tiles respond to a tap
 anywhere on them (reported from the simulator).
@@ -52,8 +50,6 @@ anywhere on them (reported from the simulator).
 
 ## Verification
 
-- Python: `pip install -e '.[dev]' pytest 'mcp<2'` then `pytest` — passes
-  (209 before this work, plus 4 new).
 - Native: `.github/workflows/ios.yml` (Xcode 26.3, simulator) runs the unit
   tests, the UI tests in `ios/RKMotionUITests` and builds the unsigned IPA.
   Run 38693678442 (build 85) on `45a22c2` passed: 68 unit tests and 3 UI

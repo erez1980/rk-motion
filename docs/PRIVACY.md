@@ -32,5 +32,4 @@ For support, use https://github.com/erez1980/rk-motion/issues. Do not attach
 private videos or personal information to public issues. GitHub handles
 information you choose to post according to its own privacy policy.
 
-This policy applies to the standalone iPhone app, not the separately installed
-desktop tools. Changes to data handling will be reflected in this policy.
+This policy applies to the standalone iPhone app. Changes to data handling will be reflected in this policy.
