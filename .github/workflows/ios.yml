@@ -2,9 +2,9 @@ name: iPhone standalone
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', '.github/workflows/ios.yml']
   pull_request:
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', '.github/workflows/ios.yml']
   workflow_dispatch:
 concurrency:
   group: ios-${{ github.head_ref || github.ref_name }}
@@ -47,3 +47,43 @@ jobs:
           name: RK-Motion-test-results
           path: build/ios/TestResults.xcresult
           if-no-files-found: ignore
+
+  # Every green main build becomes a public GitHub Release with the IPA and a
+  # SideStore/AltStore source, so the iPhone installs and updates on its own:
+  # https://github.com/<repo>/releases/latest/download/source.json
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: ios-release
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RK-Motion-unsigned-IPA
+          path: dist
+      - name: Publish IPA and install source
+        run: |
+          rk_ipa=$(ls dist/RK-Motion-*.ipa)
+          rk_name=$(basename "$rk_ipa" .ipa)
+          rk_tag="v${rk_name#RK-Motion-}"
+          rk_tag="${rk_tag%-*}"
+          # A rerun keeps the run number, so reuse the release it already made.
+          if ! gh release view "$rk_tag" >/dev/null 2>&1; then
+            gh release create "$rk_tag" --draft --target "$GITHUB_SHA" \
+              --title "RK Motion ${rk_tag#v}" \
+              --notes "Unsigned IPA from commit ${GITHUB_SHA:0:7}. Install on the iPhone through SideStore with the source https://github.com/$GH_REPO/releases/latest/download/source.json (see docs/IPHONE.md)."
+          fi
+          gh release upload "$rk_tag" "$rk_ipa" --clobber
+          gh release download --pattern source.json --output dist/previous.json || true
+          gh api "repos/$GH_REPO/releases?per_page=30" > dist/releases.json
+          python3 scripts/make-altstore-source.py "$rk_ipa" dist/releases.json dist/source.json --repo "$GH_REPO" --tag "$rk_tag" --previous dist/previous.json
+          gh release upload "$rk_tag" dist/source.json --clobber
+          gh release edit "$rk_tag" --draft=false --latest

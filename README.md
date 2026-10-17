@@ -21,8 +21,15 @@ upload, no server.
 
 ## Install
 
-See [docs/IPHONE.md](docs/IPHONE.md): download the IPA from a green
-**iPhone standalone** Actions run and sideload it.
+Add this source in SideStore on the iPhone, then install and update from there:
+
+```
+https://github.com/erez1980/rk-motion/releases/latest/download/source.json
+```
+
+Every green build of `main` is published as a
+[GitHub Release](https://github.com/erez1980/rk-motion/releases) with the IPA.
+The one-time setup is in [docs/IPHONE.md](docs/IPHONE.md).
 
 ## Develop
 
@@ -36,7 +43,7 @@ bash scripts/build-ios.sh simulator       # on a Mac with Xcode
 ```
 
 CI (`.github/workflows/ios.yml`) builds, runs the tests on a simulator and
-produces the unsigned IPA on every pull request that touches the app.
+produces the unsigned IPA on every pull request that touches the app; on\n`main` it also publishes the IPA and the SideStore source as a Release.
 
 ## License
 
