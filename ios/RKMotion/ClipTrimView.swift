@@ -41,6 +41,17 @@ struct ClipTrimView: View {
                             field("סיום", value: $clip.end, label: "סיום הקטע בשניות")
                         }
                     }.rkCard()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle(isOn: Binding(get: {clip.slowAt != nil}, set: {on in clip.slowAt = on ? slowPoint : nil})) {
+                            Label("הילוך איטי בקטע הזה", systemImage: "tortoise").font(RK.font(15, 500)).foregroundStyle(RK.ink)
+                        }.tint(RK.accent).accessibilityIdentifier("trim.slow")
+                        if let slowAt = clip.slowAt {
+                            Text(String(format: NSLocalizedString("ההאטה מתחילה ב־%@ שניות", comment: "Where the clip's slow motion starts"), fixed(slowAt)))
+                                .font(RK.font(13, 400, style: .footnote)).monospacedDigit().foregroundStyle(RK.soft)
+                            Button {clip.slowAt = slowPoint} label: {Label("להאט מהנקודה שמוצגת עכשיו", systemImage: "scope")}
+                                .buttonStyle(SecondaryButtonStyle())
+                        }
+                    }.rkCard()
                     Button {play()} label: {Label("ניגון הקטע שנבחר", systemImage: "play.fill")}.buttonStyle(PrimaryButtonStyle())
                 }.padding(20)
             }
@@ -108,6 +119,12 @@ struct ClipTrimView: View {
     // Formatting the number apart from the sentence keeps the catalog key
     // stable, instead of depending on how SwiftUI spells an interpolation.
     private func fixed(_ value: Double) -> String {String(format: "%.2f", value)}
+    /// The moment on screen in the player, inside the clip, as a timeline second.
+    private var slowPoint: Double {
+        let shown = (player?.currentTime().seconds ?? 0) + offset
+        guard shown.isFinite, shown > clip.start, shown < clip.end else {return clip.start}
+        return shown
+    }
     private func play() {
         guard let player else {return}
         player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: clip.end - offset, preferredTimescale: 600)

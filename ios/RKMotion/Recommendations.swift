@@ -26,6 +26,7 @@ enum SongIdeas {
         switch reading.kind {
         case .talk: return 70...95
         case .party: return 115...128
+        case .scenery, .food: return 75...100
         default:
             let energy = energy(reading)
             return energy >= 0.6 ? 125...150 : energy >= 0.3 ? 100...125 : 80...105
@@ -64,6 +65,22 @@ enum SongIdeas {
                     idea(NSLocalizedString("שירים מרגשים למשפחה", comment: "Song idea"), "feel good family songs"),
                     idea(NSLocalizedString("שירי ילדים שמחים", comment: "Song idea"), "happy Israeli kids songs"),
                     idea(NSLocalizedString("שריקה ומחיאות כפיים", comment: "Song idea"), "happy whistle clap background music")]
+        case .pets:
+            return [idea(NSLocalizedString("שמח ומשעשע", comment: "Song idea"), "funny happy pet video music"),
+                    idea(NSLocalizedString("שמח עם יוקלילי", comment: "Song idea"), "happy ukulele family music"),
+                    idea(NSLocalizedString("פופ שמח", comment: "Song idea"), "upbeat feel good pop songs")]
+        case .sports:
+            return [idea(NSLocalizedString("אפי ואנרגטי", comment: "Song idea"), "epic motivational music sports edit"),
+                    idea(NSLocalizedString("היפ הופ לאימון", comment: "Song idea"), "workout hip hop music"),
+                    idea(NSLocalizedString("רוק אנרגטי", comment: "Song idea"), "energetic rock action edit music")]
+        case .scenery:
+            return [idea(NSLocalizedString("קולנועי", comment: "Song idea"), "cinematic background music"),
+                    idea(NSLocalizedString("אמביינט לנופים", comment: "Song idea"), "ambient nature cinematic music drone"),
+                    idea(NSLocalizedString("אקוסטי רגוע", comment: "Song idea"), "acoustic chill travel music")]
+        case .food:
+            return [idea(NSLocalizedString("ג'אז קליל", comment: "Song idea"), "light jazz cafe music"),
+                    idea(NSLocalizedString("לו־פיי רגוע", comment: "Song idea"), "lofi chill beats"),
+                    idea(NSLocalizedString("בוסה נובה", comment: "Song idea"), "bossa nova restaurant music")]
         case .general:
             let up = [idea(NSLocalizedString("פופ שמח", comment: "Song idea"), "upbeat feel good pop songs"),
                       idea(NSLocalizedString("להיטי הקיץ", comment: "Song idea"), "summer hits")]
@@ -97,7 +114,8 @@ enum SongIdeas {
     /// What the model is told about the footage, in plain words.
     static func prompt(for reading: ContentReading, seconds: Double?) -> String {
         let kinds: [ContentKind: String] = [.action: "a ride or action sport", .party: "a party or event with dancing", .trip: "a trip",
-                                            .talk: "a talk, speech or lecture", .family: "kids and family moments", .general: "everyday moments"]
+                                            .talk: "a talk, speech or lecture", .family: "kids and family moments", .pets: "pets and animals",
+                                            .sports: "sports or a workout", .scenery: "landscapes and nature", .food: "food and a meal", .general: "everyday moments"]
         var facts = ["The video is \(kinds[reading.kind] ?? "everyday moments")."]
         let energy = energy(reading)
         facts.append(energy >= 0.6 ? "It is fast and wild." : energy >= 0.3 ? "It has a lively, steady pace." : "It is calm.")
