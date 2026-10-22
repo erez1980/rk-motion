@@ -69,6 +69,15 @@ final class EditRulesTests: XCTestCase {
         XCTAssertEqual(short.slowRange?.end ?? 0, 2, accuracy: 1e-9)
         XCTAssertEqual(short.footage(atScreen: short.screenOffset(of: 1.2, speed: 1), speed: 1), 1.2, accuracy: 1e-9)
     }
+    func testLengthPickCountsSlowMotion() {
+        let clips = (0..<10).map {Clip(start: Double($0) * 4, end: Double($0) * 4 + 4, score: 1 - Double($0) / 100)}
+        let scores = Array(repeating: 0.5, count: 40)
+        let settings: [String: Setting] = ["slowMode": .text("each"), "slowRate": .text("4"), "slowLength": .text("3")]
+        // Each clip plays 4 + 3 × 3 = 13 seconds, so a 30-second movie holds two.
+        let picked = ClipPicker.autoPick(clips, seconds: 30, shape: {SlowMotion.shaped($0, scores: scores, settings: settings)})
+        XCTAssertEqual(picked.filter {$0.selected != false}.count, 2)
+        XCTAssertEqual(ClipPicker.autoPick(clips, seconds: 30).filter {$0.selected != false}.count, 8)
+    }
     func testTransitionPreviewHoldsThenPasses() {
         XCTAssertEqual(TransitionPreview.progress(at: 0.1), 0)
         XCTAssertEqual(TransitionPreview.progress(at: TransitionPreview.loop / 2), 0.5, accuracy: 1e-9)

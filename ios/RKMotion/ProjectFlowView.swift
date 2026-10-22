@@ -812,13 +812,13 @@ private struct StyleSheet: View {
                         Label("הילוך איטי", systemImage: "tortoise").font(RK.font(15, 600)).foregroundStyle(RK.ink)
                         if model.project?.scores.isEmpty == false {
                             ChoiceGroup(title: "איפה", options: SlowMotion.modes.map {(Self.slowModeName($0), $0)},
-                                        selection: Binding(get: {SlowMotion.mode(model.edit.settings)}, set: {model.edit.settings["slowMode"] = .text($0)}))
+                                        selection: Binding(get: {SlowMotion.mode(model.edit.settings)}, set: {model.setTiming("slowMode", $0)}))
                                 .accessibilityIdentifier("edit.slowMode")
                         }
                         ChoiceGroup(title: "כמה לאט", options: SlowMotion.rates.map {(String(format: NSLocalizedString("פי %@", comment: "Slow motion factor"), $0), $0)},
-                                    selection: setting("slowRate", fallback: "2", timing: false))
+                                    selection: setting("slowRate", fallback: "2"))
                         ChoiceGroup(title: "משך ההאטה", options: SlowMotion.lengths.map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)},
-                                    selection: setting("slowLength", fallback: "1.5", timing: false))
+                                    selection: setting("slowLength", fallback: "1.5"))
                         Text("אפשר לסמן הילוך איטי גם בקטע מסוים: פתחו אותו בכפתור המספריים.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
                     }.rkCard()
                 }.padding(20).disabled(model.busy)
@@ -850,10 +850,9 @@ private struct StyleSheet: View {
         let list = counts.map {"\($0.1) " + Self.transitionName($0.0)}.joined(separator: ", ")
         return String(format: NSLocalizedString("בסרט הזה: %@", comment: "Which smart transitions this movie gets"), list)
     }
-    /// `timing` settings change the movie's length, so the clips are chosen again for it.
-    private func setting(_ key: String, fallback: String, timing: Bool = true) -> Binding<String> {
-        Binding(get: {model.edit.settings[key]?.string ?? fallback},
-                set: {value in if timing {model.setTiming(key, value)} else {model.edit.settings[key] = .text(value)}})
+    /// Each of these changes the movie's length, so the clips are chosen again for it.
+    private func setting(_ key: String, fallback: String) -> Binding<String> {
+        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.setTiming(key, $0)})
     }
 }
 

@@ -118,11 +118,13 @@ enum ClipPicker {
     /// of every transition count.
     /// `groups` names the video each clip comes from; when given, the
     /// strongest clip of every video is chosen first, whatever the length.
-    static func autoPick(_ clips: [Clip], seconds: Double, speed: Double = 1, transition: Double = 0, groups: [Int]? = nil) -> [Clip] {
+    /// `shape` turns a choice into the clips the movie plays, so slow motion counts.
+    static func autoPick(_ clips: [Clip], seconds: Double, speed: Double = 1, transition: Double = 0, groups: [Int]? = nil, shape: (([Clip]) -> [Clip])? = nil) -> [Clip] {
         let usable = clips.indices.filter {clips[$0].duration.isFinite && clips[$0].duration > 0}
         let ranked = usable.sorted {(clips[$0].score ?? 1) > (clips[$1].score ?? 1)}
         func length(_ picked: Set<Int>) -> Double {
-            LocalEngine.timeline(clips: picked.sorted().map {clips[$0]}, speed: speed, transition: transition).last?.end ?? 0
+            let picks = picked.sorted().map {clips[$0]}
+            return LocalEngine.timeline(clips: shape?(picks) ?? picks, speed: speed, transition: transition).last?.end ?? 0
         }
         var chosen = Set<Int>()
         if let groups, groups.count == clips.count {

@@ -453,7 +453,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// `seconds` is the finished movie's length, so playback speed counts.
     func autoPick(seconds: Double) {
         guard !busy, !edit.clips.isEmpty else {return}
-        edit.clips = Self.picked(edit.clips, seconds: seconds, settings: edit.settings, parts: project?.pieces ?? [])
+        edit.clips = Self.picked(edit.clips, seconds: seconds, settings: edit.settings, parts: project?.pieces ?? [], scores: project?.scores ?? [])
     }
     /// The movie length the clip choice aims at: "30", "45", "60" seconds,
     /// or "all" for every suggested moment. A new movie aims at 45 seconds.
@@ -482,15 +482,17 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard let seconds = Double(length), seconds > 0 else {
             return Edit.capped(clips.map {var clip = $0; clip.selected = true; return clip})
         }
-        return Self.picked(clips, seconds: seconds, settings: settings, parts: project?.pieces ?? [])
+        return Self.picked(clips, seconds: seconds, settings: settings, parts: project?.pieces ?? [], scores: project?.scores ?? [])
     }
     /// Every video keeps a clip in the movie unless the rider turned that off.
-    private static func picked(_ clips: [Clip], seconds: Double, settings: [String: Setting], parts: [ProjectPart]) -> [Clip] {
+    /// The length is measured with the edit's slow motion, as the export plays it.
+    private static func picked(_ clips: [Clip], seconds: Double, settings: [String: Setting], parts: [ProjectPart], scores: [Double]) -> [Clip] {
         guard !clips.isEmpty else {return clips}
         let speed = Double(settings["speed"]?.string ?? "1") ?? 1
         let overlap = (settings["transition"]?.string ?? "cut") != "cut" ? (Double(settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         let groups = ClipRules.everyVideo(settings) ? ClipRules.groups(clips, parts: parts) : nil
-        return ClipPicker.autoPick(clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0, groups: groups)
+        return ClipPicker.autoPick(clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0, groups: groups,
+                                    shape: {SlowMotion.shaped($0, scores: scores, settings: settings)})
     }
     /// The scan's moments for `scores` as the rider's rules shape them, with
     /// the clips the rider added kept at the end.

@@ -95,7 +95,11 @@ enum PhotoMotion {
         do {
             for index in 0..<frames {
                 try Task.checkCancellation()
-                while !input.isReadyForMoreMediaData {try await Task.sleep(for: .milliseconds(5))}
+                while !input.isReadyForMoreMediaData {
+                    // A writer that failed (a full disk) never becomes ready again.
+                    if writer.status == .failed || writer.status == .cancelled {throw writer.error ?? AppError(message: "לא ניתן להנפיש את התמונה.")}
+                    try await Task.sleep(for: .milliseconds(5))
+                }
                 guard let pool = adaptor.pixelBufferPool else {throw writer.error ?? AppError(message: "לא ניתן להנפיש את התמונה.")}
                 var buffer: CVPixelBuffer?
                 CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
