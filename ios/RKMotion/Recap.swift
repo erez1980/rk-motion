@@ -109,13 +109,19 @@ enum Recap {
         }
     }
     /// Up to `videos` videos and `photos` photos, taken in turn from each
-    /// day (or month) so the whole stretch shows; within one, favourites
+    /// day (or month), or from days spread over it when there are more days
+    /// than places, so the whole stretch shows; within one, favourites
     /// first, then videos of a usable length, then the longest. In the order taken.
     static func choose(_ items: [Item], videos: Int, photos: Int, spread: Calendar.Component, calendar: Calendar = .current) -> [Item] {
         func usable(_ item: Item) -> Bool {item.duration >= 3 && item.duration <= 300}
         func pick(_ pool: [Item], limit: Int, rank: (Item, Item) -> Bool) -> [Item] {
             let buckets = Dictionary(grouping: pool) {calendar.dateInterval(of: spread, for: $0.date)?.start ?? $0.date}
             var queues = buckets.keys.sorted().map {buckets[$0]!.sorted(by: rank)}
+            // More days than places: days spread evenly from the first to the last, one from each.
+            if queues.count > limit, limit > 0 {
+                let step = Double(queues.count - 1) / Double(max(1, limit - 1))
+                queues = (0..<limit).map {queues[Int((Double($0) * step).rounded())]}
+            }
             var chosen: [Item] = []
             while chosen.count < limit, queues.contains(where: {!$0.isEmpty}) {
                 for index in queues.indices where chosen.count < limit && !queues[index].isEmpty {chosen.append(queues[index].removeFirst())}

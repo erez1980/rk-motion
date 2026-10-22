@@ -153,4 +153,12 @@ final class RecapTests: XCTestCase {
         // The second round goes back to the first day: a usable length before a ten-minute one.
         XCTAssertEqual(more.map(\.id), ["a", "b", "d", "e"])
     }
+    func testMoreDaysThanPlacesSpreadsOverTheWholeStretch() {
+        let items = (1...30).map {Recap.Item(id: "v\($0)", date: day(9, $0), video: true, duration: 10)}
+        let chosen = Recap.choose(items, videos: 14, photos: 0, spread: .day, calendar: calendar)
+        XCTAssertEqual(chosen.count, 14)
+        XCTAssertEqual(chosen.first?.id, "v1")
+        XCTAssertEqual(chosen.last?.id, "v30")
+        XCTAssertEqual(Set(chosen.map(\.id)).count, 14)
+    }
 }

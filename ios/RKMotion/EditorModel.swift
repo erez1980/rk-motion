@@ -565,20 +565,25 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     }
     /// The moments that show `query`, read by the Hebrew list and, for
     /// words it does not know, by Apple Intelligence.
+    /// Works on the scan as it was when asked, so another project opened
+    /// meanwhile never mixes in.
     func moments(for query: String) async -> [Clip] {
         guard let p = project, !sightings.isEmpty else {return []}
+        let frames = sightings, pieces = p.pieces
         var terms = FrameSearch.terms(for: query)
-        if FrameSearch.moments(sightings, terms: terms, parts: p.pieces).isEmpty {
-            terms.formUnion(await ModelSearch.terms(query, vocabulary: FrameSearch.vocabulary(sightings)))
+        if FrameSearch.moments(frames, terms: terms, parts: pieces).isEmpty {
+            terms.formUnion(await ModelSearch.terms(query, vocabulary: FrameSearch.vocabulary(frames)))
         }
-        return FrameSearch.moments(sightings, terms: terms, parts: p.pieces)
+        return FrameSearch.moments(frames, terms: terms, parts: pieces)
     }
     /// Adds the moments that show `query` to the movie, in the order they
     /// were filmed; one already in the movie is chosen instead of added twice.
     @discardableResult func addMoments(for query: String) async -> Int {
-        guard !busy, project != nil else {return 0}
+        guard !busy, let asked = project?.id else {return 0}
         guard canSearch else {message = NSLocalizedString("כדי לחפש, נתחו את הסרטון שוב. הניתוח הקודם נעשה לפני שהיה חיפוש.", comment: "Search needs a new scan"); return 0}
         let found = await moments(for: query)
+        // The rider may have opened another project, or started a scan, while the model answered.
+        guard !busy, project?.id == asked else {return 0}
         guard !found.isEmpty else {
             message = String(format: NSLocalizedString("לא מצאתי רגעים עם “%@”. נסו מילה אחרת.", comment: "Search found nothing"), query)
             return 0
@@ -602,7 +607,11 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let request = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !busy, let p = project, p.analyzed, !request.isEmpty else {return}
         var commands = ChatEdit.commands(from: request)
-        if commands.isEmpty {commands = await ChatEdit.modelCommands(request)}
+        if commands.isEmpty {
+            commands = await ChatEdit.modelCommands(request)
+            // Applied only to the project that was asked, and not over another operation.
+            guard !busy, project?.id == p.id else {return}
+        }
         guard !commands.isEmpty else {
             message = NSLocalizedString("לא הבנתי מה לשנות. נסו למשל: “חצי דקה”, “בלי הילוך איטי”, “תמצא את הכלב”.", comment: "Chat edit not understood")
             return
