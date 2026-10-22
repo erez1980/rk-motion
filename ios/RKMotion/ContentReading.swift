@@ -94,6 +94,8 @@ struct Signals: Codable, Equatable {
     /// How crisp and how bright each second is, 0 … 1; nil for older scans.
     var sharpness: [Double]? = nil
     var brightness: [Double]? = nil
+    /// The looked-at frames, with their labels and faces, for search and the star; nil for older scans.
+    var sightings: [Sighting]? = nil
 
     /// The seconds too blurred or too dark to show: far less crisp than the
     /// video usually is, or nearly black, as when the phone was in a pocket.
@@ -112,6 +114,8 @@ struct Signals: Codable, Equatable {
         return flags.isEmpty ? 0 : Double(flags.filter {$0}.count) / Double(flags.count)
     }
 
+    /// The least a second with the star in it scores.
+    static let starFloor = 0.6
     func values(_ channel: Channel) -> [Double] {
         switch channel {
         case .motion: return LocalEngine.normalized(motion)
@@ -160,15 +164,21 @@ struct Signals: Codable, Equatable {
                 return values.isEmpty ? 0 : values[min(values.count - 1, $0.local)]
             }
         }
+        // Each video's frames move to where that video starts on the timeline.
+        let sightings: [Sighting]? = pieces.contains(where: {$0.signals.sightings != nil}) ? pieces.flatMap {piece in
+            (piece.signals.sightings ?? []).map {var sighting = $0; sighting.time += piece.start; return sighting}
+        } : nil
         return Signals(motion: join(\.motion), loudness: join(\.loudness), music: join(\.music), speech: join(\.speech),
                        cheer: join(\.cheer), people: join(\.people), scenes: scenes, focus: focus,
                        animals: optional(\.animals), beauty: optional(\.beauty),
-                       sharpness: optional(\.sharpness), brightness: optional(\.brightness))
+                       sharpness: optional(\.sharpness), brightness: optional(\.brightness), sightings: sightings)
     }
     /// Each second's score for `kind`. Channels that were not measured drop
     /// out and the rest are scaled back up, so a missing one never sinks
     /// every score below the threshold.
-    func scores(for kind: ContentKind) -> [Double] {
+    /// With `star`, the seconds the movie's star is in frame rise above
+    /// every other and the rest sink, so the movie follows that person.
+    func scores(for kind: ContentKind, star: [Bool]? = nil) -> [Double] {
         let count = motion.count
         var total = [Double](repeating: 0, count: count), weight = 0.0
         for (channel, share) in kind.weights {
@@ -180,7 +190,11 @@ struct Signals: Codable, Equatable {
         guard weight > 0 else {return total}
         // Blurred and dark seconds sink, so the moments chosen are ones worth watching.
         let poor = self.poor
-        return total.indices.map {total[$0] / weight * (poor[$0] ? 0.35 : 1)}
+        return total.indices.map {index in
+            let score = total[index] / weight * (poor[index] ? 0.35 : 1)
+            guard let star, star.count == count else {return score}
+            return star[index] ? Self.starFloor + (1 - Self.starFloor) * score : score * 0.5
+        }
     }
 }
 
@@ -206,6 +220,8 @@ struct ContentReading: Codable, Equatable {
     var byModel: Bool?
     /// Share of the footage too blurred or dark to use.
     var poorShare: Double?
+    /// The person the scores follow, as `FaceGroups` keys them; nil for none.
+    var star: String?
 
     static let actionScenes: Set<String> = ["bicycle", "bike", "cycling", "motorcycle", "motorbike", "ski", "skiing", "snowboard", "snowboarding", "surfing", "surfboard", "skateboard", "skateboarding", "mountain", "dirt", "trail", "motocross", "atv", "kayak", "kayaking", "canoe", "rafting", "wakeboarding", "jet", "paragliding", "parachute", "skydiving", "climbing", "car", "vehicle", "racing", "kart", "horse", "riding", "sled", "boat", "sailboat"]
     static let outdoorScenes: Set<String> = ["outdoor", "sky", "mountain", "forest", "beach", "sea", "ocean", "water", "road", "trail", "snow", "landscape", "tree", "grass", "desert", "hill", "field", "lake", "river", "cliff", "sunset", "sunrise", "cloud", "waterfall", "park", "garden", "canyon", "coast", "shore", "island", "valley", "street", "city", "cityscape", "bridge"]

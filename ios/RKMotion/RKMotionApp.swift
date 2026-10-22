@@ -32,7 +32,9 @@ struct RootView: View {
                 Task {await model.close(); if model.project == nil {path = [.project]}}
             }, open: {project in
                 Task {await model.open(project); if model.project?.id == project.id {path = [.project]}}
-            }, about: {path = [.about]})
+            }, about: {path = [.about]}, recap: {span in
+                Task {await model.close(); if model.project == nil {path = [.project]; model.makeRecap(span)}}
+            })
             .navigationDestination(for: Route.self) {route in
                 switch route {
                 case .project: ProjectFlowView(model: model)

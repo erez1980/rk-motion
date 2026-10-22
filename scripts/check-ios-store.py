@@ -48,8 +48,12 @@ def catalog(name):
 keys = set(catalog('Localizable.xcstrings')['strings'])
 literal = re.compile(r'"((?:[^"\\]|\\.)*)"')
 hebrew = re.compile(r'[\u0590-\u05FF]')
-untranslated = sorted({text for source in sorted(app.glob('*.swift'))
-                       for match in literal.finditer(source.read_text())
+# Files named *Words.swift hold the Hebrew words requests and searches are
+# read by; they are matched against what the rider types and never shown.
+untranslated = sorted({text for source in sorted(app.glob('*.swift')) if not source.name.endswith('Words.swift')
+                       # Line by line, so a multi-line """ string cannot pair quotes across lines.
+                       for line in source.read_text().splitlines()
+                       for match in literal.finditer(line)
                        if hebrew.search(text := match.group(1)) and text not in keys})
 assert not untranslated, ('Hebrew text without a Localizable.xcstrings key: '
                           f'{untranslated[:5]}')

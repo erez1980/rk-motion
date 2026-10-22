@@ -7,7 +7,9 @@ struct HomeView: View {
     let newRide: () -> Void
     let open: (LocalProject) -> Void
     let about: () -> Void
+    let recap: (Recap.Span) -> Void
     @State private var deleting: LocalProject?
+    @State private var recapping = false
     var body: some View {
         ScrollView {
             // Lazy, so a long list asks only for the pictures on screen.
@@ -44,6 +46,19 @@ struct HomeView: View {
                     .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
+                Button {recapping = true} label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "photo.stack").font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
+                            .frame(width: 52, height: 52).background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("סיכום מהגלריה").font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
+                            Text("הטיול האחרון, החודש או השנה, בלי לבחור קבצים").font(RK.font(13)).foregroundStyle(RK.soft)
+                        }
+                        Spacer()
+                    }
+                    .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }.buttonStyle(.plain).accessibilityIdentifier("home.recap").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                     Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)
@@ -71,6 +86,7 @@ struct HomeView: View {
         .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: Binding(get: {deleting != nil}, set: {if !$0 {deleting = nil}}), titleVisibility: .visible, presenting: deleting) {project in
             Button("מחיקה", role: .destructive) {Task {await model.delete(project)}}
         }
+        .sheet(isPresented: $recapping) {RecapSheet(make: recap).presentationDetents([.medium, .large])}
         .navigationTitle("הפרויקטים")
         .toolbar(.hidden, for: .navigationBar)
     }

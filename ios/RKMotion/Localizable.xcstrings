@@ -8000,6 +8000,902 @@
           }
         }
       }
+    },
+    "פועל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פועל"
+          }
+        }
+      }
+    },
+    "כבוי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כבוי"
+          }
+        }
+      }
+    },
+    "כל הקטעים בסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every clip in the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל הקטעים בסרט"
+          }
+        }
+      }
+    },
+    "בלי הגבלה לאורך קטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No limit on clip length"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי הגבלה לאורך קטע"
+          }
+        }
+      }
+    },
+    "אורך הסרט %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Movie length %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך הסרט %@ שניות"
+          }
+        }
+      }
+    },
+    "עד %@ שניות לקטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to %@ seconds a clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עד %@ שניות לקטע"
+          }
+        }
+      }
+    },
+    "בלי הילוך איטי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No slow motion"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי הילוך איטי"
+          }
+        }
+      }
+    },
+    "הילוך איטי בכל קטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion on every clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי בכל קטע"
+          }
+        }
+      }
+    },
+    "הילוך איטי ברגע השיא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion on the peak"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי ברגע השיא"
+          }
+        }
+      }
+    },
+    "הילוך איטי פי %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion %@×"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי פי %@"
+          }
+        }
+      }
+    },
+    "קול המקור מושתק": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source sound muted"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קול המקור מושתק"
+          }
+        }
+      }
+    },
+    "קול המקור נשמע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source sound kept"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קול המקור נשמע"
+          }
+        }
+      }
+    },
+    "עם מוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עם מוזיקה"
+          }
+        }
+      }
+    },
+    "בלי מוזיקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No music"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי מוזיקה"
+          }
+        }
+      }
+    },
+    "מהירות %@×": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed %@×"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהירות %@×"
+          }
+        }
+      }
+    },
+    "מסגרת המקור": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source framing"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מסגרת המקור"
+          }
+        }
+      }
+    },
+    "סדר חדש לקטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clips shuffled"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סדר חדש לקטעים"
+          }
+        }
+      }
+    },
+    "הסרט כבר לא מתמקד באדם אחד. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie no longer follows one person. You can undo this."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט כבר לא מתמקד באדם אחד. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "הסרט נערך מחדש סביב הכוכב שבחרת. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie was edited again around the star you chose. You can undo this."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט נערך מחדש סביב הכוכב שבחרת. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "כדי לחפש, נתחו את הסרטון שוב. הניתוח הקודם נעשה לפני שהיה חיפוש.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To search, analyze the video again. The last analysis was made before search existed."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כדי לחפש, נתחו את הסרטון שוב. הניתוח הקודם נעשה לפני שהיה חיפוש."
+          }
+        }
+      }
+    },
+    "לא מצאתי רגעים עם “%@”. נסו מילה אחרת.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I found no moments with “%@”. Try another word."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא מצאתי רגעים עם “%@”. נסו מילה אחרת."
+          }
+        }
+      }
+    },
+    "מצאתי %@ רגעים עם “%@” והוספתי אותם לסרט. ניתן לבטל.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I found %@ moments with “%@” and added them to the movie. You can undo this."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצאתי %@ רגעים עם “%@” והוספתי אותם לסרט. ניתן לבטל."
+          }
+        }
+      }
+    },
+    "לא הבנתי מה לשנות. נסו למשל: “חצי דקה”, “בלי הילוך איטי”, “תמצא את הכלב”.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I didn't understand what to change. Try for example: “half a minute”, “no slow motion”, “find the dog”."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא הבנתי מה לשנות. נסו למשל: “חצי דקה”, “בלי הילוך איטי”, “תמצא את הכלב”."
+          }
+        }
+      }
+    },
+    "שיניתי: %@. ניתן לבטל.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed: %@. You can undo this."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיניתי: %@. ניתן לבטל."
+          }
+        }
+      }
+    },
+    "העריכה כבר כזאת.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The edit is already like that."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "העריכה כבר כזאת."
+          }
+        }
+      }
+    },
+    "מחפש בגלריה…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking through your library…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחפש בגלריה…"
+          }
+        }
+      }
+    },
+    "כדי ליצור סיכום, אפשרו ל־RK Motion גישה לתמונות בהגדרות האייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To make a recap, allow RK Motion to access your photos in the iPhone's Settings."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כדי ליצור סיכום, אפשרו ל־RK Motion גישה לתמונות בהגדרות האייפון."
+          }
+        }
+      }
+    },
+    "לא מצאתי טיול בשנה האחרונה: ימים רצופים עם הרבה צילומים הרחק מהבית.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I found no trip in the last year: several days in a row with many shots, away from home."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא מצאתי טיול בשנה האחרונה: ימים רצופים עם הרבה צילומים הרחק מהבית."
+          }
+        }
+      }
+    },
+    "לא מצאתי סרטונים או תמונות בתקופה הזאת.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I found no videos or photos in that time."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא מצאתי סרטונים או תמונות בתקופה הזאת."
+          }
+        }
+      }
+    },
+    "סיכום מהגלריה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recap from your library"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיכום מהגלריה"
+          }
+        }
+      }
+    },
+    "הטיול האחרון, החודש או השנה, בלי לבחור קבצים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your latest trip, the month or the year, with nothing to pick"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטיול האחרון, החודש או השנה, בלי לבחור קבצים"
+          }
+        }
+      }
+    },
+    "הטיול האחרון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest trip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטיול האחרון"
+          }
+        }
+      }
+    },
+    "החודש האחרון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last month"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החודש האחרון"
+          }
+        }
+      }
+    },
+    "השנה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This year"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השנה"
+          }
+        }
+      }
+    },
+    "אמצא ימים רצופים עם הרבה צילומים, רחוק מהבית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll find days in a row with many shots, away from home"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אמצא ימים רצופים עם הרבה צילומים, רחוק מהבית"
+          }
+        }
+      }
+    },
+    "הרגעים של 30 הימים האחרונים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The moments of the last 30 days"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הרגעים של 30 הימים האחרונים"
+          }
+        }
+      }
+    },
+    "קטעים מכל חודש מתחילת השנה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clips from every month since January"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטעים מכל חודש מתחילת השנה"
+          }
+        }
+      }
+    },
+    "טיול · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trip · %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "טיול · %@"
+          }
+        }
+      }
+    },
+    "סיכום החודש": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Month recap"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיכום החודש"
+          }
+        }
+      }
+    },
+    "סיכום %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ recap"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיכום %@"
+          }
+        }
+      }
+    },
+    "מביא מהגלריה %@ מתוך %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting %@ of %@ from your library…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מביא מהגלריה %@ מתוך %@…"
+          }
+        }
+      }
+    },
+    "חצי דקה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Half a minute"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חצי דקה"
+          }
+        }
+      }
+    },
+    "יותר הילוך איטי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More slow motion"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יותר הילוך איטי"
+          }
+        }
+      }
+    },
+    "בלי ווש": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No whoosh"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי ווש"
+          }
+        }
+      }
+    },
+    "קטעים של 3 שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3-second clips"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטעים של 3 שניות"
+          }
+        }
+      }
+    },
+    "תמצא את הים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find the sea"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמצא את הים"
+          }
+        }
+      }
+    },
+    "מה לשנות?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What should change?"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מה לשנות?"
+          }
+        }
+      }
+    },
+    "למשל: תקצר לחצי דקה ותוסיף זום על הביט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For example: make it half a minute and add beat zoom"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "למשל: תקצר לחצי דקה ותוסיף זום על הביט"
+          }
+        }
+      }
+    },
+    "שליחה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שליחה"
+          }
+        }
+      }
+    },
+    "החיפוש בתוך הסרטונים זמין אחרי ניתוח מחדש.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching inside the videos needs a new analysis."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החיפוש בתוך הסרטונים זמין אחרי ניתוח מחדש."
+          }
+        }
+      }
+    },
+    "כוכב הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star of the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כוכב הסרט"
+          }
+        }
+      }
+    },
+    "בחרו אדם, והסרט יתמקד ברגעים שהוא בפריים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a person, and the movie will follow the moments they are in."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו אדם, והסרט יתמקד ברגעים שהוא בפריים."
+          }
+        }
+      }
+    },
+    "%@ פעמים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ times"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ פעמים"
+          }
+        }
+      }
+    },
+    "הכוכב שנבחר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The chosen star"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הכוכב שנבחר"
+          }
+        }
+      }
+    },
+    "בחירה ככוכב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the star"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירה ככוכב"
+          }
+        }
+      }
+    },
+    "אבחר בעצמי סרטונים ותמונות מהגלריה, מפוזרים לאורך הזמן ומועדפים קודם, ואערוך מהם סרט של דקה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll choose videos and photos from your library myself, spread over the time and favorites first, and edit a one-minute movie from them."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אבחר בעצמי סרטונים ותמונות מהגלריה, מפוזרים לאורך הזמן ומועדפים קודם, ואערוך מהם סרט של דקה."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

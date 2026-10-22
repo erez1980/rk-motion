@@ -219,24 +219,25 @@ actor LocalEngine {
         return Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
                        cheer: heard.cheer, people: seen.people, scenes: seen.scenes, focus: seen.focus.isEmpty ? nil : seen.focus,
                        animals: seen.animals.isEmpty ? nil : seen.animals, beauty: seen.beauty.isEmpty ? nil : seen.beauty,
-                       sharpness: sharp, brightness: light)
+                       sharpness: sharp, brightness: light, sightings: seen.sightings)
     }
     /// Looks at frames spread over the video, one every few seconds: how
     /// many people and animals are in frame, what kind of place it is, and
     /// how good the frame looks. Vision runs on the device; a frame it cannot
     /// read is skipped, and if none can be read all come back empty so the
     /// scan still finishes on motion and sound.
-    private func look(_ asset: AVAsset, duration: Double, count: Int, progress: Progress) async throws -> (people: [Double], scenes: [String: Double], focus: [Double], animals: [Double], beauty: [Double]) {
+    private func look(_ asset: AVAsset, duration: Double, count: Int, progress: Progress) async throws -> (people: [Double], scenes: [String: Double], focus: [Double], animals: [Double], beauty: [Double], sightings: [Sighting]) {
         let samples = min(90, max(6, Int(duration / 3)))
         let times = (0..<samples).map {time(min(max(0, duration - 0.05), (Double($0) + 0.5) * duration / Double(samples)))}
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 384, height: 384)
+        // Big enough for the faces in a frame to be told apart.
+        generator.maximumSize = CGSize(width: 640, height: 640)
         generator.requestedTimeToleranceBefore = time(1)
         generator.requestedTimeToleranceAfter = time(1)
         defer {generator.cancelAllCGImageGeneration()}
         var counted: [(time: Double, people: Double, focus: Double)] = [], labels: [String: Int] = [:], looked = 0, done = 0
-        var pets: [(time: Double, count: Double)] = [], looks: [(time: Double, score: Double)] = []
+        var pets: [(time: Double, count: Double)] = [], looks: [(time: Double, score: Double)] = [], sightings: [Sighting] = []
         for await result in generator.images(for: times) {
             try Task.checkCancellation()
             done += 1
@@ -252,10 +253,15 @@ actor LocalEngine {
                     counted.append((requested.seconds, Double(people.count), focus))
                 }
                 let classify = VNClassifyImageRequest()
+                var seen: [String: Double] = [:]
                 if (try? handler.perform([classify])) != nil {
                     looked += 1
                     for label in classify.results ?? [] where label.confidence > 0.3 {labels[label.identifier, default: 0] += 1}
+                    seen = Sighting.labels(classify.results ?? [])
                 }
+                // What the frame shows and who is in it, for search and the movie's star.
+                let faces = Sighting.faces(in: image)
+                sightings.append(Sighting(time: requested.seconds, labels: seen, faces: faces.isEmpty ? nil : faces))
                 let animals = VNRecognizeAnimalsRequest()
                 if (try? handler.perform([animals])) != nil {
                     pets.append((requested.seconds, Double((animals.results ?? []).filter {$0.confidence > 0.5}.count)))
@@ -290,7 +296,7 @@ actor LocalEngine {
                 return found.min {abs($0.time - at) < abs($1.time - at)}!.value
             }
         }
-        return (people, scenes, focus, spread(pets.map {(time: $0.time, value: $0.count)}), spread(looks.map {(time: $0.time, value: $0.score)}))
+        return (people, scenes, focus, spread(pets.map {(time: $0.time, value: $0.count)}), spread(looks.map {(time: $0.time, value: $0.score)}), sightings)
     }
     /// How crisp a small gray frame is (the mean step between neighbouring
     /// pixels, 0 … 1; blur flattens it) and how bright, 0 … 1.
