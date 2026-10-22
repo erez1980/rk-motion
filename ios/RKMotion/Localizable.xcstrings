@@ -7056,6 +7056,726 @@
           }
         }
       }
+    },
+    "%@ קטעים מסומנים להאטה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ clips marked for slow motion"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ קטעים מסומנים להאטה"
+          }
+        }
+      }
+    },
+    "Apple Intelligence עזרה לזהות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence helped decide"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence עזרה לזהות"
+          }
+        }
+      }
+    },
+    "אוכל ומסעדות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Food and restaurants"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אוכל ומסעדות"
+          }
+        }
+      }
+    },
+    "אולי זה %@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maybe it's %@?"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אולי זה %@?"
+          }
+        }
+      }
+    },
+    "אורך מקסימלי לקטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longest clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אורך מקסימלי לקטע"
+          }
+        }
+      }
+    },
+    "אחתוך את הפריימים היפים ביותר, עם תנועת מצלמה רגועה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll cut the most beautiful frames, with calm camera movement."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחתוך את הפריימים היפים ביותר, עם תנועת מצלמה רגועה."
+          }
+        }
+      }
+    },
+    "אחתוך את הצילומים היפים של האוכל ואת הרגעים סביב השולחן.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll cut the best-looking food shots and the moments around the table."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחתוך את הצילומים היפים של האוכל ואת הרגעים סביב השולחן."
+          }
+        }
+      }
+    },
+    "אחתוך את הרגעים שהחיה בפריים וזזה, ואת הצחוקים סביבה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll cut the moments the animal is in frame and moving, and the laughs around it."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחתוך את הרגעים שהחיה בפריים וזזה, ואת הצחוקים סביבה."
+          }
+        }
+      }
+    },
+    "אחתוך את רגעי השיא: תנועה מהירה, קריאות עידוד ומחיאות כפיים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll cut the high points: fast movement, cheering and applause."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אחתוך את רגעי השיא: תנועה מהירה, קריאות עידוד ומחיאות כפיים."
+          }
+        }
+      }
+    },
+    "איפה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איפה"
+          }
+        }
+      }
+    },
+    "אמביינט לנופים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambient for landscapes"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אמביינט לנופים"
+          }
+        }
+      }
+    },
+    "אפשר לסמן הילוך איטי גם בקטע מסוים: פתחו אותו בכפתור המספריים.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also mark slow motion on a single clip: open it with the scissors button."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לסמן הילוך איטי גם בקטע מסוים: פתחו אותו בכפתור המספריים."
+          }
+        }
+      }
+    },
+    "בוסה נובה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bossa nova"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בוסה נובה"
+          }
+        }
+      }
+    },
+    "בחרו סרטונים ותמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose videos and photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו סרטונים ותמונות"
+          }
+        }
+      }
+    },
+    "בכל קטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בכל קטע"
+          }
+        }
+      }
+    },
+    "ברגע השיא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At the peak"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברגע השיא"
+          }
+        }
+      }
+    },
+    "בתיאבון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bon appétit"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בתיאבון"
+          }
+        }
+      }
+    },
+    "ג'אז קליל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light jazz"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ג'אז קליל"
+          }
+        }
+      }
+    },
+    "גם סרטון בלי אקשן בולט יקבל לפחות קטע אחד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Even a video without standout action gets at least one clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גם סרטון בלי אקשן בולט יקבל לפחות קטע אחד"
+          }
+        }
+      }
+    },
+    "האטה בכל קטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "slow motion in every clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "האטה בכל קטע"
+          }
+        }
+      }
+    },
+    "ההאטה מתחילה ב־%@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion starts at %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההאטה מתחילה ב־%@ שניות"
+          }
+        }
+      }
+    },
+    "החבר הכי טוב": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best friend"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החבר הכי טוב"
+          }
+        }
+      }
+    },
+    "הילוך איטי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי"
+          }
+        }
+      }
+    },
+    "הילוך איטי בקטע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion in this clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי בקטע"
+          }
+        }
+      }
+    },
+    "הילוך איטי בקטע הזה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion in this clip"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי בקטע הזה"
+          }
+        }
+      }
+    },
+    "היפ הופ לאימון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workout hip hop"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "היפ הופ לאימון"
+          }
+        }
+      }
+    },
+    "חיה בפריים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An animal in frame"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיה בפריים"
+          }
+        }
+      }
+    },
+    "חיות מחמד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pets"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חיות מחמד"
+          }
+        }
+      }
+    },
+    "יום של ספורט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Game day"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יום של ספורט"
+          }
+        }
+      }
+    },
+    "כמה לאט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How slow"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כמה לאט"
+          }
+        }
+      }
+    },
+    "כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום. תמונות יקבלו תנועה משלהן.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Several videos join into one movie, in the order they were filmed. Photos get motion of their own."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום. תמונות יקבלו תנועה משלהן."
+          }
+        }
+      }
+    },
+    "לא ניתן להנפיש את התמונה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The photo could not be animated."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן להנפיש את התמונה."
+          }
+        }
+      }
+    },
+    "לא ניתן לקרוא את התמונה שנבחרה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The chosen photo could not be read."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא ניתן לקרוא את התמונה שנבחרה."
+          }
+        }
+      }
+    },
+    "להאט מהנקודה שמוצגת עכשיו": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow down from the moment shown now"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "להאט מהנקודה שמוצגת עכשיו"
+          }
+        }
+      }
+    },
+    "ללא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ללא"
+          }
+        }
+      }
+    },
+    "מנפיש את התמונה…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animating the photo…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מנפיש את התמונה…"
+          }
+        }
+      }
+    },
+    "מנפיש תמונה %@ מתוך %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animating photo %@ of %@…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מנפיש תמונה %@ מתוך %@…"
+          }
+        }
+      }
+    },
+    "משך ההאטה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion length"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משך ההאטה"
+          }
+        }
+      }
+    },
+    "נוף וטבע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scenery and nature"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נוף וטבע"
+          }
+        }
+      }
+    },
+    "נופים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Views"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נופים"
+          }
+        }
+      }
+    },
+    "ספורט וכושר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sports and fitness"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ספורט וכושר"
+          }
+        }
+      }
+    },
+    "פי %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@×"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פי %@"
+          }
+        }
+      }
+    },
+    "קטע מכל סרטון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A clip from every video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטע מכל סרטון"
+          }
+        }
+      }
+    },
+    "רק בקטעים שסימנתי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only clips I marked"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רק בקטעים שסימנתי"
+          }
+        }
+      }
+    },
+    "שמח ומשעשע": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Happy and funny"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמח ומשעשע"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

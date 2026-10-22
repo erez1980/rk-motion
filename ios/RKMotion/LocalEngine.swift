@@ -65,11 +65,10 @@ actor LocalEngine {
         edit.settings["beatSync"]?.bool != false && edit.settings["useMusic"]?.bool != false && !project.music.isEmpty
             && edit.settings["wholeVideo"]?.bool != true && !(edit.settings["wholeVideo"] == nil && project.wholeVideo)
     }
-    /// The chosen clips with slow motion on the movie's strongest moment,
-    /// when the edit asks for it and the scan scored the footage.
+    /// The chosen clips with their slow motion: the rider's own marks, and
+    /// those the edit's mode adds where the scan scored the footage.
     static func shaped(_ clips: [Clip], project: LocalProject, edit: Edit) -> [Clip] {
-        guard edit.settings["slowPeak"]?.bool == true, !project.scores.isEmpty else {return clips}
-        return Highlights.slowed(clips, scores: project.scores)
+        SlowMotion.shaped(clips, scores: project.scores, settings: edit.settings)
     }
     /// The clips as they will be exported: with each cut moved onto the
     /// beat when that applies. Only the first song is measured, since it is
@@ -157,7 +156,8 @@ actor LocalEngine {
             measured.append((signals, part.start, part.duration))
         }
         let signals = Signals.joined(measured)
-        let reading = ContentReading.read(signals)
+        // A close call gets a second opinion from Apple Intelligence, on the device.
+        let reading = await ModelReading.refine(ContentReading.read(signals), signals: signals)
         let scores = signals.scores(for: reading.kind)
         logger.info("Analysis completed: sourceSeconds=\(total, privacy: .public), videos=\(sources.count, privacy: .public), elapsedSeconds=\(Date().timeIntervalSince(scanStarted), privacy: .public), kind=\(reading.kind.rawValue, privacy: .public)")
         await progress(1, "הניתוח הושלם באייפון")
@@ -206,14 +206,16 @@ actor LocalEngine {
         let seen = try await look(asset, duration: duration, count: count, progress: progress)
         let heard = try await loudness(asset, duration: duration, progress: progress)
         return Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
-                       cheer: heard.cheer, people: seen.people, scenes: seen.scenes, focus: seen.focus.isEmpty ? nil : seen.focus)
+                       cheer: heard.cheer, people: seen.people, scenes: seen.scenes, focus: seen.focus.isEmpty ? nil : seen.focus,
+                       animals: seen.animals.isEmpty ? nil : seen.animals, beauty: seen.beauty.isEmpty ? nil : seen.beauty)
     }
-    /// Looks at a few dozen frames spread over the video: how many people
-    /// are in frame, and what kind of place it is. Vision runs on the device;
-    /// a frame it cannot read is skipped, and if none can be read both come
-    /// back empty so the scan still finishes on motion and sound.
-    private func look(_ asset: AVAsset, duration: Double, count: Int, progress: Progress) async throws -> (people: [Double], scenes: [String: Double], focus: [Double]) {
-        let samples = min(48, max(4, Int(duration / 5)))
+    /// Looks at frames spread over the video, one every few seconds: how
+    /// many people and animals are in frame, what kind of place it is, and
+    /// how good the frame looks. Vision runs on the device; a frame it cannot
+    /// read is skipped, and if none can be read all come back empty so the
+    /// scan still finishes on motion and sound.
+    private func look(_ asset: AVAsset, duration: Double, count: Int, progress: Progress) async throws -> (people: [Double], scenes: [String: Double], focus: [Double], animals: [Double], beauty: [Double]) {
+        let samples = min(90, max(6, Int(duration / 3)))
         let times = (0..<samples).map {time(min(max(0, duration - 0.05), (Double($0) + 0.5) * duration / Double(samples)))}
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -222,6 +224,7 @@ actor LocalEngine {
         generator.requestedTimeToleranceAfter = time(1)
         defer {generator.cancelAllCGImageGeneration()}
         var counted: [(time: Double, people: Double, focus: Double)] = [], labels: [String: Int] = [:], looked = 0, done = 0
+        var pets: [(time: Double, count: Double)] = [], looks: [(time: Double, score: Double)] = []
         for await result in generator.images(for: times) {
             try Task.checkCancellation()
             done += 1
@@ -241,6 +244,18 @@ actor LocalEngine {
                     looked += 1
                     for label in classify.results ?? [] where label.confidence > 0.3 {labels[label.identifier, default: 0] += 1}
                 }
+                let animals = VNRecognizeAnimalsRequest()
+                if (try? handler.perform([animals])) != nil {
+                    pets.append((requested.seconds, Double((animals.results ?? []).filter {$0.confidence > 0.5}.count)))
+                }
+                if #available(iOS 18.0, *) {
+                    let aesthetics = VNCalculateImageAestheticsScoresRequest()
+                    if (try? handler.perform([aesthetics])) != nil, let score = aesthetics.results?.first {
+                        // A screenshot or a document is not a frame worth keeping.
+                        let value = score.isUtility ? 0 : (Double(score.overallScore) + 1) / 2
+                        looks.append((requested.seconds, min(1, max(0, value))))
+                    }
+                }
             }
             if done % 4 == 0 {await progress(0.7 + 0.1 * Double(done) / Double(samples), "זיהוי מה יש בסרטון…")}
         }
@@ -255,7 +270,15 @@ actor LocalEngine {
             if counted.contains(where: {$0.focus >= 0}) {focus = nearest.map {$0.focus}}
         }
         let scenes = looked == 0 ? [:] : labels.mapValues {Double($0) / Double(looked)}
-        return (people, scenes, focus)
+        /// Each second takes the value of the nearest looked-at frame.
+        func spread(_ found: [(time: Double, value: Double)]) -> [Double] {
+            guard !found.isEmpty else {return []}
+            return (0..<count).map {second in
+                let at = Double(second) + 0.5
+                return found.min {abs($0.time - at) < abs($1.time - at)}!.value
+            }
+        }
+        return (people, scenes, focus, spread(pets.map {(time: $0.time, value: $0.count)}), spread(looks.map {(time: $0.time, value: $0.score)}))
     }
     private static func gray(_ image: CGImage) throws -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: 160 * 90)
@@ -519,7 +542,7 @@ actor LocalEngine {
                 guard to - from > 0.0001 else {continue}
                 let slowed = clip.slowRange.map {middle >= $0.start && middle <= $0.end} ?? false
                 track.scaleTimeRange(CMTimeRange(start: time(movie + from - first), duration: time(to - from)),
-                                     toDuration: time((to - from) * (slowed ? Clip.slowFactor : 1) / speed))
+                                     toDuration: time((to - from) * (slowed ? clip.pace : 1) / speed))
             }
         }
         let closing = fadesOut ? min(1, segments.last!.duration / 2) : 0

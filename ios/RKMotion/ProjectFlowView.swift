@@ -224,10 +224,10 @@ private struct VideoStep: View {
                     }
                 }.rkCard(padding: 12).rkRow()
             } else {
-                Text("בחרו סרטון אחד או כמה").font(RK.font(22, 700, style: .title2)).foregroundStyle(RK.ink).rkRow(top: 4)
-                Text("כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).rkRow(top: 0)
+                Text("בחרו סרטונים ותמונות").font(RK.font(22, 700, style: .title2)).foregroundStyle(RK.ink).rkRow(top: 4)
+                Text("כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום. תמונות יקבלו תנועה משלהן.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).rkRow(top: 0)
                 HStack(spacing: 10) {
-                    PhotosPicker(selection: $picked, maxSelectionCount: 30, selectionBehavior: .ordered, matching: .videos, preferredItemEncoding: .current) {SourceTile(title: "מהתמונות", symbol: "photo.on.rectangle")}
+                    PhotosPicker(selection: $picked, maxSelectionCount: 30, selectionBehavior: .ordered, matching: .any(of: [.videos, .images]), preferredItemEncoding: .current) {SourceTile(title: "מהתמונות", symbol: "photo.on.rectangle")}
                     Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
                 }.buttonStyle(.plain).disabled(model.busy).rkRow()
             }
@@ -256,7 +256,7 @@ private struct VideoStep: View {
             guard !items.isEmpty else {return}
             model.importPickedVideos(items); picked = []
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.movie], allowsMultipleSelection: true) {result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.movie, .image], allowsMultipleSelection: true) {result in
             switch result {
             case .success(let sources): Task {await model.importVideos(sources)}
             case .failure(let error): model.message = error.localizedDescription
@@ -336,6 +336,18 @@ private struct EditStep: View {
                     (NSLocalizedString("הכל", comment: "Keep every suggested moment"), "all"),
                 ], selection: Binding(get: {model.targetLength}, set: {model.pickLength($0)}))
                 .disabled(model.busy).accessibilityIdentifier("edit.length").rkRow(top: 12)
+            }
+            if model.project?.scores.isEmpty == false, model.edit.settings["wholeVideo"]?.bool != true {
+                ChoiceGroup(title: "אורך מקסימלי לקטע", options: [
+                    (NSLocalizedString("ללא", comment: "No limit on clip length"), "off"),
+                    (RK.seconds(3), "3"), (RK.seconds(5), "5"), (RK.seconds(8), "8"),
+                ], selection: Binding(get: {model.edit.settings["maxClip"]?.string ?? "off"}, set: {model.setClipRule("maxClip", .text($0))}))
+                .disabled(model.busy).accessibilityIdentifier("edit.maxClip").rkRow(top: 12)
+                if model.project?.joinsVideos == true {
+                    ToggleRow(title: "קטע מכל סרטון", detail: "גם סרטון בלי אקשן בולט יקבל לפחות קטע אחד",
+                              isOn: Binding(get: {ClipRules.everyVideo(model.edit.settings)}, set: {model.setClipRule("everyVideo", .flag($0))}))
+                        .rkCard().disabled(model.busy).accessibilityIdentifier("edit.everyVideo").rkRow(top: 12)
+                }
             }
             clipsHeader.rkRow(top: 12)
             if model.edit.clips.count > 1 {clipTools.rkRow(top: 0, bottom: 4)}
@@ -419,7 +431,11 @@ private struct EditStep: View {
         let transition = settings["transition"]?.string ?? "cut"
         var parts = [String(format: NSLocalizedString("מעברים: %@", comment: "Style summary: the transitions"), StyleSheet.transitionName(transition))]
         if let speed = settings["speed"]?.string, speed != "1" {parts.append(speed + "×")}
-        if settings["slowPeak"]?.bool == true, model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בשיא", comment: "Style summary: slow motion on the peak"))}
+        let slow = SlowMotion.mode(settings)
+        if slow == "peak", model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בשיא", comment: "Style summary: slow motion on the peak"))}
+        else if slow == "each", model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בכל קטע", comment: "Style summary: slow motion on every clip"))}
+        let marked = model.edit.clips.filter {$0.selected != false && $0.slowAt != nil}.count
+        if marked > 0 {parts.append(String(format: NSLocalizedString("%@ קטעים מסומנים להאטה", comment: "Style summary: clips the rider marked for slow motion"), "\(marked)"))}
         return parts.joined(separator: " · ")
     }
     private func showSource() {
@@ -513,6 +529,13 @@ private struct ReadingCard: View {
                     .font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
             }
             Text(verbatim: reading.kind.plan).font(RK.font(14)).foregroundStyle(RK.ink).fixedSize(horizontal: false, vertical: true)
+            if let other = reading.runnerUp, other != reading.kind {
+                Button {pick(other)} label: {
+                    Label(String(format: NSLocalizedString("אולי זה %@?", comment: "One-tap switch to the second most likely content kind"), other.title), systemImage: other.symbol)
+                        .font(RK.font(13, 500, style: .footnote)).foregroundStyle(RK.accentSoftInk)
+                        .padding(.horizontal, 12).frame(minHeight: 34).background(RK.accentSoft, in: Capsule())
+                }.buttonStyle(.plain).accessibilityIdentifier("reading.runnerUp")
+            }
         }
         .rkCard()
         .accessibilityElement(children: .contain)
@@ -655,6 +678,10 @@ private struct ClipRow: View {
                 Text(verbatim: [RK.seconds(clip.duration), video].compactMap {$0}.joined(separator: " · ")).font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
             }
             Spacer(minLength: 0)
+            if clip.slowAt != nil {
+                Image(systemName: "tortoise.fill").font(.system(size: 13)).foregroundStyle(RK.accent)
+                    .accessibilityLabel("הילוך איטי בקטע")
+            }
             if let score = clip.score, score >= 0.8 {Pill(text: NSLocalizedString("רגע שיא", comment: "A clip among the video's strongest moments"))}
             else if clip.manual == true {Pill(text: NSLocalizedString("ידני", comment: "Manually added clip"), fill: RK.raised, ink: RK.soft)}
             if canTrim {
@@ -756,23 +783,22 @@ private struct StyleSheet: View {
     @ObservedObject var model: EditorModel
     @Environment(\.dismiss) private var dismiss
     @State private var plan: String?
+    /// Two frames of the movie for the transition previews.
+    @State private var shots: [UIImage?] = [nil, nil]
     static let transitions = [SmartTransitions.name, "cut", "dissolve", "fade", "flash", "slide", "zoom"]
-    static func transitionName(_ value: String) -> String {
+    static func transitionName(_ value: String) -> String {StyleSheetNames.transition(value)}
+    static func slowModeName(_ value: String) -> String {
         switch value {
-        case SmartTransitions.name: return NSLocalizedString("חכם ✨", comment: "Smart transitions, chosen per seam")
-        case "dissolve": return NSLocalizedString("המסה", comment: "Dissolve transition")
-        case "fade": return NSLocalizedString("דעיכה", comment: "Dip-to-black transition")
-        case "flash": return NSLocalizedString("הבזק", comment: "Flash-to-white transition")
-        case "slide": return NSLocalizedString("החלקה", comment: "Push transition")
-        case "zoom": return NSLocalizedString("זום", comment: "Zoom transition")
-        default: return NSLocalizedString("חיתוך", comment: "Cut transition")
+        case "peak": return NSLocalizedString("ברגע השיא", comment: "Slow motion on the movie's strongest moment")
+        case "each": return NSLocalizedString("בכל קטע", comment: "Slow motion on every clip's strongest moment")
+        default: return NSLocalizedString("רק בקטעים שסימנתי", comment: "Slow motion only where the rider marked it")
         }
     }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ChoiceGroup(title: "מעבר בין קטעים", options: Self.transitions.map {(Self.transitionName($0), $0)}, selection: setting("transition", fallback: "cut"), columns: 4)
+                    TransitionPicker(options: Self.transitions, selection: setting("transition", fallback: "cut"), first: shots[0], second: shots[1])
                     if transition == SmartTransitions.name {
                         Text("לכל חיבור אבחר מעבר לפי מה שקורה בו.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
                             .accessibilityIdentifier("edit.smartNote")
@@ -782,11 +808,19 @@ private struct StyleSheet: View {
                         ChoiceGroup(title: "משך המעבר", options: ["0.3", "0.5", "1"].map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)}, selection: setting("transitionDuration", fallback: "0.5"))
                     }
                     ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
-                    if model.project?.scores.isEmpty == false {
-                        Toggle(isOn: Binding(get: {model.edit.settings["slowPeak"]?.bool ?? false}, set: {model.edit.settings["slowPeak"] = .flag($0)})) {
-                            Label("האטה ברגע השיא", systemImage: "tortoise").font(RK.font(14, 500)).foregroundStyle(RK.ink)
-                        }.tint(RK.accent).accessibilityIdentifier("edit.slowPeak")
-                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("הילוך איטי", systemImage: "tortoise").font(RK.font(15, 600)).foregroundStyle(RK.ink)
+                        if model.project?.scores.isEmpty == false {
+                            ChoiceGroup(title: "איפה", options: SlowMotion.modes.map {(Self.slowModeName($0), $0)},
+                                        selection: Binding(get: {SlowMotion.mode(model.edit.settings)}, set: {model.edit.settings["slowMode"] = .text($0)}))
+                                .accessibilityIdentifier("edit.slowMode")
+                        }
+                        ChoiceGroup(title: "כמה לאט", options: SlowMotion.rates.map {(String(format: NSLocalizedString("פי %@", comment: "Slow motion factor"), $0), $0)},
+                                    selection: setting("slowRate", fallback: "2", timing: false))
+                        ChoiceGroup(title: "משך ההאטה", options: SlowMotion.lengths.map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)},
+                                    selection: setting("slowLength", fallback: "1.5", timing: false))
+                        Text("אפשר לסמן הילוך איטי גם בקטע מסוים: פתחו אותו בכפתור המספריים.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                    }.rkCard()
                 }.padding(20).disabled(model.busy)
             }
             .background(RK.bg.ignoresSafeArea())
@@ -796,6 +830,14 @@ private struct StyleSheet: View {
         .tint(RK.accent)
         .environment(\.layoutDirection, AppLanguage.direction)
         .task(id: model.edit.clips) {plan = smartPlan()}
+        .task(id: model.project?.id) {
+            guard let p = model.project else {return}
+            let chosen = model.edit.clips.filter {$0.selected != false}.prefix(2)
+            for (index, clip) in chosen.enumerated() {
+                let middle = (clip.start + clip.end) / 2, part = p.part(at: middle)
+                shots[index] = await Thumbnails.shared.frame(LocalStore.file(part.file, project: p.id), at: middle - part.start)
+            }
+        }
     }
     private var transition: String {model.edit.settings["transition"]?.string ?? "cut"}
     /// "In this movie: 3 zoom, 2 dissolve", from the same choice the export makes.
@@ -808,8 +850,10 @@ private struct StyleSheet: View {
         let list = counts.map {"\($0.1) " + Self.transitionName($0.0)}.joined(separator: ", ")
         return String(format: NSLocalizedString("בסרט הזה: %@", comment: "Which smart transitions this movie gets"), list)
     }
-    private func setting(_ key: String, fallback: String) -> Binding<String> {
-        Binding(get: {model.edit.settings[key]?.string ?? fallback}, set: {model.setTiming(key, $0)})
+    /// `timing` settings change the movie's length, so the clips are chosen again for it.
+    private func setting(_ key: String, fallback: String, timing: Bool = true) -> Binding<String> {
+        Binding(get: {model.edit.settings[key]?.string ?? fallback},
+                set: {value in if timing {model.setTiming(key, value)} else {model.edit.settings[key] = .text(value)}})
     }
 }
 

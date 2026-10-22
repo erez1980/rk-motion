@@ -153,6 +153,10 @@ enum Look {
         case .trip: return Grade(vibrance: 0.5, warmth: 0.03)
         case .talk: return Grade(contrast: 1.03)
         case .family: return Grade(saturation: 1.05, brightness: 0.02, warmth: 0.05)
+        case .pets: return Grade(saturation: 1.05, vibrance: 0.2, warmth: 0.03)
+        case .sports: return Grade(saturation: 1.08, contrast: 1.08, vibrance: 0.3)
+        case .scenery: return Grade(contrast: 1.04, vibrance: 0.55)
+        case .food: return Grade(saturation: 1.12, contrast: 1.03, warmth: 0.06)
         case .general: return Grade(vibrance: 0.25)
         }
     }
@@ -185,6 +189,10 @@ enum MovieWords {
         case .trip: title = NSLocalizedString("יצאנו לטייל", comment: "Suggested movie title"); tags = "#trip #travel #explore"
         case .talk: title = NSLocalizedString("הרגעים החשובים", comment: "Suggested movie title"); tags = "#talk #moments"
         case .family: title = NSLocalizedString("רגעים משפחתיים", comment: "Suggested movie title"); tags = "#family #kids #love"
+        case .pets: title = NSLocalizedString("החבר הכי טוב", comment: "Suggested movie title"); tags = "#pets #dog #cat #cute"
+        case .sports: title = NSLocalizedString("יום של ספורט", comment: "Suggested movie title"); tags = "#sport #fitness #game"
+        case .scenery: title = NSLocalizedString("נופים", comment: "Suggested movie title"); tags = "#nature #landscape #views"
+        case .food: title = NSLocalizedString("בתיאבון", comment: "Suggested movie title"); tags = "#food #foodie #yum"
         case .general: title = NSLocalizedString("רגעים טובים", comment: "Suggested movie title"); tags = "#moments #memories"
         }
         let subtitle = date.formatted(date: .long, time: .omitted)

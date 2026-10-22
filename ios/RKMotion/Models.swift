@@ -8,23 +8,34 @@ struct Clip: Codable, Identifiable, Equatable {
     var selected: Bool? = true
     var manual: Bool?
     /// Where slow motion starts, in source seconds; nil plays the clip at one pace.
+    /// Kept on a clip only when the rider marked it; the edit's slow-motion
+    /// mode adds its own marks while the movie is built.
     var slowAt: Double?
+    /// How much and for how long the marked part slows, set from the edit
+    /// while the movie is built; nil keeps the defaults.
+    var slowRate: Double?
+    var slowLength: Double?
     var duration: Double {end - start}
     var id: String {uid}
 }
 extension Clip {
     /// How long slow motion lasts in the source, and how much it slows it.
     static let slowSpan = 1.5, slowFactor = 2.0
+    /// This clip's own slowing: how many times slower, and over how many source seconds.
+    var pace: Double {slowRate.flatMap {$0.isFinite && $0 >= 1 ? $0 : nil} ?? Self.slowFactor}
+    var slowSeconds: Double {slowLength.flatMap {$0.isFinite && $0 > 0.2 ? $0 : nil} ?? Self.slowSpan}
     /// The source seconds played slowed, kept inside the clip; nil when
-    /// none are marked or the clip is too short to slow a part of it.
+    /// none are marked or the clip is too short to slow a part of it. A
+    /// short clip slows a shorter stretch rather than none.
     var slowRange: (start: Double, end: Double)? {
-        guard let slowAt, slowAt.isFinite, duration >= Self.slowSpan + 0.5 else {return nil}
-        let from = min(max(start, slowAt), end - Self.slowSpan)
-        return (from, from + Self.slowSpan)
+        let span = min(slowSeconds, duration - 0.5)
+        guard let slowAt, slowAt.isFinite, span >= min(Self.slowSpan, slowSeconds) - 0.0001 else {return nil}
+        let from = min(max(start, slowAt), end - span)
+        return (from, from + span)
     }
     /// How long the clip is on screen at `speed`, slow motion included.
     func shown(_ speed: Double) -> Double {
-        (duration + (slowRange == nil ? 0 : Self.slowSpan * (Self.slowFactor - 1))) / speed
+        (duration + (slowRange.map {($0.end - $0.start) * (pace - 1)} ?? 0)) / speed
     }
     /// How far into the clip, on screen, a source moment plays.
     func screenOffset(of time: Double, speed: Double) -> Double {
@@ -32,8 +43,8 @@ extension Clip {
         guard let slow = slowRange else {return into / speed}
         let from = slow.start - start, to = slow.end - start
         if into <= from {return into / speed}
-        if into <= to {return (from + (into - from) * Self.slowFactor) / speed}
-        return (from + (to - from) * Self.slowFactor + into - to) / speed
+        if into <= to {return (from + (into - from) * pace) / speed}
+        return (from + (to - from) * pace + into - to) / speed
     }
 }
 enum Setting: Codable, Equatable {
@@ -105,14 +116,21 @@ enum ClipPicker {
     /// allowing a fifth over rather than stopping short. The order is kept.
     /// The length is measured on the real timeline, so speed and the overlap
     /// of every transition count.
-    static func autoPick(_ clips: [Clip], seconds: Double, speed: Double = 1, transition: Double = 0) -> [Clip] {
+    /// `groups` names the video each clip comes from; when given, the
+    /// strongest clip of every video is chosen first, whatever the length.
+    static func autoPick(_ clips: [Clip], seconds: Double, speed: Double = 1, transition: Double = 0, groups: [Int]? = nil) -> [Clip] {
         let usable = clips.indices.filter {clips[$0].duration.isFinite && clips[$0].duration > 0}
         let ranked = usable.sorted {(clips[$0].score ?? 1) > (clips[$1].score ?? 1)}
         func length(_ picked: Set<Int>) -> Double {
             LocalEngine.timeline(clips: picked.sorted().map {clips[$0]}, speed: speed, transition: transition).last?.end ?? 0
         }
-        var chosen = Set<Int>(), total = 0.0
-        for index in ranked {
+        var chosen = Set<Int>()
+        if let groups, groups.count == clips.count {
+            var seen = Set<Int>()
+            for index in ranked where groups[index] >= 0 && seen.insert(groups[index]).inserted {chosen.insert(index)}
+        }
+        var total = chosen.isEmpty ? 0 : length(chosen)
+        for index in ranked where !chosen.contains(index) {
             if total >= seconds {break}
             let trial = length(chosen.union([index]))
             if trial <= seconds * 1.2 {chosen.insert(index); total = trial}
