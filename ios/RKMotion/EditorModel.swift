@@ -382,6 +382,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                     // Slow motion on the strongest moment, except where people are talking,
                     // unless the rider already chose where it goes.
                     if edit.settings["slowMode"] == nil {edit.settings["slowPeak"] = .flag(kind != .talk)}
+                    // A teaser of the peak first, and a ramp into the slow motion, except for a talk.
+                    if edit.settings["hook"] == nil {edit.settings["hook"] = .flag(kind != .talk)}
+                    if edit.settings["speedRamp"] == nil {edit.settings["speedRamp"] = .flag(kind != .talk)}
                 }
                 previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
                 if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
@@ -492,7 +495,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let overlap = (settings["transition"]?.string ?? "cut") != "cut" ? (Double(settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         let groups = ClipRules.everyVideo(settings) ? ClipRules.groups(clips, parts: parts) : nil
         return ClipPicker.autoPick(clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0, groups: groups,
-                                    shape: {SlowMotion.shaped($0, scores: scores, settings: settings)})
+                                    shape: {MovieShape.shaped($0, scores: scores, settings: settings)})
     }
     /// The scan's moments for `scores` as the rider's rules shape them, with
     /// the clips the rider added kept at the end.
@@ -592,6 +595,46 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 if await save() {processingSucceeded = true; projectBytes = await persistence.bytes(current); message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"}
             } catch is CancellationError {try? FileManager.default.removeItem(at: output); message = "הייצוא בוטל. העריכה נשמרה."}
             catch {try? FileManager.default.removeItem(at: output); message = error.localizedDescription}
+            setBusy(false)
+          }
+        }
+    }
+    /// The movie lengths one tap makes: a story, a Reel and a WhatsApp status.
+    static let versionLengths: [Double] = [15, 30, 60]
+    /// Exports the edit once for each of `lengths`, choosing the clips for
+    /// each from the same suggestions; every version is kept with the others.
+    func exportVersions(_ lengths: [Double] = EditorModel.versionLengths) {
+        guard !busy, let p = project, p.analyzed, edit.settings["wholeVideo"]?.bool != true, !edit.clips.isEmpty else {return}
+        if let problem = editValidationMessage {message = problem; return}
+        let versions = lengths.map {seconds -> Edit in
+            var version = edit
+            version.settings["targetLength"] = .text(String(Int(seconds)))
+            version.clips = fittedToLength(edit.clips, settings: version.settings)
+            return version
+        }
+        setBusy(true, .exporting); percent = 0; message = "ייצוא באייפון…"
+        launchProcessing(title: "ייצוא גרסאות") { [self] in
+          operation = Task {
+            guard await save() else {setBusy(false); return}
+            var made: [URL] = []
+            do {
+                for (index, version) in versions.enumerated() {
+                    let file = "RK-Motion-" + UUID().uuidString + ".mp4", output = LocalStore.file(file, project: p.id)
+                    made.append(output)
+                    let share = 1 / Double(versions.count), base = Double(index) * share
+                    let label = String(format: NSLocalizedString("גרסה %@ מתוך %@", comment: "Which of several exported versions is being made"), "\(index + 1)", "\(versions.count)")
+                    let duration = try await engine.export(p, edit: version, output: output) {[weak self] fraction, text in
+                        await self?.progress(base + fraction * share, label + " · " + NSLocalizedString(text, comment: ""))
+                    }
+                    try Task.checkCancellation()
+                    guard var current = project, current.id == p.id else {return}
+                    current.exports.append(LocalExport(file: file, duration: duration)); project = current; movieURL = output
+                    made.removeAll {$0 == output}
+                }
+                if await save() {processingSucceeded = true; if let current = project {projectBytes = await persistence.bytes(current)}; message = "הגרסאות נוצרו באייפון ומוכנות לשמירה ושיתוף"}
+            } catch is CancellationError {message = "הייצוא בוטל. העריכה נשמרה."}
+            catch {message = error.localizedDescription}
+            for url in made {try? FileManager.default.removeItem(at: url)}
             setBusy(false)
           }
         }

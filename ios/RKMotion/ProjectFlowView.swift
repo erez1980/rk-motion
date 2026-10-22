@@ -819,7 +819,20 @@ private struct StyleSheet: View {
                                     selection: setting("slowRate", fallback: "2"))
                         ChoiceGroup(title: "משך ההאטה", options: SlowMotion.lengths.map {(String(format: NSLocalizedString("%@ שניות", comment: "Seconds value"), $0), $0)},
                                     selection: setting("slowLength", fallback: "1.5"))
+                        ToggleRow(title: "האצה לפני ואחרי ההאטה", detail: "speed ramp: הסרט רץ מהר אל הרגע ומאט בו", isOn: timingFlag("speedRamp"))
+                            .accessibilityIdentifier("edit.speedRamp")
                         Text("אפשר לסמן הילוך איטי גם בקטע מסוים: פתחו אותו בכפתור המספריים.").font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft)
+                    }.rkCard()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("אפקטים", systemImage: "sparkles").font(RK.font(15, 600)).foregroundStyle(RK.ink)
+                        if model.project?.scores.isEmpty == false {
+                            ToggleRow(title: "פתיח הוק", detail: "שתי שניות מרגע השיא בפתיחה, לפני שהסרט מתחיל", isOn: timingFlag("hook"))
+                                .accessibilityIdentifier("edit.hook")
+                        }
+                        ToggleRow(title: "זום על הביט", detail: "דחיפה קטנה פנימה על כל ביט שני של השיר", isOn: flag("beatZoom"))
+                            .accessibilityIdentifier("edit.beatZoom")
+                        ToggleRow(title: "סאונד ווש במעברים", detail: "משב קל מתחת לכל מעבר שאינו חיתוך", isOn: flag("whoosh"))
+                            .accessibilityIdentifier("edit.whoosh")
                     }.rkCard()
                 }.padding(20).disabled(model.busy)
             }
@@ -849,6 +862,13 @@ private struct StyleSheet: View {
         let counts = Dictionary(grouping: styles, by: {$0}).map {($0.key, $0.value.count)}.sorted {($0.1, $1.0) > ($1.1, $0.0)}
         let list = counts.map {"\($0.1) " + Self.transitionName($0.0)}.joined(separator: ", ")
         return String(format: NSLocalizedString("בסרט הזה: %@", comment: "Which smart transitions this movie gets"), list)
+    }
+    private func flag(_ key: String) -> Binding<Bool> {
+        Binding(get: {model.edit.settings[key]?.bool ?? false}, set: {model.edit.settings[key] = .flag($0)})
+    }
+    /// A switch that changes the movie's length, so the clips are chosen again for it.
+    private func timingFlag(_ key: String) -> Binding<Bool> {
+        Binding(get: {model.edit.settings[key]?.bool ?? false}, set: {model.setTiming(key, $0 ? "true" : "false")})
     }
     /// Each of these changes the movie's length, so the clips are chosen again for it.
     private func setting(_ key: String, fallback: String) -> Binding<String> {
@@ -1286,6 +1306,12 @@ private struct ExportStep: View {
                 Button {model.exportMovie()} label: {Label("ייצוא הסרט", systemImage: "film.stack")}
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.busy || model.selectedClips.isEmpty || model.editValidationMessage != nil)
+                if model.edit.settings["wholeVideo"]?.bool != true, model.edit.clips.count > 1 {
+                    Button {model.exportVersions()} label: {Label("3 גרסאות: סטורי 15, ריל 30, וואטסאפ 60", systemImage: "square.stack.3d.up")}
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(model.busy || model.selectedClips.isEmpty || model.editValidationMessage != nil)
+                        .accessibilityIdentifier("export.versions")
+                }
             }
         }
     }

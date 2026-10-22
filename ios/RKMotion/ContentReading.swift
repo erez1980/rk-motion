@@ -91,6 +91,26 @@ struct Signals: Codable, Equatable {
     /// 0 … 1, by the on-device aesthetics model; nil when not measured.
     var animals: [Double]? = nil
     var beauty: [Double]? = nil
+    /// How crisp and how bright each second is, 0 … 1; nil for older scans.
+    var sharpness: [Double]? = nil
+    var brightness: [Double]? = nil
+
+    /// The seconds too blurred or too dark to show: far less crisp than the
+    /// video usually is, or nearly black, as when the phone was in a pocket.
+    var poor: [Bool] {
+        guard let sharpness, sharpness.count == motion.count, !sharpness.isEmpty else {return Array(repeating: false, count: motion.count)}
+        let usual = sharpness.filter {$0 > 0}.sorted()
+        let median = usual.isEmpty ? 0 : usual[usual.count / 2]
+        return sharpness.indices.map {index in
+            let dark = (brightness.map {index < $0.count ? $0[index] : 1} ?? 1) < 0.06
+            return dark || (median > 0 && sharpness[index] < median * 0.4)
+        }
+    }
+    /// Share of the seconds `poor` leaves out.
+    var poorShare: Double {
+        let flags = poor
+        return flags.isEmpty ? 0 : Double(flags.filter {$0}.count) / Double(flags.count)
+    }
 
     func values(_ channel: Channel) -> [Double] {
         switch channel {
@@ -142,7 +162,8 @@ struct Signals: Codable, Equatable {
         }
         return Signals(motion: join(\.motion), loudness: join(\.loudness), music: join(\.music), speech: join(\.speech),
                        cheer: join(\.cheer), people: join(\.people), scenes: scenes, focus: focus,
-                       animals: optional(\.animals), beauty: optional(\.beauty))
+                       animals: optional(\.animals), beauty: optional(\.beauty),
+                       sharpness: optional(\.sharpness), brightness: optional(\.brightness))
     }
     /// Each second's score for `kind`. Channels that were not measured drop
     /// out and the rest are scaled back up, so a missing one never sinks
@@ -157,7 +178,9 @@ struct Signals: Codable, Equatable {
             for index in 0..<count {total[index] += share * (values[index].isFinite ? values[index] : 0)}
         }
         guard weight > 0 else {return total}
-        return total.map {$0 / weight}
+        // Blurred and dark seconds sink, so the moments chosen are ones worth watching.
+        let poor = self.poor
+        return total.indices.map {total[$0] / weight * (poor[$0] ? 0.35 : 1)}
     }
 }
 
@@ -181,6 +204,8 @@ struct ContentReading: Codable, Equatable {
     var runnerUp: ContentKind?
     /// Set when the on-device language model settled a close call.
     var byModel: Bool?
+    /// Share of the footage too blurred or dark to use.
+    var poorShare: Double?
 
     static let actionScenes: Set<String> = ["bicycle", "bike", "cycling", "motorcycle", "motorbike", "ski", "skiing", "snowboard", "snowboarding", "surfing", "surfboard", "skateboard", "skateboarding", "mountain", "dirt", "trail", "motocross", "atv", "kayak", "kayaking", "canoe", "rafting", "wakeboarding", "jet", "paragliding", "parachute", "skydiving", "climbing", "car", "vehicle", "racing", "kart", "horse", "riding", "sled", "boat", "sailboat"]
     static let outdoorScenes: Set<String> = ["outdoor", "sky", "mountain", "forest", "beach", "sea", "ocean", "water", "road", "trail", "snow", "landscape", "tree", "grass", "desert", "hill", "field", "lake", "river", "cliff", "sunset", "sunrise", "cloud", "waterfall", "park", "garden", "canyon", "coast", "shore", "island", "valley", "street", "city", "cityscape", "bridge"]
@@ -229,7 +254,8 @@ struct ContentReading: Codable, Equatable {
             .food: 0.75 * scenes(foodScenes) + 0.15 * beauty + 0.1 * (1 - motion),
         ]
         let reading = ContentReading(detected: .general, kind: .general, musicShare: music, speechShare: speech, cheerShare: cheer,
-                                     people: people, motion: motion, outdoors: outdoors, animals: animals)
+                                     people: people, motion: motion, outdoors: outdoors, animals: animals,
+                                     poorShare: signals.poorShare)
         return (likelihood, reading)
     }
     /// The bar a kind must clear; under it the footage reads as general.
@@ -269,6 +295,9 @@ struct ContentReading: Codable, Equatable {
         if motion >= 0.6 {facts.append(NSLocalizedString("הרבה תנועה ומהירות", comment: "Detected fact"))}
         else if motion <= 0.15 {facts.append(NSLocalizedString("מצלמה כמעט יציבה", comment: "Detected fact"))}
         if outdoors >= 0.4 {facts.append(NSLocalizedString("צולם בחוץ", comment: "Detected fact"))}
+        if let poorShare, poorShare >= 0.05 {
+            facts.append(String(format: NSLocalizedString("דילגתי על %d%% מטושטש או חשוך", comment: "Detected fact: blurred or dark footage left out"), percent(poorShare)))
+        }
         return facts
     }
 }
