@@ -68,20 +68,26 @@ actor LocalEngine {
     /// The chosen clips with their slow motion: the rider's own marks, and
     /// those the edit's mode adds where the scan scored the footage.
     static func shaped(_ clips: [Clip], project: LocalProject, edit: Edit) -> [Clip] {
-        SlowMotion.shaped(clips, scores: project.scores, settings: edit.settings)
+        MovieShape.shaped(clips, scores: project.scores, settings: edit.settings)
     }
     /// The clips as they will be exported: with each cut moved onto the
     /// beat when that applies. Only the first song is measured, since it is
     /// the one playing from the movie's first frame.
     private func synced(_ clips: [Clip], project: LocalProject, edit: Edit, speed: Double, overlap: Double, total: Double) async -> [Clip] {
-        guard Self.syncsToBeat(edit, project: project), let song = project.music.first else {return clips}
+        guard Self.syncsToBeat(edit, project: project),
+              let beats = await movieBeats(clips, project: project, edit: edit, speed: speed, overlap: overlap) else {return clips}
+        let seams = project.joinsVideos ? project.pieces.dropLast().map(\.end) : []
+        return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total, seams: seams)
+    }
+    /// The first song's beats over a movie of `clips`, in movie seconds;
+    /// nil without music or a clear beat.
+    private func movieBeats(_ clips: [Clip], project: LocalProject, edit: Edit, speed: Double, overlap: Double) async -> [Double]? {
+        guard edit.settings["useMusic"]?.bool != false, let song = project.music.first else {return nil}
         let start = edit.musicStart(for: song.id, first: true)
         let estimate = Self.timeline(clips: clips, speed: speed, transition: overlap).last?.end ?? 0
         // Rounded up to half minutes, so small edits reuse the same beats.
         let window = min(max(0, song.duration - start), ceil((estimate + 15) / 30) * 30)
-        guard let beats = await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window) else {return clips}
-        let seams = project.joinsVideos ? project.pieces.dropLast().map(\.end) : []
-        return Beats.synced(clips, beats: beats, speed: speed, transition: overlap, sourceDuration: total, seams: seams)
+        return await songBeats(LocalStore.file(song.file, project: project.id), start: start, length: window)
     }
     /// When the movie's strongest moment plays, in movie seconds, on the
     /// timeline `export` will make: slow motion and beat moves included.
@@ -169,6 +175,7 @@ actor LocalEngine {
     private func measure(_ asset: AVURLAsset, duration: Double, progress: Progress) async throws -> Signals {
         let count = max(1, Int(ceil(duration)))
         var motion = [Double](repeating: 0, count: count), counts = [Int](repeating: 0, count: count)
+        var sharp = [Double](repeating: 0, count: count), light = sharp, looks = counts
         var previous: [UInt8]?
         let frameCount = Int(ceil(duration * 2))
         // Reuse the decoder while keeping only a bounded batch of tiny images.
@@ -199,15 +206,20 @@ actor LocalEngine {
                     let bucket = min(count - 1, index / 2); motion[bucket] += diff; counts[bucket] += 1
                 }
                 previous = pixels
+                let look = Self.clarity(pixels, width: 160)
+                let bucket = min(count - 1, index / 2)
+                sharp[bucket] += look.sharpness; light[bucket] += look.brightness; looks[bucket] += 1
             }
             await progress(0.7 * Double(last) / Double(frameCount), "ניתוח תנועה באייפון…")
         }
         for index in motion.indices where counts[index] > 0 {motion[index] /= Double(counts[index])}
+        for index in sharp.indices where looks[index] > 0 {sharp[index] /= Double(looks[index]); light[index] /= Double(looks[index])}
         let seen = try await look(asset, duration: duration, count: count, progress: progress)
         let heard = try await loudness(asset, duration: duration, progress: progress)
         return Signals(motion: motion, loudness: heard.loudness, music: heard.music, speech: heard.speech,
                        cheer: heard.cheer, people: seen.people, scenes: seen.scenes, focus: seen.focus.isEmpty ? nil : seen.focus,
-                       animals: seen.animals.isEmpty ? nil : seen.animals, beauty: seen.beauty.isEmpty ? nil : seen.beauty)
+                       animals: seen.animals.isEmpty ? nil : seen.animals, beauty: seen.beauty.isEmpty ? nil : seen.beauty,
+                       sharpness: sharp, brightness: light)
     }
     /// Looks at frames spread over the video, one every few seconds: how
     /// many people and animals are in frame, what kind of place it is, and
@@ -279,6 +291,18 @@ actor LocalEngine {
             }
         }
         return (people, scenes, focus, spread(pets.map {(time: $0.time, value: $0.count)}), spread(looks.map {(time: $0.time, value: $0.score)}))
+    }
+    /// How crisp a small gray frame is (the mean step between neighbouring
+    /// pixels, 0 … 1; blur flattens it) and how bright, 0 … 1.
+    static func clarity(_ pixels: [UInt8], width: Int) -> (sharpness: Double, brightness: Double) {
+        guard width > 1, pixels.count >= width * 2 else {return (0, 0)}
+        var steps = 0, total = 0, sum = 0
+        for index in 0..<(pixels.count - width) where index % width != width - 1 {
+            let here = Int(pixels[index])
+            steps += abs(here - Int(pixels[index + 1])) + abs(here - Int(pixels[index + width])); total += 2
+        }
+        for value in pixels {sum += Int(value)}
+        return (Double(steps) / Double(max(1, total)) / 255, Double(sum) / Double(pixels.count) / 255)
     }
     private static func gray(_ image: CGImage) throws -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: 160 * 90)
@@ -517,6 +541,14 @@ actor LocalEngine {
             sources[from[$0]].transform(filling: size, focus: smartFrame ? Framing.focus(of: clips[$0], in: signals?.focus) : nil)
         }
         let length = segments.last!.end
+        // A short push in on the song's beats, when the edit asks for it.
+        var punches: [Double] = []
+        if edit.settings["beatZoom"]?.bool == true, let beats = await movieBeats(clips, project: project, edit: edit, speed: speed, overlap: overlap) {
+            punches = BeatPunch.times(beats, length: length)
+        }
+        let punch = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+            .concatenating(CGAffineTransform(scaleX: BeatPunch.scale, y: BeatPunch.scale))
+            .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2))
         guard length.isFinite, length > 0, length <= 24 * 3600 else {throw AppError(message: "אורך הסרט הערוך צריך להיות עד 24 שעות.")}
         let composition = AVMutableComposition()
         let videos = (0..<2).map {_ in composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!}
@@ -529,9 +561,10 @@ actor LocalEngine {
         func lay(_ track: AVMutableCompositionTrack, _ source: AVAssetTrack, range: CMTimeRange, clip: Clip, offset: Double, at movie: Double, whole: Double) throws {
             try track.insertTimeRange(range, of: source, at: time(movie))
             let first = range.start.seconds, last = range.end.seconds
+            let stretches = clip.stretches
             var cuts = [first, last]
-            if let slow = clip.slowRange {cuts += [slow.start - offset, slow.end - offset].filter {$0 > first + 0.0001 && $0 < last - 0.0001}}
-            guard cuts.count > 2 || clip.slowRange != nil else {
+            cuts += stretches.dropFirst().map {$0.start - offset}.filter {$0 > first + 0.0001 && $0 < last - 0.0001}
+            guard cuts.count > 2 || stretches.count > 1 else {
                 track.scaleTimeRange(CMTimeRange(start: time(movie), duration: range.duration), toDuration: time(whole))
                 return
             }
@@ -540,9 +573,9 @@ actor LocalEngine {
             for index in stride(from: cuts.count - 2, through: 0, by: -1) {
                 let from = cuts[index], to = cuts[index + 1], middle = (from + to) / 2 + offset
                 guard to - from > 0.0001 else {continue}
-                let slowed = clip.slowRange.map {middle >= $0.start && middle <= $0.end} ?? false
+                let factor = stretches.first {middle >= $0.start && middle <= $0.end}?.factor ?? 1
                 track.scaleTimeRange(CMTimeRange(start: time(movie + from - first), duration: time(to - from)),
-                                     toDuration: time((to - from) * (slowed ? clip.pace : 1) / speed))
+                                     toDuration: time((to - from) * factor / speed))
             }
         }
         let closing = fadesOut ? min(1, segments.last!.duration / 2) : 0
@@ -582,6 +615,10 @@ actor LocalEngine {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(passStart), duration: time(passEnd - passStart))
                 let l = layer(index)
+                for beat in punches where beat >= passStart && beat + BeatPunch.span <= passEnd {
+                    l.setTransformRamp(fromStart: transforms[index].concatenating(punch), toEnd: transforms[index],
+                                       timeRange: CMTimeRange(start: time(beat), duration: time(BeatPunch.span)))
+                }
                 if index == segments.count - 1 && closing > 0 {l.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
                 instruction.layerInstructions = [l]; instructions.append(instruction)
             }
@@ -646,6 +683,23 @@ actor LocalEngine {
                 params.setVolumeRamp(fromStartVolume: from.volume, toEndVolume: to.volume, timeRange: CMTimeRange(start: time(from.time), end: time(to.time)))
             }
             parameters.append(params)
+        }
+        // A soft whoosh under each seam that has a transition.
+        if edit.settings["whoosh"]?.bool == true, styles.contains(where: {$0 != "cut"}),
+           let file = try? Whoosh.file(), let sound = try await AVURLAsset(url: file).loadTracks(withMediaType: .audio).first {
+            let soundRange = try await sound.load(.timeRange)
+            let seams = styles.indices.filter {styles[$0] != "cut" && $0 < segments.count - 1}
+                .map {segments[$0].end - segments[$0].outgoing / 2}
+            let places = Whoosh.places(seams: seams, length: length)
+            if !places.isEmpty {
+                let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+                for at in places {
+                    try track.insertTimeRange(CMTimeRange(start: soundRange.start, duration: time(min(Whoosh.seconds, soundRange.duration.seconds))), of: sound, at: time(at))
+                }
+                let params = AVMutableAudioMixInputParameters(track: track)
+                params.setVolume(Whoosh.volume, at: .zero)
+                parameters.append(params)
+            }
         }
         // The composition's duration is the result of AVFoundation's own
         // rounding of the scaled segments, not of the seconds computed above,

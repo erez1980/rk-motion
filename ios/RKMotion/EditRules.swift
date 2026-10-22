@@ -103,10 +103,10 @@ enum SlowMotion {
     /// The clips as the movie plays them: the rider's marks kept, the mode's
     /// own marks added on clips without one, all at the edit's rate and length.
     static func shaped(_ clips: [Clip], scores: [Double], settings: [String: Setting]) -> [Clip] {
-        let rate = rate(settings), length = length(settings)
+        let rate = rate(settings), length = length(settings), ramp = settings["speedRamp"]?.bool == true
         var result = clips.map {clip -> Clip in
             var clip = clip
-            clip.slowRate = rate; clip.slowLength = length
+            clip.slowRate = rate; clip.slowLength = length; clip.ramp = ramp
             return clip
         }
         guard !scores.isEmpty else {return result}

@@ -15,6 +15,9 @@ struct Clip: Codable, Identifiable, Equatable {
     /// while the movie is built; nil keeps the defaults.
     var slowRate: Double?
     var slowLength: Double?
+    /// Set while the movie is built when the edit ramps into and out of
+    /// slow motion: the seconds around it play fast.
+    var ramp: Bool?
     var duration: Double {end - start}
     var id: String {uid}
 }
@@ -33,18 +36,42 @@ extension Clip {
         let from = min(max(start, slowAt), end - span)
         return (from, from + span)
     }
+    /// How long a ramp runs on each side of the slow stretch, and how fast it plays.
+    static let rampSpan = 0.8, rampFactor = 0.5
+    /// The clip's source seconds in stretches, each with how many times
+    /// longer than the source it plays: 1 at normal pace, `pace` slowed,
+    /// `rampFactor` in a ramp.
+    var stretches: [(start: Double, end: Double, factor: Double)] {
+        guard let slow = slowRange else {return [(start, end, 1)]}
+        var cuts: [(start: Double, end: Double, factor: Double)] = []
+        let before = ramp == true ? max(start, slow.start - Self.rampSpan) : slow.start
+        let after = ramp == true ? min(end, slow.end + Self.rampSpan) : slow.end
+        if before > start {cuts.append((start, before, 1))}
+        if slow.start > before {cuts.append((before, slow.start, Self.rampFactor))}
+        cuts.append((slow.start, slow.end, pace))
+        if after > slow.end {cuts.append((slow.end, after, Self.rampFactor))}
+        if end > after {cuts.append((after, end, 1))}
+        return cuts
+    }
     /// How long the clip is on screen at `speed`, slow motion included.
     func shown(_ speed: Double) -> Double {
-        (duration + (slowRange.map {($0.end - $0.start) * (pace - 1)} ?? 0)) / speed
+        stretches.reduce(0) {$0 + ($1.end - $1.start) * $1.factor} / speed
     }
     /// How far into the clip, on screen, a source moment plays.
     func screenOffset(of time: Double, speed: Double) -> Double {
-        let into = min(max(time, start), end) - start
-        guard let slow = slowRange else {return into / speed}
-        let from = slow.start - start, to = slow.end - start
-        if into <= from {return into / speed}
-        if into <= to {return (from + (into - from) * pace) / speed}
-        return (from + (to - from) * pace + into - to) / speed
+        let at = min(max(time, start), end)
+        return stretches.reduce(0) {$0 + max(0, min(at, $1.end) - $1.start) * $1.factor} / speed
+    }
+    /// The source moment shown a given time into this clip's screen time:
+    /// the inverse of `screenOffset`, slow motion included.
+    func footage(atScreen offset: Double, speed: Double) -> Double {
+        var left = max(0, offset) * speed
+        for stretch in stretches {
+            let length = (stretch.end - stretch.start) * stretch.factor
+            if left <= length {return min(end, stretch.start + left / stretch.factor)}
+            left -= length
+        }
+        return end
     }
 }
 enum Setting: Codable, Equatable {

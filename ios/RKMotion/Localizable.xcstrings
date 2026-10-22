@@ -7776,6 +7776,230 @@
           }
         }
       }
+    },
+    "3 גרסאות: סטורי 15, ריל 30, וואטסאפ 60": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 versions: 15 s story, 30 s Reel, 60 s WhatsApp"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 גרסאות: סטורי 15, ריל 30, וואטסאפ 60"
+          }
+        }
+      }
+    },
+    "speed ramp: הסרט רץ מהר אל הרגע ומאט בו": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed ramp: the movie rushes into the moment and slows in it"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "speed ramp: הסרט רץ מהר אל הרגע ומאט בו"
+          }
+        }
+      }
+    },
+    "אפקטים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effects"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפקטים"
+          }
+        }
+      }
+    },
+    "גרסה %@ מתוך %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ of %@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גרסה %@ מתוך %@"
+          }
+        }
+      }
+    },
+    "דחיפה קטנה פנימה על כל ביט שני של השיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A small push in on every other beat of the song"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דחיפה קטנה פנימה על כל ביט שני של השיר"
+          }
+        }
+      }
+    },
+    "דילגתי על %d%% מטושטש או חשוך": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped %d%% that was blurred or dark"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דילגתי על %d%% מטושטש או חשוך"
+          }
+        }
+      }
+    },
+    "האצה לפני ואחרי ההאטה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed up around the slow motion"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "האצה לפני ואחרי ההאטה"
+          }
+        }
+      }
+    },
+    "הגרסאות נוצרו באייפון ומוכנות לשמירה ושיתוף": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The versions were made on the iPhone and are ready to save and share"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הגרסאות נוצרו באייפון ומוכנות לשמירה ושיתוף"
+          }
+        }
+      }
+    },
+    "זום על הביט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom on the beat"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זום על הביט"
+          }
+        }
+      }
+    },
+    "ייצוא גרסאות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting versions"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא גרסאות"
+          }
+        }
+      }
+    },
+    "משב קל מתחת לכל מעבר שאינו חיתוך": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A light whoosh under every transition that isn't a cut"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משב קל מתחת לכל מעבר שאינו חיתוך"
+          }
+        }
+      }
+    },
+    "סאונד ווש במעברים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whoosh on transitions"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סאונד ווש במעברים"
+          }
+        }
+      }
+    },
+    "פתיח הוק": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hook opening"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתיח הוק"
+          }
+        }
+      }
+    },
+    "שתי שניות מרגע השיא בפתיחה, לפני שהסרט מתחיל": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two seconds of the peak first, before the movie starts"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שתי שניות מרגע השיא בפתיחה, לפני שהסרט מתחיל"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

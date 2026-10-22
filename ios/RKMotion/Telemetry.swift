@@ -210,15 +210,4 @@ enum Telemetry {
     }
 }
 
-extension Clip {
-    /// The source moment shown a given time into this clip's screen time:
-    /// the inverse of `screenOffset`, slow motion included.
-    func footage(atScreen offset: Double, speed: Double) -> Double {
-        let shown = max(0, offset) * speed
-        guard let slow = slowRange else {return min(end, start + shown)}
-        let before = slow.start - start, slowed = (slow.end - slow.start) * pace
-        if shown <= before {return start + shown}
-        if shown <= before + slowed {return slow.start + (shown - before) / pace}
-        return min(end, slow.end + shown - before - slowed)
-    }
-}
+
