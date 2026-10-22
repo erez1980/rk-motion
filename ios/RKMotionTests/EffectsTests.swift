@@ -52,7 +52,7 @@ final class EffectsTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
     func testBlurredAndDarkSecondsSink() {
-        let sharp: [UInt8] = (0..<(16 * 8)).map {UInt8(($0 % 2) * 200 + 20)}
+        let sharp: [UInt8] = (0..<128).map {(index: Int) -> UInt8 in index % 2 == 0 ? 20 : 220}
         let flat = [UInt8](repeating: 120, count: 16 * 8)
         XCTAssertGreaterThan(LocalEngine.clarity(sharp, width: 16).sharpness, 0.3)
         XCTAssertEqual(LocalEngine.clarity(flat, width: 16).sharpness, 0)
