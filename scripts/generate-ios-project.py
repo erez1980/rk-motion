@@ -28,6 +28,8 @@ refs.append(add("info", 'isa = PBXFileReference; lastKnownFileType = text.plist.
 refs.append(add("privacy", 'isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>";'))
 refs.append(add("strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>";'))
 refs.append(add("info-strings", 'isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>";'))
+refs.append(add("third-party-notices", 'isa = PBXFileReference; lastKnownFileType = text; path = Resources/ThirdPartyNotices.txt; sourceTree = "<group>";'))
+add("third-party-notices-build", f'isa = PBXBuildFile; fileRef = {uid("third-party-notices")};')
 # Rubik, the web app's typeface, so both read as one product.
 refs.append(add("font", 'isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Rubik.ttf; sourceTree = "<group>";'))
 refs.append(add("font-license", 'isa = PBXFileReference; lastKnownFileType = text; path = Fonts/OFL.txt; sourceTree = "<group>";'))
@@ -73,7 +75,7 @@ add("products", f'isa = PBXGroup; children = ({uid("app")},{uid("test-product")}
 add("sources-group", f'isa = PBXGroup; children = ({",".join(refs)},); path = RKMotion; sourceTree = "<group>";')
 add("main", f'isa = PBXGroup; children = ({uid("sources-group")},{uid("test-group")},{uid("ui-group")},{uid("products")},); sourceTree = "<group>";')
 add("sources", f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
-add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},{uid("font-build")},{uid("font-license-build")},); runOnlyForDeploymentPostprocessing = 0;')
+add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({uid("asset-build")},{uid("privacy-build")},{uid("strings-build")},{uid("info-strings-build")},{uid("font-build")},{uid("font-license-build")},{uid("third-party-notices-build")},); runOnlyForDeploymentPostprocessing = 0;')
 # YouTubeKit fetches a song's audio from a YouTube link, on the device.
 add("ytkit-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git"; requirement = {kind = exactVersion; version = 0.4.9;};')
 add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("ytkit-package")}; productName = YouTubeKit;')

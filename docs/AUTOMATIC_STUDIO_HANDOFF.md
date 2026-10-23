@@ -10,9 +10,11 @@ a required step of the new flow. Initial media choice and OS permission are
 unavoidable inputs, not editing steps.
 
 Base: `b60e818` on main (0.32.0). Initial implementation commit: `4b9a15e`; later compatibility/validation commits are on the same branch.
-Draft PR: https://github.com/erez1980/rk-motion/pull/21. Branch: `codex/automatic-studio`, app 0.33.0.
-Do not merge or publish a release just to save the work. The main branch's
-existing release workflow remains unchanged. The detailed 30-row status and
+PR: https://github.com/erez1980/rk-motion/pull/21. Branch: `codex/automatic-studio`, app 0.33.0.
+The owner explicitly authorized merging when validation is complete on
+2026-10-23. Keep the continuation branch available after merging. The main
+branch's existing workflow publishes an unsigned IPA after a successful build;
+that release is not proof of physical-device installation. The detailed 30-row status and
 continuation order are in [AUTOMATIC_STUDIO_PLAN.md](AUTOMATIC_STUDIO_PLAN.md).
 The historical full product research is also committed, including sources.
 
@@ -80,7 +82,8 @@ The historical full product research is also committed, including sources.
 
 The generated Xcode project and Package.resolved are committed. The added
 runtime dependency is ZIPFoundation **0.9.20**, pinned exactly; YouTubeKit
-remains pinned at 0.4.9. Keep the dependency license/attribution obligations.
+remains pinned at 0.4.9. Their complete MIT notices are included in the app
+bundle as `ThirdPartyNotices.txt` through the generated resource build phase.
 
 ## Build and validation
 
