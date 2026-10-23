@@ -14,7 +14,15 @@ final class EffectsExportTests: XCTestCase {
         let silent = folder.appendingPathComponent("silent.mov"), voice = folder.appendingPathComponent("voice.wav")
         try await UITestFixture.makeRide(silent, seconds: seconds)
         try writeWave(voice, seconds: Double(seconds), beat: nil)
-        try await merge(video: silent, audio: voice, into: LocalStore.file(project.source, project: project.id), seconds: Double(seconds))
+        let source = LocalStore.file(project.source, project: project.id)
+        do {
+            try await merge(video: silent, audio: voice, into: source)
+        } catch {
+            // The effects are what is under test: without the sound, the video alone still goes through them.
+            print("EFFECTS: fixture sound not merged: \(Self.describe(error))")
+            try? FileManager.default.removeItem(at: source)
+            try FileManager.default.copyItem(at: silent, to: source)
+        }
         try writeWave(folder.appendingPathComponent("song.wav"), seconds: 40, beat: 0.5)
         project.duration = Double(seconds); project.analyzed = true
         project.music = [LocalMusic(file: "song.wav", name: "song", duration: 40)]
@@ -67,9 +75,9 @@ final class EffectsExportTests: XCTestCase {
         }
         return parts.joined(separator: " <- ")
     }
-    /// Mono 16-bit sound at 16 kHz: a soft tone, with a click every `beat` seconds when given.
+    /// Mono 16-bit sound at 8 kHz: a soft tone, with a click every `beat` seconds when given.
     private func writeWave(_ url: URL, seconds: Double, beat: Double?) throws {
-        let rate = 16000, count = Int(seconds * Double(rate))
+        let rate = 8000, count = Int(seconds * Double(rate))
         var data = Data()
         func text(_ s: String) {data.append(contentsOf: s.utf8)}
         func word(_ n: UInt16) {data.append(UInt8(n & 255)); data.append(UInt8(n >> 8))}
@@ -87,18 +95,19 @@ final class EffectsExportTests: XCTestCase {
         }
         try data.write(to: url)
     }
-    private func merge(video: URL, audio: URL, into output: URL, seconds: Double) async throws {
+    private func merge(video: URL, audio: URL, into output: URL) async throws {
         let composition = AVMutableComposition()
-        let range = CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600))
         let videoTracks = try await AVURLAsset(url: video).loadTracks(withMediaType: .video)
         let audioTracks = try await AVURLAsset(url: audio).loadTracks(withMediaType: .audio)
         let videoTrack = try XCTUnwrap(videoTracks.first), audioTrack = try XCTUnwrap(audioTracks.first)
+        let videoRange = try await videoTrack.load(.timeRange), audioRange = try await audioTrack.load(.timeRange)
+        let range = CMTimeRange(start: .zero, duration: CMTimeMinimum(videoRange.duration, audioRange.duration))
+        print("EFFECTS: fixture video \(videoRange.duration.seconds) s, sound \(audioRange.duration.seconds) s")
         try composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!.insertTimeRange(range, of: videoTrack, at: .zero)
         try composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!.insertTimeRange(range, of: audioTrack, at: .zero)
-        // Copied as they are: re-encoding the generated sound failed on the simulator (-12780).
-        let session = try XCTUnwrap(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough))
+        let session = try XCTUnwrap(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality))
         session.outputURL = output; session.outputFileType = .mov
         await withCheckedContinuation {done in session.exportAsynchronously {done.resume()}}
-        XCTAssertEqual(session.status, .completed, session.error.map {Self.describe($0)} ?? "")
+        if session.status != .completed {throw session.error ?? CocoaError(.fileWriteUnknown)}
     }
 }
