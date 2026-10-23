@@ -24,15 +24,15 @@ real shared-audio cameras and real repeated routes remain device gates.
 No claim that all 30 roadmap capabilities are complete.
 
 Device archive: PASS. Release iphoneos archive and unsigned IPA packaging.
-Source code commit: 378b311423cfc23e0fc55e729adbafce8cb1f975
-IPA: RK-Motion-0.33.0-build3-378b311.ipa
-SHA-256: 2381dc55a46a9b404e768de3ca7a0e06a35efdcf3f1474ab66a5b4df78f4eaf6
-Size: 1788081 bytes. ZIP CRC + Info.plist version/build/commit verified.
+Source code commit: f9ce1a373c8358809278023ec934f93d19638a37
+IPA: RK-Motion-0.33.0-build3-f9ce1a3.ipa
+SHA-256: d60816f2a9191b14b9844bec7283ebe118887da0b195d0018d9ca3973960c926
+Size: 1790916 bytes. ZIP CRC + Info.plist version/build/commit verified.
 This verification is recorded in a documentation-only follow-up commit.
 The IPA still requires signing for a standard physical iPhone.
 
 CI compatibility: first Xcode 26.3 run 40017702228 failed type-checking
 a compound tuple map/sort. Replaced it with a named RankedSecond and loop/sort;
 the local focused rerun passed all 17 automation tests. The final device
-archive was rebuilt from 378b311 with the complete dependency notices
+archive was rebuilt from f9ce1a3 with the complete dependency notices
 verified inside the IPA. Latest CI results are recorded in the PR.
