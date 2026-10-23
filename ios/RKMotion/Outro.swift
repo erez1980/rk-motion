@@ -40,7 +40,7 @@ enum Outro {
 
     /// Draws the end screen as it looks `time` seconds in, into a context
     /// whose origin is the top left: black, then the app icon springs up
-    /// fast, and "Made with" comes in above it.
+    /// fast with its name under it, and "Made with" comes in above it.
     static func draw(_ context: CGContext, at time: Double, size: CGSize) {
         let w = size.width, h = size.height, s = min(w, h)
         context.setFillColor(UIColor.black.cgColor)
@@ -66,6 +66,16 @@ enum Outro {
             let top = center.y - side / 2 - s * 0.05 - height + s * 0.04 * CGFloat(1 - eased)
             ("Made with" as NSString).draw(with: CGRect(x: 0, y: top, width: w, height: height), options: [.usesLineFragmentOrigin],
                 attributes: [.font: font, .foregroundColor: UIColor.white.withAlphaComponent(CGFloat(clamp(rise * 1.5))), .paragraphStyle: style], context: nil)
+        }
+        // The app's name under the icon, as the home screen shows it.
+        let named = (time - overlap - 0.25) / 0.3
+        if named > 0 {
+            let points = (s * 0.058).rounded()
+            let font = UIFont.systemFont(ofSize: points, weight: .medium)
+            let style = NSMutableParagraphStyle(); style.alignment = .center
+            let top = center.y + side / 2 + s * 0.035 - s * 0.02 * CGFloat(1 - easeOut(named))
+            ("RK Motion" as NSString).draw(with: CGRect(x: 0, y: top, width: w, height: ceil(font.lineHeight * 1.2)), options: [.usesLineFragmentOrigin],
+                attributes: [.font: font, .foregroundColor: UIColor.white.withAlphaComponent(CGFloat(clamp(named * 1.5))), .paragraphStyle: style], context: nil)
         }
     }
     /// The app icon, `side` wide around the context's origin, drawn the way
@@ -106,7 +116,7 @@ enum Outro {
     static func file(size: CGSize) async throws -> URL {
         let width = Int(size.width), height = Int(size.height)
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let url = caches.appendingPathComponent("rk-outro-2-\(width)x\(height).mov")
+        let url = caches.appendingPathComponent("rk-outro-3-\(width)x\(height).mov")
         if FileManager.default.fileExists(atPath: url.path) {return url}
         let partial = caches.appendingPathComponent("rk-outro-\(UUID().uuidString).mov")
         defer {try? FileManager.default.removeItem(at: partial)}
