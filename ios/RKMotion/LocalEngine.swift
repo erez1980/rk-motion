@@ -671,13 +671,16 @@ actor LocalEngine {
             // The end screen under the last shot, which rushes towards the
             // viewer and fades into it, then the end screen alone.
             let file = try await Outro.file(size: size)
-            guard let screen = try await AVURLAsset(url: file).loadTracks(withMediaType: .video).first else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
+            // The asset is kept: a track only holds its asset weakly, and
+            // one whose asset is gone cannot be inserted.
+            let screenAsset = AVURLAsset(url: file)
+            guard let screen = try await screenAsset.loadTracks(withMediaType: .video).first else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
             let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
             // The written movie can end a frame short of its length; stretch
             // what is there to it rather than ask for frames past the end.
             let drawn = try await screen.load(.timeRange)
             guard drawn.duration.seconds > 1 else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
-            try track.insertTimeRange(drawn, of: screen, at: time(outroStart))
+            try withExtendedLifetime(screenAsset) {try track.insertTimeRange(drawn, of: screen, at: time(outroStart))}
             if abs(drawn.duration.seconds - Outro.seconds) > 0.0001 {
                 track.scaleTimeRange(CMTimeRange(start: time(outroStart), duration: drawn.duration), toDuration: time(Outro.seconds))
             }
@@ -726,15 +729,19 @@ actor LocalEngine {
         }
         // A soft whoosh under each seam that has a transition.
         if edit.settings["whoosh"]?.bool == true, outro || styles.contains(where: {$0 != "cut"}),
-           let file = try? Whoosh.file(), let sound = try await AVURLAsset(url: file).loadTracks(withMediaType: .audio).first {
+           let file = try? Whoosh.file() {
+            let soundAsset = AVURLAsset(url: file)
+            guard let sound = try await soundAsset.loadTracks(withMediaType: .audio).first else {throw AppError(message: "קריאת השמע נכשלה.")}
             let soundRange = try await sound.load(.timeRange)
             let seams = styles.indices.filter {styles[$0] != "cut" && $0 < segments.count - 1}
                 .map {segments[$0].end - segments[$0].outgoing / 2} + (outro ? [movieEnd - Outro.overlap / 2] : [])
             let places = Whoosh.places(seams: seams, length: length)
             if !places.isEmpty {
                 let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
-                for at in places {
-                    try track.insertTimeRange(CMTimeRange(start: soundRange.start, duration: time(min(Whoosh.seconds, soundRange.duration.seconds))), of: sound, at: time(at))
+                try withExtendedLifetime(soundAsset) {
+                    for at in places {
+                        try track.insertTimeRange(CMTimeRange(start: soundRange.start, duration: time(min(Whoosh.seconds, soundRange.duration.seconds))), of: sound, at: time(at))
+                    }
                 }
                 let params = AVMutableAudioMixInputParameters(track: track)
                 params.setVolume(Whoosh.volume, at: .zero)
