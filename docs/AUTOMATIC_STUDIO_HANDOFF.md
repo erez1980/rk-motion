@@ -9,7 +9,8 @@ No prompt, music picker, face selection, trimming or output configuration is
 a required step of the new flow. Initial media choice and OS permission are
 unavoidable inputs, not editing steps.
 
-Base: `b60e818` on main (0.32.0). Branch: `codex/automatic-studio`, app 0.33.0.
+Base: `b60e818` on main (0.32.0). Implementation commit: `4b9a15e`.
+Draft PR: https://github.com/erez1980/rk-motion/pull/21. Branch: `codex/automatic-studio`, app 0.33.0.
 Do not merge or publish a release just to save the work. The main branch's
 existing release workflow remains unchanged. The detailed 30-row status and
 continuation order are in [AUTOMATIC_STUDIO_PLAN.md](AUTOMATIC_STUDIO_PLAN.md).
@@ -89,8 +90,8 @@ Foundation Models image inference was used to certify this implementation.
 
 Completed full run before the last bounded-import defensive guards:
 **166 unit tests + 5 UI tests passed**. A further actual rendered-angle test
-passed individually. The final focused automation rerun and device archive
-results are recorded in `docs/validation/automatic-studio-2026-10-23.txt`.
+passed individually. The final focused automation rerun passed **17 tests**; the Release device
+archive and unsigned IPA packaging also passed. Results and IPA checksums are recorded in `docs/validation/automatic-studio-2026-10-23.txt`.
 The added tests cover whole event retention, manual intervals, speech endings,
 quiet aesthetic moments, invalid/duplicate repair, missing/nonfinite inputs,
 focus velocity, preference feedback, score PCM/cancellation, real media export,

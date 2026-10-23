@@ -20,5 +20,10 @@ physical-device memory/thermal/battery, installed image-model inference,
 real shared-audio cameras and real repeated routes remain device gates.
 No claim that all 30 roadmap capabilities are complete.
 
-Device archive: pending at this implementation commit; final result will be
-recorded in a follow-up documentation-only commit.
+Device archive: PASS. Release iphoneos archive and unsigned IPA packaging.
+Source code commit: 4b9a15e1f8ede5432ab4a244c7b7502acadddb04
+IPA: RK-Motion-0.33.0-build3-4b9a15e.ipa
+SHA-256: b652509e45a131c1ea9ef5c848da627c4956e4e9b5cdc2a6a9e6b6088e04663f
+Size: 1786532 bytes. ZIP CRC + Info.plist version/build/commit verified.
+This verification is recorded in a documentation-only follow-up commit.
+The IPA still requires signing for a standard physical iPhone.

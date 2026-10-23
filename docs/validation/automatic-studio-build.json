@@ -1,0 +1,13 @@
+{
+  "app_version": "0.33.0",
+  "build": "3",
+  "source_commit": "4b9a15e1f8ede5432ab4a244c7b7502acadddb04",
+  "pull_request": "https://github.com/erez1980/rk-motion/pull/21",
+  "ipa_name": "RK-Motion-0.33.0-build3-4b9a15e.ipa",
+  "ipa_bytes": 1786532,
+  "sha256": "b652509e45a131c1ea9ef5c848da627c4956e4e9b5cdc2a6a9e6b6088e04663f",
+  "device_archive": "passed; Release iphoneos, CODE_SIGNING_ALLOWED=NO",
+  "signed": false,
+  "installed_on_physical_iphone": false,
+  "physical_model_inference_tested": false
+}
