@@ -147,6 +147,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         UserDefaults.standard.set(value.id, forKey: "localProject")
         sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(value.source, project: value.id))) ?? .zero
         await joinSource(value)
+        loadSightings()
         previewEdit = nil; projectBytes = await persistence.bytes(value); setBusy(false)
         message = value.analyzed ? "הפרויקט נשמר באייפון" : "הסרטון נשמר. אפשר לחדש את הניתוח."
     }
@@ -157,6 +158,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard await save() else {setBusy(false); return}
         project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewEdit = nil; projectBytes = 0
         sourceDimensions = .zero; joinedSource = nil; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
+        loadSightings()
         UserDefaults.standard.removeObject(forKey: "localProject")
         setBusy(false)
     }
@@ -309,15 +311,16 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// pieces, and only then saves the project. An interruption leaves the
     /// manifest behind for `restore` to find; a cancellation removes this
     /// import's own partial copy and nothing else.
-    private func runImport(_ files: [URL]) async {
+    private func runImport(_ files: [URL], name named: String? = nil, settings: [String: Setting] = [:]) async {
         guard await save() else {setBusy(false); return}
         guard let first = files.first else {setBusy(false); return}
         let copying = files.count > 1 ? NSLocalizedString("העתקת הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("העתקת הסרטון לאחסון המקומי…", comment: "Copying the video")
         message = copying
-        let name = UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened)
+        let name = named ?? (UUID(uuidString: first.deletingPathExtension().lastPathComponent) == nil ? first.lastPathComponent : NSLocalizedString("סרטון ", comment: "Default project name prefix") + Date().formatted(date: .abbreviated, time: .shortened))
         var p = LocalProject(name: name, source: "")
         p.wholeVideo = wholeVideo
         p.edit.settings.merge(Edit.newMovieSettings(wholeVideo: p.wholeVideo)) {$1}
+        p.edit.settings.merge(settings) {$1}
         do {
             let size = files.reduce(Int64(0)) {$0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)}
             let targets = files.map {"source-" + UUID().uuidString + "." + ($0.pathExtension.isEmpty ? "mov" : $0.pathExtension)}
@@ -386,6 +389,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                     if edit.settings["hook"] == nil {edit.settings["hook"] = .flag(kind != .talk)}
                     if edit.settings["speedRamp"] == nil {edit.settings["speedRamp"] = .flag(kind != .talk)}
                 }
+                edit.settings.removeValue(forKey: "star")
+                loadSightings(result.signals)
                 previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
                 if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
@@ -439,12 +444,21 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         message = String(format: NSLocalizedString("הסרט נערך מחדש כ%@. ניתן לבטל את השינוי.", comment: "Content kind changed"), kind.title)
     }
     private func apply(_ kind: ContentKind, signals: Signals) {
-        project?.reading?.kind = kind; project?.scores = signals.scores(for: kind)
+        let star = starPresence(signals)
+        project?.reading?.kind = kind; project?.reading?.star = star == nil ? nil : edit.settings["star"]?.string
+        project?.scores = signals.scores(for: kind, star: star)
     }
-    /// After undo or redo, the scores follow the kind the restored edit was made as.
+    /// Each second of the timeline: whether the edit's star is in frame; nil without a star.
+    private func starPresence(_ signals: Signals) -> [Bool]? {
+        guard let key = edit.settings["star"]?.string, !key.isEmpty, let sightings = signals.sightings,
+              let group = FaceGroups.group(key, in: sightings) else {return nil}
+        return FaceGroups.presence(group, sightings: sightings, count: signals.motion.count)
+    }
+    /// After undo or redo, the scores follow the kind and the star the restored edit was made with.
     private func followKind() {
         guard let raw = edit.settings["contentKind"]?.string, let kind = ContentKind(rawValue: raw),
-              let p = project, p.reading != nil, p.reading?.kind != kind,
+              let p = project, p.reading != nil,
+              p.reading?.kind != kind || p.reading?.star != edit.settings["star"]?.string.nilIfEmpty,
               let signals = LocalStore.readSignals(project: p.id) else {return}
         apply(kind, signals: signals)
     }
@@ -513,6 +527,161 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         edit.settings = settings
         edit.clips = fittedToLength(suggested(p, scores: p.scores, settings: settings), settings: settings)
         changed(from: previous); suppressedEdit = edit
+    }
+    // MARK: Search, the star and edits in words
+
+    /// The looked-at frames of the open project's scan, kept for search and the star.
+    private var sightings: [Sighting] = []
+    /// The people seen in the footage, most seen first, to choose the star from.
+    @Published private(set) var people: [FaceGroups.Group] = []
+    /// Whether the scan kept what search and the star need; older scans did not.
+    @Published private(set) var canSearch = false
+    private func loadSightings(_ signals: Signals? = nil) {
+        guard let p = project else {sightings = []; people = []; canSearch = false; return}
+        sightings = (signals ?? LocalStore.readSignals(project: p.id))?.sightings ?? []
+        canSearch = !sightings.isEmpty
+        people = FaceGroups.groups(sightings)
+    }
+    /// The video file, the second in it and the face to show for a person.
+    func picture(of person: FaceGroups.Group) -> (file: URL, seconds: Double, face: Sighting.Face)? {
+        guard let p = project, person.best.sighting < sightings.count,
+              let face = sightings[person.best.sighting].faces?[safe: person.best.face] else {return nil}
+        let time = sightings[person.best.sighting].time, part = p.part(at: time)
+        return (LocalStore.file(part.file, project: p.id), time - part.start, face)
+    }
+    var star: String? {edit.settings["star"]?.string.nilIfEmpty}
+    /// Makes one person the movie's star, or no one: the moments they are
+    /// in rise and the clips are chosen again, as one change to undo.
+    func setStar(_ key: String?) {
+        guard !busy, let p = project, let kind = p.reading?.kind, key != star,
+              let signals = LocalStore.readSignals(project: p.id) else {return}
+        let previous = edit
+        if let key {edit.settings["star"] = .text(key)} else {edit.settings.removeValue(forKey: "star")}
+        apply(kind, signals: signals)
+        edit.clips = fittedToLength(suggested(p, scores: project?.scores ?? [], settings: edit.settings), settings: edit.settings)
+        wholeVideo = false; project?.wholeVideo = false; edit.settings["wholeVideo"] = .flag(false)
+        changed(from: previous); suppressedEdit = edit
+        message = key == nil ? NSLocalizedString("הסרט כבר לא מתמקד באדם אחד. ניתן לבטל את השינוי.", comment: "Star cleared") : NSLocalizedString("הסרט נערך מחדש סביב הכוכב שבחרת. ניתן לבטל את השינוי.", comment: "Star chosen")
+    }
+    /// The moments that show `query`, read by the Hebrew list and, for
+    /// words it does not know, by Apple Intelligence.
+    /// Works on the scan as it was when asked, so another project opened
+    /// meanwhile never mixes in.
+    func moments(for query: String) async -> [Clip] {
+        guard let p = project, !sightings.isEmpty else {return []}
+        let frames = sightings, pieces = p.pieces
+        var terms = FrameSearch.terms(for: query)
+        if FrameSearch.moments(frames, terms: terms, parts: pieces).isEmpty {
+            terms.formUnion(await ModelSearch.terms(query, vocabulary: FrameSearch.vocabulary(frames)))
+        }
+        return FrameSearch.moments(frames, terms: terms, parts: pieces)
+    }
+    /// Adds the moments that show `query` to the movie, in the order they
+    /// were filmed; one already in the movie is chosen instead of added twice.
+    @discardableResult func addMoments(for query: String) async -> Int {
+        guard !busy, let asked = project?.id else {return 0}
+        guard canSearch else {message = NSLocalizedString("כדי לחפש, נתחו את הסרטון שוב. הניתוח הקודם נעשה לפני שהיה חיפוש.", comment: "Search needs a new scan"); return 0}
+        let found = await moments(for: query)
+        // The rider may have opened another project, or started a scan, while the model answered.
+        guard !busy, project?.id == asked else {return 0}
+        guard !found.isEmpty else {
+            message = String(format: NSLocalizedString("לא מצאתי רגעים עם “%@”. נסו מילה אחרת.", comment: "Search found nothing"), query)
+            return 0
+        }
+        var next = edit
+        for moment in found {
+            let middle = (moment.start + moment.end) / 2
+            if let index = next.clips.firstIndex(where: {$0.start <= middle && $0.end >= middle}) {next.clips[index].selected = true; continue}
+            let at = next.clips.firstIndex {$0.start > moment.start} ?? next.clips.count
+            next.clips.insert(moment, at: at)
+        }
+        next.clips = Edit.capped(next.clips)
+        let previous = edit
+        edit = next; changed(from: previous); suppressedEdit = edit
+        message = String(format: NSLocalizedString("מצאתי %@ רגעים עם “%@” והוספתי אותם לסרט. ניתן לבטל.", comment: "Search moments added"), "\(found.count)", query)
+        return found.count
+    }
+    /// Carries out an edit asked for in words, as one change to undo
+    /// (a new content kind is a change of its own).
+    func chat(_ text: String) async {
+        let request = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, let p = project, p.analyzed, !request.isEmpty else {return}
+        var commands = ChatEdit.commands(from: request)
+        if commands.isEmpty {
+            commands = await ChatEdit.modelCommands(request)
+            // Applied only to the project that was asked, and not over another operation.
+            guard !busy, project?.id == p.id else {return}
+        }
+        guard !commands.isEmpty else {
+            message = NSLocalizedString("לא הבנתי מה לשנות. נסו למשל: “חצי דקה”, “בלי הילוך איטי”, “תמצא את הכלב”.", comment: "Chat edit not understood")
+            return
+        }
+        var done: [String] = []
+        for case .kind(let kind) in commands where kind != project?.reading?.kind {
+            setKind(kind); done.append(kind.title)
+        }
+        let previous = edit
+        var next = edit
+        let reach = ChatEdit.apply(commands, to: &next.settings, currentLength: movieDuration)
+        if next.settings["wholeVideo"]?.bool != true, let current = project {
+            switch reach {
+            case .suggestions:
+                next.clips = fittedToLength(ClipRules.apply(current.fitted(LocalEngine.ranges(scores: current.scores, duration: current.duration, threshold: threshold)), parts: current.pieces, scores: current.scores, settings: next.settings)
+                    + edit.clips.filter {$0.manual == true}, settings: next.settings)
+            case .length where next.clips.count > 1:
+                next.clips = fittedToLength(next.clips, settings: next.settings)
+            default: break
+            }
+        }
+        if commands.contains(.shuffle), next.clips.count > 1 {
+            var generator = SystemRandomNumberGenerator()
+            next.clips = ClipPicker.shuffled(next.clips, using: &generator)
+        }
+        for command in commands {
+            switch command {
+            case .kind, .search: continue
+            default: done.append(ChatEdit.describe(command, settings: next.settings))
+            }
+        }
+        if next != edit {edit = next; changed(from: previous); suppressedEdit = edit}
+        for case .search(let query) in commands {await addMoments(for: query)}
+        let searched = commands.contains {if case .search = $0 {return true}; return false}
+        if !done.isEmpty {
+            message = String(format: NSLocalizedString("שיניתי: %@. ניתן לבטל.", comment: "Chat edit done"), done.joined(separator: " · "))
+        } else if !searched {
+            message = NSLocalizedString("העריכה כבר כזאת.", comment: "Chat edit changed nothing")
+        }
+    }
+    /// Makes a project from the photo library: the latest trip, the last
+    /// month or this year, aimed at a one-minute movie.
+    func makeRecap(_ span: Recap.Span) {
+        guard !busy else {return}
+        wholeVideo = false
+        setBusy(true, .importing); percent = 0; message = NSLocalizedString("מחפש בגלריה…", comment: "Reading the photo library for a recap")
+        operation = Task {
+            var staged: [URL] = []
+            do {
+                let permission = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+                guard permission == .authorized || permission == .limited else {
+                    throw AppError(message: "כדי ליצור סיכום, אפשרו ל־RK Motion גישה לתמונות בהגדרות האייפון.")
+                }
+                let now = Date()
+                let library = Recap.library(since: Recap.earliest(span, now: now))
+                guard let interval = Recap.interval(span, now: now, items: library.items) else {
+                    throw AppError(message: "לא מצאתי טיול בשנה האחרונה: ימים רצופים עם הרבה צילומים הרחק מהבית.")
+                }
+                let limits = span.limits
+                let chosen = Recap.choose(library.items.filter {interval.contains($0.date)}, videos: limits.videos, photos: limits.photos, spread: limits.spread)
+                guard !chosen.isEmpty else {throw AppError(message: "לא מצאתי סרטונים או תמונות בתקופה הזאת.")}
+                staged = try await Recap.export(chosen, assets: library.assets, into: LocalStore.imports) {[weak self] fraction, text in
+                    await self?.progress(fraction, text)
+                }
+                try Task.checkCancellation()
+                await runImport(staged, name: Recap.name(span, interval: interval), settings: ["targetLength": .text("60")])
+            } catch is CancellationError {finishImport(nil, cancelled: true)}
+            catch {finishImport(nil, error: error)}
+            for url in staged where FileManager.default.fileExists(atPath: url.path) {try? FileManager.default.removeItem(at: url)}
+        }
     }
     func undo() {guard let previous = undoStack.popLast() else {return}; redoStack.append(edit); edit = previous; wholeVideo = previous.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = previous; followKind(); updateUndo(); scheduleSave()}
     func redo() {guard let next = redoStack.popLast() else {return}; undoStack.append(edit); edit = next; wholeVideo = next.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo; suppressedEdit = next; followKind(); updateUndo(); scheduleSave()}
@@ -661,6 +830,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             try await persistence.deleteProject(p.id)
             await Thumbnails.shared.forget(p.id)
             projects.removeAll {$0.id == p.id}; project = nil; movieURL = nil; previewEdit = nil; joinedSource = nil; projectBytes = 0; edit = Edit(clips: []); suppressedEdit = edit
+            loadSightings()
             UserDefaults.standard.removeObject(forKey: "localProject"); message = "הפרויקט נמחק מהאייפון"
         } catch {message = error.localizedDescription}
         setBusy(false)
@@ -766,3 +936,10 @@ extension EditorModel {
     }
 }
 #endif
+
+private extension String {
+    var nilIfEmpty: String? {isEmpty ? nil : self}
+}
+private extension Array {
+    subscript(safe index: Int) -> Element? {indices.contains(index) ? self[index] : nil}
+}

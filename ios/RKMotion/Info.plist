@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>שמירת הסרט שייצאתם בספריית התמונות באייפון.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>קריאת הסרטונים והתמונות רק כדי לבחור רגעים לסיכום טיול, חודש או שנה שביקשתם. שום דבר לא יוצא מהאייפון.</string>
 	<key>RKBackgroundGPUEnabled</key>
 	<string>$(RK_BACKGROUND_GPU_ENABLED)</string>
 	<key>UIAppFonts</key>

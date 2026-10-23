@@ -17,6 +17,23 @@
           }
         }
       }
+    },
+    "NSPhotoLibraryUsageDescription": {
+      "comment": "Photos read permission prompt shown by iOS, for recaps.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reads your videos and photos only to choose the moments of a trip, month or year recap you asked for. Nothing leaves your iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קריאת הסרטונים והתמונות רק כדי לבחור רגעים לסיכום טיול, חודש או שנה שביקשתם. שום דבר לא יוצא מהאייפון."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
