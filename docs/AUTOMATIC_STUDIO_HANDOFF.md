@@ -95,12 +95,12 @@ Local environment: Xcode **27.1**, Swift **6.4**, iPhone 18 Pro **simulator**,
 iOS **27.0**. No physical iPhone, thermal/battery benchmark or live on-device
 Foundation Models image inference was used to certify this implementation.
 
-Completed full run before the last bounded-import defensive guards:
-**166 unit tests + 5 UI tests passed**. A further actual rendered-angle test
-passed individually. The final focused automation rerun passed **19 tests**, including a sparse
-32-GiB source, oversized-JSON rejection and joined/repeated-source evidence
-time regressions; the Release device
-archive and unsigned IPA packaging also passed. Results and IPA checksums are recorded in `docs/validation/automatic-studio-2026-10-23.txt`.
+Latest complete local run after source-time and scheme fixes: **169 unit tests +
+5 UI tests passed**, with no failures. The focused automation rerun passed
+**19 tests**, including real rendered media, oversized backup rejection and
+joined/repeated-source evidence times. Release device archive and unsigned
+IPA packaging passed for `063b9ab`. The matching source/version/build and
+checksum are in `docs/validation/automatic-studio-build.json`.
 The added tests cover whole event retention, manual intervals, speech endings,
 quiet aesthetic moments, invalid/duplicate repair, missing/nonfinite inputs,
 focus velocity, preference feedback, score PCM/cancellation, real media export,

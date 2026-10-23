@@ -19,3 +19,5 @@ The generated scheme now sets `enablePerformanceAntipatternChecker="NO"` **only 
 The existing main baseline `b60e818` also has a failed [CI run](https://github.com/erez1980/rk-motion/actions/runs/39998029677) with an unexpected process exit during a joined-video media test. Its crash artifact was not analyzed here, so it is not claimed to have the same cause.
 
 The failed report additionally contains invalid-frame-dimension runtime warnings. UI tests passed, but a loading/layout audit on real devices is still follow-up work. A successful rerun must include the complete effects test and the complete unit/UI suites; do not skip the crashing test or treat a retry alone as remediation. The PR's latest check records the final CI outcome.
+
+After the TestAction setting change, the complete local Xcode 27.1 run passed **169 unit tests + 5 UI tests**, with no failures. The compatible Xcode 26.3 CI rerun remains a separate validation, visible on PR #21.
