@@ -99,11 +99,14 @@ final class PlayerUITests: XCTestCase {
             let action = app.buttons[delete].firstMatch
             wait(for: action, in: app, timeout: 5, "A right-to-left swipe shows Delete in \(language)")
             action.tap()
+            let title = language == "he" ? "למחוק את הפרויקט ואת הקבצים שלו מהאייפון?" : "Delete the project and its files from this iPhone?"
+            wait(for: app.staticTexts[title], in: app, timeout: 10, "Delete asks before the files go, in \(language)")
             // The confirmation's own Delete button; the swipe's may still be on screen.
-            let confirm = NSPredicate(format: "label == %@ AND isHittable == true", delete)
-            expectation(for: NSPredicate {_, _ in app.buttons.matching(confirm).count > 0}, evaluatedWith: app)
-            waitForExpectations(timeout: 5)
-            app.buttons.matching(confirm).allElementsBoundByIndex.last!.tap()
+            let buttons = app.buttons.matching(NSPredicate(format: "label == %@", delete)).allElementsBoundByIndex.filter(\.isHittable)
+            guard let confirm = buttons.last else {
+                XCTFail("No Delete button in the confirmation, in \(language). Screen:\n\(app.debugDescription)"); return
+            }
+            confirm.tap()
             expectation(for: NSPredicate {_, _ in rows.count == before - 1}, evaluatedWith: app)
             waitForExpectations(timeout: 15)
             app.terminate()
