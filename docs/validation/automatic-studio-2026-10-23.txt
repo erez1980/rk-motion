@@ -1,0 +1,24 @@
+Automatic studio validation — 2026-10-23 (Asia/Jerusalem)
+Base: main b60e818; implementation: codex/automatic-studio; app 0.33.0.
+Environment: Xcode 27.1 (27A9275), Swift 6.4; iPhone 18 Pro simulator, iOS 27.0.
+
+PASS: python3 scripts/check-ios-store.py (Hebrew/English strings + metadata).
+PASS: git diff --check.
+PASS: full xcodebuild test — 166 unit tests, 0 failures; 5 UI tests, 0 failures.
+PASS: additional rendered-angle-switch test — 1 test, 0 failures.
+PASS: after final bounded-import/input guards, focused AutomaticDirectorTests +
+      AutomaticMediaTests — 17 tests, 0 failures (10.900 seconds).
+
+Real synthetic-media integration exercised analysis -> automatic recipe ->
+local score creation -> critique -> export -> media validation -> persistent receipt.
+Other probes exercised finite PCM/cancel cleanup, whole-event protection,
+source boundaries, audio alignment/silence rejection, persistent versions,
+ZIP backup+fresh-ID restore+hash equality, corrupt ZIP rejection, path rejection,
+actual alternating-angle output and source preservation.
+UI fixture uses a Debug-only flag to skip Photos permission; Photos itself,
+physical-device memory/thermal/battery, installed image-model inference,
+real shared-audio cameras and real repeated routes remain device gates.
+No claim that all 30 roadmap capabilities are complete.
+
+Device archive: pending at this implementation commit; final result will be
+recorded in a follow-up documentation-only commit.

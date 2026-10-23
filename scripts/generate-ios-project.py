@@ -78,14 +78,17 @@ add("resources", f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; f
 add("ytkit-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/alexeichhorn/YouTubeKit.git"; requirement = {kind = exactVersion; version = 0.4.9;};')
 add("ytkit-product", f'isa = XCSwiftPackageProductDependency; package = {uid("ytkit-package")}; productName = YouTubeKit;')
 add("ytkit-build", f'isa = PBXBuildFile; productRef = {uid("ytkit-product")};')
-add("frameworks", f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({uid("ytkit-build")},); runOnlyForDeploymentPostprocessing = 0;')
+add("zip-package", 'isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/weichsel/ZIPFoundation.git"; requirement = {kind = exactVersion; version = 0.9.20;};')
+add("zip-product", f'isa = XCSwiftPackageProductDependency; package = {uid("zip-package")}; productName = ZIPFoundation;')
+add("zip-build", f'isa = PBXBuildFile; productRef = {uid("zip-product")};')
+add("frameworks", f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = ({uid("ytkit-build")},{uid("zip-build")},); runOnlyForDeploymentPostprocessing = 0;')
 for kind in ("Debug", "Release"):
     # Packages build only the active architecture in Debug. The app must match,
     # or its other slice cannot find YouTubeKit (Xcode's own Debug default).
     debug_arch = " ONLY_ACTIVE_ARCH = YES;" if kind == "Debug" else ""
     add("project-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0;{debug_arch}}};')
     settings = '''ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.32.0; RK_COMMIT = local;
+        CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; MARKETING_VERSION = 0.33.0; RK_COMMIT = local;
         GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = RKMotion/Info.plist;
         IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.rkmotion.companion;
         PRODUCT_NAME = RKMotion; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1;
@@ -96,8 +99,8 @@ for kind in ("Debug", "Release"):
     add("target-" + kind, f'isa = XCBuildConfiguration; name = {kind}; buildSettings = {{{settings}}};')
 for prefix in ("project", "target"):
     add(prefix + "-configs", f'isa = XCConfigurationList; buildConfigurations = ({uid(prefix + "-Debug")},{uid(prefix + "-Release")},); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
-add("target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("target-configs")}; buildPhases = ({uid("sources")},{uid("frameworks")},{uid("resources")},); buildRules = (); dependencies = (); name = RKMotion; packageProductDependencies = ({uid("ytkit-product")},); productName = RKMotion; productReference = {uid("app")}; productType = "com.apple.product-type.application";')
-add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; packageReferences = ({uid("ytkit-package")},); productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},{uid("ui-target")},);')
+add("target", f'isa = PBXNativeTarget; buildConfigurationList = {uid("target-configs")}; buildPhases = ({uid("sources")},{uid("frameworks")},{uid("resources")},); buildRules = (); dependencies = (); name = RKMotion; packageProductDependencies = ({uid("ytkit-product")},{uid("zip-product")},); productName = RKMotion; productReference = {uid("app")}; productType = "com.apple.product-type.application";')
+add("project", f'isa = PBXProject; attributes = {{LastUpgradeCheck = 1640;}}; buildConfigurationList = {uid("project-configs")}; compatibilityVersion = "Xcode 14.0"; developmentRegion = he; hasScannedForEncodings = 0; knownRegions = (he,en,Base,); mainGroup = {uid("main")}; packageReferences = ({uid("ytkit-package")},{uid("zip-package")},); productRefGroup = {uid("products")}; projectDirPath = ""; projectRoot = ""; targets = ({uid("target")},{uid("test-target")},{uid("ui-target")},);')
 project = IOS / "RKMotion.xcodeproj"
 project.mkdir(exist_ok=True)
 (project / "project.pbxproj").write_text('// !$*UTF8*$!\n{\narchiveVersion = 1; classes = {}; objectVersion = 56;\nobjects = {\n' + '\n'.join(objects) + '\n};\nrootObject = ' + uid("project") + ';\n}\n')
