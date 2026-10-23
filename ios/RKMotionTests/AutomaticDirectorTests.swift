@@ -102,6 +102,21 @@ final class AutomaticDirectorTests: XCTestCase {
         XCTAssertFalse(AutomaticVision.accepted(best: 0.8, runnerUp: 1))
         XCTAssertTrue(AutomaticVision.accepted(best: 0.1, runnerUp: 0.5))
     }
+    func testSourceNotesUseFileTimeAcrossJoinedAndRepeatedSources() {
+        var p = project()
+        p.parts = [ProjectPart(file: "source.mov", start: 0, duration: 10),
+                   ProjectPart(file: "second.mov", start: 10, duration: 10),
+                   ProjectPart(file: "source.mov", start: 20, duration: 10)]
+        var second = event("second", 12, 16); second.file = "second.mov"
+        let events = [event("first", 2, 5), second, event("repeated", 22, 26), event("invalid-seam", 8, 12)]
+        let edit = Edit(clips: events.map(\.clip))
+        let run = AutomaticRun(sourceFiles: p.files, style: .family, events: events, review: .init(), edit: edit)
+        let report = AutomaticInsights.make(run, signals: Signals(), project: p)
+        XCTAssertEqual(report.insights.map(\.file), ["source.mov", "second.mov", "source.mov"])
+        XCTAssertEqual(report.insights.map(\.start), [2, 2, 2])
+        XCTAssertEqual(report.insights.map(\.end), [5, 6, 6])
+        XCTAssertEqual(run.edit.clips.map(\.start), [2, 12, 22, 8], "Evidence conversion must not mutate the render timeline")
+    }
 }
 
 final class AutomaticMediaTests: XCTestCase {

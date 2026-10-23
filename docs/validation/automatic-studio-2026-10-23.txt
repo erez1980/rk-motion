@@ -11,6 +11,9 @@ PASS: after final bounded-import/input guards, focused AutomaticDirectorTests +
 PASS: after backup/restore limit parity fix, all 18 focused automation tests
       passed, 0 failures (9.423 seconds). Oversized sparse sources and JSON
       are rejected before copying; no ZIP is published and originals survive.
+PASS: final source-note time conversion fix: all 19 focused automation tests
+      passed, 0 failures (10.203 seconds). Notes use file-local time across
+      joined/repeated sources and leave the render timeline unchanged.
 
 Real synthetic-media integration exercised analysis -> automatic recipe ->
 local score creation -> critique -> export -> media validation -> persistent receipt.

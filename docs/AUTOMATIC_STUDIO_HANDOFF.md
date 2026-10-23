@@ -62,7 +62,8 @@ The historical full product research is also committed, including sources.
   projects. It creates a short alternating-angle edit, retaining first-camera
   sound. It does not choose angles with a trained narrative/action model yet.
 - Evidence notes contain source filenames, SOURCE time ranges and measured
-  event labels. They are not movie-time SRT subtitles or speech transcripts.
+  event labels. Joined/repeated source offsets are converted from the project
+  timeline into each file's own time; this conversion leaves the edit unchanged. They are not movie-time SRT subtitles or speech transcripts.
   A coverage suggestion is generated from available event reasons.
 
 ## File map
@@ -96,8 +97,9 @@ Foundation Models image inference was used to certify this implementation.
 
 Completed full run before the last bounded-import defensive guards:
 **166 unit tests + 5 UI tests passed**. A further actual rendered-angle test
-passed individually. The final focused automation rerun passed **18 tests**, including a sparse
-32-GiB source and oversized-JSON rejection regression; the Release device
+passed individually. The final focused automation rerun passed **19 tests**, including a sparse
+32-GiB source, oversized-JSON rejection and joined/repeated-source evidence
+time regressions; the Release device
 archive and unsigned IPA packaging also passed. Results and IPA checksums are recorded in `docs/validation/automatic-studio-2026-10-23.txt`.
 The added tests cover whole event retention, manual intervals, speech endings,
 quiet aesthetic moments, invalid/duplicate repair, missing/nonfinite inputs,

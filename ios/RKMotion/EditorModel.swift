@@ -1080,7 +1080,7 @@ extension EditorModel {
                     try AutomaticStore.save(run, name: "automatic-run.json", project: current.id)
                     try AutomaticStore.checkpoint(next, style: recipe, project: current.id, output: filename)
                     automaticRun = run; lastOutput = output; movieURL = output; completedOutputs.append(output)
-                    let insights = AutomaticInsights.make(run, signals: signals)
+                    let insights = AutomaticInsights.make(run, signals: signals, project: current)
                     try AutomaticStore.save(insights, name: "automatic-insights.json", project: current.id)
                     try AutomaticInsights.sourceNotes(insights).write(to: LocalStore.file("automatic-source-notes.txt", project: current.id), atomically: true, encoding: .utf8)
                 }

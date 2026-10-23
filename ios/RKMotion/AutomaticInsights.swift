@@ -11,15 +11,21 @@ enum AutomaticInsights {
         var text: String
     }
     struct Report: Codable {
-        var schema = 1
+        var schema = 2
         var insights: [Insight]
         var nextShot: String
         var labels: [String]
         var generatedAt = Date()
     }
-    static func make(_ run: AutomaticRun, signals: Signals) -> Report {
+    static func make(_ run: AutomaticRun, signals: Signals, project: LocalProject) -> Report {
         let selected = run.events.filter {event in run.edit.clips.contains {$0.uid == event.id}}
-        let insights = selected.map {Insight(eventID: $0.id, file: $0.file, start: $0.start, end: $0.end, text: $0.title)}
+        let insights = selected.compactMap {event -> Insight? in
+            guard let part = project.pieces.first(where: {
+                $0.file == event.file && event.start >= $0.start && event.end <= $0.end + 0.001
+            }) else {return nil}
+            return Insight(eventID: event.id, file: event.file, start: event.start - part.start,
+                           end: min(part.duration, event.end - part.start), text: event.title)
+        }
         let reasons = Set(selected.map(\.reason))
         let suggestion: String
         if !reasons.contains(.scenery) {
