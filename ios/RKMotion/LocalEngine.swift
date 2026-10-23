@@ -673,7 +673,14 @@ actor LocalEngine {
             let file = try await Outro.file(size: size)
             guard let screen = try await AVURLAsset(url: file).loadTracks(withMediaType: .video).first else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
             let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
-            try track.insertTimeRange(CMTimeRange(start: .zero, duration: time(Outro.seconds)), of: screen, at: time(outroStart))
+            // The written movie can end a frame short of its length; stretch
+            // what is there to it rather than ask for frames past the end.
+            let drawn = try await screen.load(.timeRange)
+            guard drawn.duration.seconds > 1 else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
+            try track.insertTimeRange(drawn, of: screen, at: time(outroStart))
+            if abs(drawn.duration.seconds - Outro.seconds) > 0.0001 {
+                track.scaleTimeRange(CMTimeRange(start: time(outroStart), duration: drawn.duration), toDuration: time(Outro.seconds))
+            }
             let leaving = CMTimeRange(start: time(outroStart), end: time(movieEnd))
             let front = layer(last), back = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
             let grow = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
