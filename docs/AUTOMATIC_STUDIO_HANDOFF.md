@@ -172,3 +172,13 @@ map/sort tuple expression was split into a named RankedSecond and explicit
 loop/sort with unchanged scoring. The branch contains this compatibility fix.
 Latest CI status is visible on PR #21; do not treat the old failed SHA as the
 current implementation.
+
+## CI Core Image instrumentation crash
+
+The Xcode 26.3 / iOS 18.5 run `40020515542` passed all automatic tests and all
+five UI tests, but crashed inside injected `libRPAC` during an existing effects
+export test. The scheme disables Thread Performance Checker only for TestAction;
+all tests and Main Thread Checker remain enabled, and Run/Profile/Archive are
+unchanged. See [the crash evidence and rationale](validation/ci-coreimage-checker-2026-10-24.md).
+The report also emitted invalid-frame-dimension warnings; retain a device
+loading/layout audit as follow-up work. Latest CI status is on PR #21.

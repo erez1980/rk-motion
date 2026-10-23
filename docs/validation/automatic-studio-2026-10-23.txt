@@ -39,3 +39,10 @@ a compound tuple map/sort. Replaced it with a named RankedSecond and loop/sort;
 the local focused rerun passed all 17 automation tests. The final device
 archive was rebuilt from f9ce1a3 with the complete dependency notices
 verified inside the IPA. Latest CI results are recorded in the PR.
+
+Validation continued after midnight on 2026-10-24 (Asia/Jerusalem).
+CI run 40020515542: 172 passed / 1 process crash in an existing effects test.
+All 18 automatic tests and all 5 UI tests passed; full CI did not pass.
+Crash stack: libRPAC -> interposed_dispatch_group_wait -> CoreImage.
+TestAction-only checker workaround, with no skipped tests, is documented in
+ci-coreimage-checker-2026-10-24.md. Final complete rerun results are on PR #21.
