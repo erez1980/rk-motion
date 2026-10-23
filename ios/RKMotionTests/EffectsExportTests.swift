@@ -95,7 +95,8 @@ final class EffectsExportTests: XCTestCase {
         let videoTrack = try XCTUnwrap(videoTracks.first), audioTrack = try XCTUnwrap(audioTracks.first)
         try composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!.insertTimeRange(range, of: videoTrack, at: .zero)
         try composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!.insertTimeRange(range, of: audioTrack, at: .zero)
-        let session = try XCTUnwrap(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality))
+        // Copied as they are: re-encoding the generated sound failed on the simulator (-12780).
+        let session = try XCTUnwrap(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough))
         session.outputURL = output; session.outputFileType = .mov
         await withCheckedContinuation {done in session.exportAsynchronously {done.resume()}}
         XCTAssertEqual(session.status, .completed, session.error.map {Self.describe($0)} ?? "")
