@@ -47,24 +47,24 @@ final class OutroTests: XCTestCase {
         let plannedLength = await engine.plannedLength(project, edit: edit)
         let planned = try XCTUnwrap(plannedLength)
         XCTAssertEqual(planned, 7 + Outro.added, accuracy: 0.01)
-        let output = folder.appendingPathComponent("outro.mp4")
-        let length: Double
-        do {length = try await engine.export(project, edit: edit, output: output) {_, _ in}}
-        catch {
-            // What the export was given, to tell a bad end screen file from a bad composition.
+        // Each step on its own first, so a failure says which one it was.
+        do {
             let screen = try await Outro.file(size: CGSize(width: 160, height: 120))
             let screenTracks = try await AVURLAsset(url: screen).loadTracks(withMediaType: .video)
             let screenRange = try await screenTracks.first?.load(.timeRange)
             print("OUTRO: screen \(screenRange.map {"\($0.start.seconds)…\($0.end.seconds)"} ?? "no track")")
-            let preview = try? await engine.previewEdit(project, edit: edit)
-            for track in (preview?.composition.tracks ?? []) {
+        } catch {print("OUTRO: the end screen file failed: \(error)")}
+        do {
+            let preview = try await engine.previewEdit(project, edit: edit)
+            for track in preview.composition.tracks {
                 print("OUTRO: track \(track.trackID) \(track.mediaType.rawValue): " + track.segments.map {"\($0.isEmpty ? "empty" : "media") \($0.timeMapping.target.start.seconds)…\($0.timeMapping.target.end.seconds)"}.joined(separator: ", "))
             }
-            for instruction in (preview?.video.instructions ?? []) {
+            for instruction in preview.video.instructions {
                 print("OUTRO: instruction \(instruction.timeRange.start.seconds)…\(instruction.timeRange.end.seconds) layers \((instruction as? AVVideoCompositionInstruction)?.layerInstructions.map(\.trackID) ?? [])")
             }
-            throw error
-        }
+        } catch {print("OUTRO: preparing failed: \(error)")}
+        let output = folder.appendingPathComponent("outro.mp4")
+        let length = try await engine.export(project, edit: edit, output: output) {_, _ in}
         XCTAssertEqual(length, planned, accuracy: 0.001)
         let actual = try await AVURLAsset(url: output).load(.duration).seconds
         XCTAssertEqual(actual, planned, accuracy: 0.1)
