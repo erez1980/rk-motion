@@ -97,8 +97,10 @@ final class EffectsExportTests: XCTestCase {
     }
     private func merge(video: URL, audio: URL, into output: URL) async throws {
         let composition = AVMutableComposition()
-        let videoTracks = try await AVURLAsset(url: video).loadTracks(withMediaType: .video)
-        let audioTracks = try await AVURLAsset(url: audio).loadTracks(withMediaType: .audio)
+        // The assets are kept: a track holds its asset only weakly.
+        let videoAsset = AVURLAsset(url: video), audioAsset = AVURLAsset(url: audio)
+        let videoTracks = try await videoAsset.loadTracks(withMediaType: .video)
+        let audioTracks = try await audioAsset.loadTracks(withMediaType: .audio)
         let videoTrack = try XCTUnwrap(videoTracks.first), audioTrack = try XCTUnwrap(audioTracks.first)
         let videoRange = try await videoTrack.load(.timeRange), audioRange = try await audioTrack.load(.timeRange)
         let range = CMTimeRange(start: .zero, duration: CMTimeMinimum(videoRange.duration, audioRange.duration))
@@ -108,6 +110,7 @@ final class EffectsExportTests: XCTestCase {
         let session = try XCTUnwrap(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality))
         session.outputURL = output; session.outputFileType = .mov
         await withCheckedContinuation {done in session.exportAsynchronously {done.resume()}}
+        withExtendedLifetime((videoAsset, audioAsset)) {}
         if session.status != .completed {throw session.error ?? CocoaError(.fileWriteUnknown)}
     }
 }

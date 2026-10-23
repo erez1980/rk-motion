@@ -692,15 +692,21 @@ actor LocalEngine {
         }
         // A soft whoosh under each seam that has a transition.
         if edit.settings["whoosh"]?.bool == true, styles.contains(where: {$0 != "cut"}),
-           let file = try? Whoosh.file(), let sound = try await AVURLAsset(url: file).loadTracks(withMediaType: .audio).first {
+           let file = try? Whoosh.file() {
+            // The asset is kept: a track only holds its asset weakly, and
+            // one whose asset is gone cannot be inserted (-11800 / -12780).
+            let soundAsset = AVURLAsset(url: file)
+            guard let sound = try await soundAsset.loadTracks(withMediaType: .audio).first else {throw AppError(message: "קריאת השמע נכשלה.")}
             let soundRange = try await sound.load(.timeRange)
             let seams = styles.indices.filter {styles[$0] != "cut" && $0 < segments.count - 1}
                 .map {segments[$0].end - segments[$0].outgoing / 2}
             let places = Whoosh.places(seams: seams, length: length)
             if !places.isEmpty {
                 let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
-                for at in places {
-                    try track.insertTimeRange(CMTimeRange(start: soundRange.start, duration: time(min(Whoosh.seconds, soundRange.duration.seconds))), of: sound, at: time(at))
+                try withExtendedLifetime(soundAsset) {
+                    for at in places {
+                        try track.insertTimeRange(CMTimeRange(start: soundRange.start, duration: time(min(Whoosh.seconds, soundRange.duration.seconds))), of: sound, at: time(at))
+                    }
                 }
                 let params = AVMutableAudioMixInputParameters(track: track)
                 params.setVolume(Whoosh.volume, at: .zero)
