@@ -19,6 +19,11 @@ final class OutroTests: XCTestCase {
         XCTAssertEqual(points.first?.volume, 0)
         XCTAssertEqual(try XCTUnwrap(points.first {abs($0.time - 0.6) < 0.0001}).volume, 0.8, accuracy: 0.0001)
         XCTAssertEqual(Ducking.envelope([], volume: 0.8, length: 20).first?.volume, 0.8, "Without a fade in the song starts at its level")
+        // A movie shorter than the closing fade still rises from silence, then fades out.
+        let short = Ducking.envelope([], volume: 0.8, length: 2, fadeIn: 0.6)
+        XCTAssertEqual(short.first?.volume, 0)
+        XCTAssertEqual(try XCTUnwrap(short.first {abs($0.time - 0.5) < 0.0001}).volume, 0.8 * 0.75, accuracy: 0.0001)
+        XCTAssertEqual(short.last?.volume, 0)
     }
     func testTheEndScreenDrawsTheLogo() throws {
         let size = CGSize(width: 270, height: 480)
