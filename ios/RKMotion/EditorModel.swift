@@ -63,7 +63,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         let clips = project.map {LocalEngine.shaped(selectedClips, project: $0, edit: edit)} ?? selectedClips
-        return LocalEngine.timeline(clips: clips, speed: speed, transition: fade).last?.end ?? 0
+        return Outro.length(edit.settings, segments: LocalEngine.timeline(clips: clips, speed: speed, transition: fade)) ?? 0
     }
     /// The exported movie's length as the engine will really make it, beat
     /// moves included, worked out again shortly after every change.

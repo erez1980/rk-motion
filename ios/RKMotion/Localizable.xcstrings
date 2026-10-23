@@ -8896,6 +8896,54 @@
           }
         }
       }
+    },
+    "מסך סיום עם הלוגו": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End screen with the logo"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מסך סיום עם הלוגו"
+          }
+        }
+      }
+    },
+    "בסוף הסרט התמונה עוברת למסך שבו הלוגו של RK Motion מופיע באנימציה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The movie ends by moving into a screen where the RK Motion logo animates in"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בסוף הסרט התמונה עוברת למסך שבו הלוגו של RK Motion מופיע באנימציה"
+          }
+        }
+      }
+    },
+    "יצירת מסך הסיום נכשלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not make the end screen."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יצירת מסך הסיום נכשלה."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
