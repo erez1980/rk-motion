@@ -93,10 +93,12 @@ final class PlayerUITests: XCTestCase {
             expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: newRide)
             waitForExpectations(timeout: 90)
             let rows = app.descendants(matching: .any).matching(identifier: "home.project")
+            // The list is lazy: a row below the cards above it is not there until scrolled to.
+            for _ in 0..<3 where rows.count == 0 {app.swipeUp()}
             // The list can still be filling in when the button turns on.
             wait(for: rows.firstMatch, in: app, timeout: 15, "No project in the list in \(language)")
             let before = rows.count
-            XCTAssertGreaterThan(before, 0, "language \(language)")
+            XCTAssertGreaterThan(before, 0, "No project row in \(language). Screen:\n\(app.debugDescription)")
             rows.element(boundBy: 0).swipeLeft()
             let action = app.buttons[delete].firstMatch
             wait(for: action, in: app, timeout: 5, "A right-to-left swipe shows Delete in \(language)")

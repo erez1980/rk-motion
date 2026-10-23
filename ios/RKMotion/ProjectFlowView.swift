@@ -312,6 +312,10 @@ private struct EditStep: View {
             if let reading = model.project?.reading {
                 ReadingCard(reading: reading) {model.setKind($0)}.disabled(model.busy).rkRow()
             }
+            if model.project?.scores.isEmpty == false {
+                AskCard(model: model).disabled(model.busy).rkRow(top: 10)
+                if !model.people.isEmpty {StarCard(model: model).disabled(model.busy).rkRow(top: 10)}
+            }
             if let project = model.project, !project.scores.isEmpty {
                 ActivityCard(project: project, clips: model.edit.clips, threshold: model.threshold, tune: {tuning = true}, seek: seek)
                     .disabled(model.busy).rkRow()
