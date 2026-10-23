@@ -28,7 +28,7 @@ final class OutroTests: XCTestCase {
     func testTheEndScreenDrawsTheLogo() throws {
         let size = CGSize(width: 270, height: 480)
         XCTAssertEqual(lime(try XCTUnwrap(Outro.image(at: 0.1, size: size))), 0, "Only the dark screen while the last shot leaves")
-        XCTAssertGreaterThan(lime(try XCTUnwrap(Outro.image(at: Outro.seconds - 0.05, size: size))), 5, "The logo stands at the end")
+        XCTAssertGreaterThan(lime(try XCTUnwrap(Outro.image(at: Outro.seconds - 0.05, size: size))), 2, "The app icon stands at the end")
     }
     /// End to end: the movie opens dark, the planned length counts the end
     /// screen, and the last frames show the green logo the footage never has.
@@ -56,7 +56,7 @@ final class OutroTests: XCTestCase {
         XCTAssertLessThan(brightness(opening), brightness(later) * 0.5, "The movie should open from black")
         let footage = try await frame(output, at: 5), ending = try await frame(output, at: actual - 0.1)
         XCTAssertEqual(lime(footage), 0, "The footage has no logo green")
-        XCTAssertGreaterThan(lime(ending), 3, "The movie should end on the logo")
+        XCTAssertGreaterThan(lime(ending), 2, "The movie should end on the app icon")
         // Turned off, the movie is only its shots again.
         edit.settings["outro"] = .flag(false)
         let plainLength = await engine.plannedLength(project, edit: edit)

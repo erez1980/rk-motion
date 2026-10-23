@@ -1,9 +1,8 @@
 import AVFoundation
 import UIKit
 
-/// The RK Motion end screen: the last shot rushes away into a dark screen
-/// where the logo springs in, its speed lines slide up to it and the name
-/// rises under it. It is drawn on the device into a short movie, made once
+/// The RK Motion end screen: the last shot rushes away into black, the
+/// app icon springs up and "Made with" comes in above it. It is drawn on the device into a short movie, made once
 /// per frame size, and laid after the edit so the preview shows it too.
 enum Outro {
     /// The end screen's own length, and how much of it plays under the
@@ -40,69 +39,60 @@ enum Outro {
     }
 
     /// Draws the end screen as it looks `time` seconds in, into a context
-    /// whose origin is the top left.
+    /// whose origin is the top left: black, then the app icon springs up
+    /// fast, and "Made with" comes in above it.
     static func draw(_ context: CGContext, at time: Double, size: CGSize) {
         let w = size.width, h = size.height, s = min(w, h)
-        context.setFillColor(background.cgColor)
+        context.setFillColor(UIColor.black.cgColor)
         context.fill(CGRect(origin: .zero, size: size))
-        let center = CGPoint(x: w / 2, y: h / 2 - s * 0.08)
-        // A soft green glow grows behind the logo.
-        let glow = easeOut((time - overlap) / 0.9)
-        if glow > 0, let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [accent.withAlphaComponent(0.22 * glow).cgColor, accent.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1]) {
-            context.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: s * 0.75, options: [])
-        }
-        // The logo is drawn in the app icon's own 1024 units around its middle.
-        let unit = s * 0.42 / 770
-        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {CGPoint(x: center.x + (x - 495) * unit, y: center.y + (y - 512) * unit)}
-        // A ring rings out as the logo lands.
-        let ring = (time - overlap - 0.4) / 0.6
-        if ring > 0 && ring < 1 {
-            let radius = s * (0.12 + 0.28 * easeOut(ring))
-            context.setStrokeColor(accent.withAlphaComponent(0.55 * (1 - ring)).cgColor)
-            context.setLineWidth(max(1, s * 0.008))
-            context.strokeEllipse(in: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-        }
-        // The speed lines slide in from the left, one after another.
-        for (index, (from, to, y)) in [(150.0, 360.0, 392.0), (110.0, 370.0, 512.0), (150.0, 360.0, 632.0)].enumerated() {
-            let p = (time - overlap - 0.2 - Double(index) * 0.07) / 0.35
-            guard p > 0 else {continue}
-            let shift = (1 - easeOut(p)) * -Double(s) * 0.45
-            let a = point(CGFloat(from) + 26, CGFloat(y)), b = point(CGFloat(to) - 26, CGFloat(y))
-            context.setStrokeColor(lines.withAlphaComponent(CGFloat(clamp(p * 2))).cgColor)
-            context.setLineWidth(52 * unit); context.setLineCap(.round)
-            context.strokeLineSegments(between: [CGPoint(x: a.x + shift, y: a.y), CGPoint(x: b.x + shift, y: b.y)])
-        }
-        // The play triangle springs up from nothing with a small turn.
-        let pop = (time - overlap) / 0.55
+        let side = s * 0.4, center = CGPoint(x: w / 2, y: h / 2 + s * 0.04)
+        let pop = (time - overlap - 0.05) / 0.4
         if pop > 0 {
-            let scale = back(pop), turn = (1 - easeOut(pop)) * -0.35
-            let middle = point(585, 512)
             context.saveGState()
-            context.translateBy(x: middle.x, y: middle.y); context.rotate(by: turn); context.scaleBy(x: scale, y: scale)
-            context.translateBy(x: -middle.x, y: -middle.y)
-            context.setFillColor(accent.withAlphaComponent(CGFloat(clamp(pop * 3))).cgColor)
-            context.move(to: point(438, 268)); context.addLine(to: point(880, 512)); context.addLine(to: point(438, 756)); context.closePath()
-            context.fillPath()
+            context.setAlpha(CGFloat(clamp(pop * 4)))
+            let scale = 0.2 + 0.8 * back(pop), turn = (1 - easeOut(pop)) * -0.25
+            context.translateBy(x: center.x, y: center.y); context.rotate(by: turn); context.scaleBy(x: scale, y: scale)
+            icon(context, side: side)
             context.restoreGState()
         }
-        // "Made with RK Motion" rises under the logo, its letters closing up as it comes.
         UIGraphicsPushContext(context)
         defer {UIGraphicsPopContext()}
-        func text(_ string: String, at y: CGFloat, size points: CGFloat, weight: CGFloat, color: UIColor, start: Double, spread: CGFloat) {
-            let p = (time - start) / 0.45
-            guard p > 0 else {return}
-            let eased = easeOut(p)
-            let font = RK.uiFont(points, weight).withSize(points)
+        let rise = (time - overlap - 0.3) / 0.35
+        if rise > 0 {
+            let points = (s * 0.075).rounded(), eased = easeOut(rise)
+            let font = RK.uiFont(points, 600).withSize(points)
             let style = NSMutableParagraphStyle(); style.alignment = .center
-            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color.withAlphaComponent(CGFloat(clamp(p * 1.5))),
-                .paragraphStyle: style, .kern: points * spread * CGFloat(1 - eased)]
-            let height = ceil(font.lineHeight * 1.2), rise = s * 0.05 * CGFloat(1 - eased)
-            (string as NSString).draw(with: CGRect(x: 0, y: y + rise, width: w, height: height), options: [.usesLineFragmentOrigin], attributes: attributes, context: nil)
+            let height = ceil(font.lineHeight * 1.2)
+            let top = center.y - side / 2 - s * 0.05 - height + s * 0.04 * CGFloat(1 - eased)
+            ("Made with" as NSString).draw(with: CGRect(x: 0, y: top, width: w, height: height), options: [.usesLineFragmentOrigin],
+                attributes: [.font: font, .foregroundColor: UIColor.white.withAlphaComponent(CGFloat(clamp(rise * 1.5))), .paragraphStyle: style], context: nil)
         }
-        let below = point(0, 756).y + s * 0.08
-        text("MADE WITH", at: below, size: max(6, (s * 0.034).rounded()), weight: 500, color: accent, start: overlap + 0.5, spread: 0.6)
-        text("RK Motion", at: below + s * 0.055, size: (s * 0.1).rounded(), weight: 700, color: .white, start: overlap + 0.65, spread: 0.25)
+    }
+    /// The app icon, `side` wide around the context's origin, drawn the way
+    /// the icon file is: a dark tile lit green from two corners, the speed
+    /// lines and the play triangle.
+    private static func icon(_ context: CGContext, side: CGFloat) {
+        let unit = side / 1024
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {CGPoint(x: (x - 512) * unit, y: (y - 512) * unit)}
+        let tile = CGRect(x: -side / 2, y: -side / 2, width: side, height: side)
+        context.saveGState()
+        context.addPath(UIBezierPath(roundedRect: tile, cornerRadius: side * 0.215).cgPath); context.clip()
+        context.setFillColor(background.cgColor); context.fill(tile)
+        let space = CGColorSpaceCreateDeviceRGB()
+        for (spot, color) in [(point(1000, 60), UIColor(red: 0x36 / 255, green: 0x44 / 255, blue: 0x1a / 255, alpha: 1)),
+                              (point(60, 980), UIColor(red: 0x15 / 255, green: 0x2e / 255, blue: 0x1e / 255, alpha: 1))] {
+            if let glow = CGGradient(colorsSpace: space, colors: [color.cgColor, color.withAlphaComponent(0).cgColor] as CFArray, locations: [0.2, 1]) {
+                context.drawRadialGradient(glow, startCenter: spot, startRadius: 0, endCenter: spot, endRadius: side * 0.6, options: [])
+            }
+        }
+        context.setStrokeColor(lines.cgColor); context.setLineWidth(52 * unit); context.setLineCap(.round)
+        for (from, to, y) in [(176.0, 334.0, 392.0), (136.0, 344.0, 512.0), (176.0, 334.0, 632.0)] {
+            context.strokeLineSegments(between: [point(CGFloat(from), CGFloat(y)), point(CGFloat(to), CGFloat(y))])
+        }
+        context.setFillColor(accent.cgColor)
+        context.move(to: point(438, 268)); context.addLine(to: point(880, 512)); context.addLine(to: point(438, 756)); context.closePath()
+        context.fillPath()
+        context.restoreGState()
     }
 
     /// One frame of the end screen as a picture.
@@ -116,7 +106,7 @@ enum Outro {
     static func file(size: CGSize) async throws -> URL {
         let width = Int(size.width), height = Int(size.height)
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let url = caches.appendingPathComponent("rk-outro-1-\(width)x\(height).mov")
+        let url = caches.appendingPathComponent("rk-outro-2-\(width)x\(height).mov")
         if FileManager.default.fileExists(atPath: url.path) {return url}
         let partial = caches.appendingPathComponent("rk-outro-\(UUID().uuidString).mov")
         defer {try? FileManager.default.removeItem(at: partial)}
