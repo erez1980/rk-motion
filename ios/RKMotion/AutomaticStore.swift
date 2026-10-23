@@ -64,13 +64,29 @@ enum AutomaticStore {
     /// A flat, self-contained package with sources, music, plan and hashes.
     /// No symlinks, absolute paths or external references are published.
     static func archive(_ project: LocalProject, edit: Edit) async throws -> URL {
+        // Use the restore limits before copying large sources, then check the
+        // complete inventory (including generated metadata) before publishing.
+        func checkedBytes(_ files: [URL], extraEntries: Int = 0) throws -> Int64 {
+            guard files.count + extraEntries <= AutomaticPackage.maximumEntries else {throw CocoaError(.fileReadCorruptFile)}
+            var total: UInt64 = 0
+            for file in files {
+                let values = try file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true,
+                      let size = values.fileSize, size >= 0,
+                      AutomaticPackage.permits(name: file.lastPathComponent, bytes: UInt64(size)),
+                      total <= AutomaticPackage.maximumBytes - UInt64(size) else {throw CocoaError(.fileReadCorruptFile)}
+                total += UInt64(size)
+            }
+            return Int64(total)
+        }
         let parent = LocalStore.folder(project.id).appendingPathComponent("packages", isDirectory: true)
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let stage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
         defer {try? FileManager.default.removeItem(at: stage)}
         let names = Set(project.files + project.music.map(\.file) + [LocalStore.signalsName, "automatic-run.json", "automatic-versions.json", "automatic-insights.json", "automatic-source-notes.txt"])
-        let total = names.reduce(Int64(0)) {$0 + Int64((try? LocalStore.file($1, project: project.id).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)}
+        let present = names.map {LocalStore.file($0, project: project.id)}.filter {FileManager.default.fileExists(atPath: $0.path)}
+        let total = try checkedBytes(present, extraEntries: 3)
         try LocalStore.checkSpace(required: total * 2 + 256 * 1024 * 1024)
         var hashes: [String: String] = [:]
         for name in names.sorted() {
@@ -92,6 +108,7 @@ enum AutomaticStore {
         hashes["scores.json"] = try await digest(stage.appendingPathComponent("scores.json"))
         hashes["project.json"] = try await digest(stage.appendingPathComponent("project.json"))
         try JSONEncoder().encode(hashes).write(to: stage.appendingPathComponent("checksums.json"), options: .atomic)
+        _ = try checkedBytes(FileManager.default.contentsOfDirectory(at: stage, includingPropertiesForKeys: nil))
         try Task.checkCancellation()
         let output = parent.appendingPathComponent("RK-Project-\(UUID().uuidString).zip")
         var failure: NSError?, copyingError: Error?

@@ -49,6 +49,9 @@ The historical full product research is also committed, including sources.
   paths, entry types, CRC, byte budgets and checksums, then publishes under a
   fresh UUID. Existing projects cannot be overwritten. Backup files live under
   the originating project so project deletion also removes internal copies.
+  Backup enforces the same entry/byte/sidecar limits as restore before copying
+  large sources and again before publishing, so it cannot knowingly produce
+  a package that exceeds the restore contract.
 - Visual replay uses a bounded number of native Vision feature prints, a
   distance threshold and an ambiguity margin. It exports a matched pair side
   by side. This is a heuristic visual comparison, not verified same-location
@@ -93,7 +96,8 @@ Foundation Models image inference was used to certify this implementation.
 
 Completed full run before the last bounded-import defensive guards:
 **166 unit tests + 5 UI tests passed**. A further actual rendered-angle test
-passed individually. The final focused automation rerun passed **17 tests**; the Release device
+passed individually. The final focused automation rerun passed **18 tests**, including a sparse
+32-GiB source and oversized-JSON rejection regression; the Release device
 archive and unsigned IPA packaging also passed. Results and IPA checksums are recorded in `docs/validation/automatic-studio-2026-10-23.txt`.
 The added tests cover whole event retention, manual intervals, speech endings,
 quiet aesthetic moments, invalid/duplicate repair, missing/nonfinite inputs,

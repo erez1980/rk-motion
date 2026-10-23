@@ -240,4 +240,28 @@ final class AutomaticMediaTests: XCTestCase {
         XCTAssertEqual(AutomaticPackage.safeName("package/source.mov"), "source.mov")
         XCTAssertEqual(AutomaticPackage.safeName("source.mov"), "source.mov")
     }
+    func testBackupRejectsSourcesAndSidecarsThatRestoreCannotAccept() async throws {
+        let id = UUID().uuidString, folder = LocalStore.folder(id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer {try? FileManager.default.removeItem(at: folder)}
+        func sparse(_ name: String, size: UInt64) throws {
+            let url = folder.appendingPathComponent(name)
+            XCTAssertTrue(FileManager.default.createFile(atPath: url.path, contents: nil))
+            let handle = try FileHandle(forWritingTo: url)
+            defer {try? handle.close()}
+            try handle.truncate(atOffset: size)
+        }
+        let project = LocalProject(id: id, name: "Oversized backup", source: "source.mov")
+        try sparse("source.mov", size: AutomaticPackage.maximumBytes + 1)
+        do {_ = try await AutomaticStore.archive(project, edit: Edit(clips: [])); XCTFail("Unrestorable source accepted")}
+        catch let error as CocoaError {XCTAssertEqual(error.code, .fileReadCorruptFile)}
+        XCTAssertEqual(try folder.appendingPathComponent("source.mov").resourceValues(forKeys: [.fileSizeKey]).fileSize, Int(AutomaticPackage.maximumBytes + 1))
+        try sparse("source.mov", size: 4)
+        try sparse(LocalStore.signalsName, size: 32 * 1024 * 1024 + 1)
+        do {_ = try await AutomaticStore.archive(project, edit: Edit(clips: [])); XCTFail("Unrestorable JSON accepted")}
+        catch let error as CocoaError {XCTAssertEqual(error.code, .fileReadCorruptFile)}
+        let packages = folder.appendingPathComponent("packages")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: packages.path), [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(LocalStore.signalsName).path))
+    }
 }

@@ -5,6 +5,12 @@ import ZIPFoundation
 /// cannot overwrite another project, escape staging or install symlinks.
 enum AutomaticPackage {
     static let maximumBytes: UInt64 = 32 * 1024 * 1024 * 1024
+    static let maximumEntries = 512
+    static func permits(name: String, bytes: UInt64) -> Bool {
+        bytes <= maximumBytes &&
+        (!name.hasSuffix(".json") || bytes <= 32 * 1024 * 1024) &&
+        (!name.hasSuffix(".txt") || bytes <= 2 * 1024 * 1024)
+    }
     static func safeName(_ path: String) -> String? {
         guard !path.hasPrefix("/"), !path.contains("\\"), !path.contains("\0") else {return nil}
         let pieces = path.split(separator: "/", omittingEmptySubsequences: false)
@@ -19,13 +25,11 @@ enum AutomaticPackage {
         try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
         defer {try? FileManager.default.removeItem(at: stage)}
         let entries = archive.filter {$0.type != .directory}
-        guard !entries.isEmpty, entries.count <= 512 else {throw CocoaError(.fileReadCorruptFile)}
+        guard !entries.isEmpty, entries.count <= maximumEntries else {throw CocoaError(.fileReadCorruptFile)}
         var total: UInt64 = 0, names = Set<String>()
         for entry in entries {
             guard entry.type == .file, let name = safeName(entry.path), names.insert(name).inserted,
-                  entry.uncompressedSize <= maximumBytes, total <= maximumBytes - entry.uncompressedSize else {throw CocoaError(.fileReadCorruptFile)}
-            if name.hasSuffix(".json"), entry.uncompressedSize > 32 * 1024 * 1024 {throw CocoaError(.fileReadCorruptFile)}
-            if name.hasSuffix(".txt"), entry.uncompressedSize > 2 * 1024 * 1024 {throw CocoaError(.fileReadCorruptFile)}
+                  permits(name: name, bytes: entry.uncompressedSize), total <= maximumBytes - entry.uncompressedSize else {throw CocoaError(.fileReadCorruptFile)}
             total += entry.uncompressedSize
         }
         try LocalStore.checkSpace(required: Int64(total) + 256 * 1024 * 1024)

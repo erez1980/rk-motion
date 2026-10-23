@@ -8,6 +8,9 @@ PASS: full xcodebuild test — 166 unit tests, 0 failures; 5 UI tests, 0 failure
 PASS: additional rendered-angle-switch test — 1 test, 0 failures.
 PASS: after final bounded-import/input guards, focused AutomaticDirectorTests +
       AutomaticMediaTests — 17 tests, 0 failures (10.900 seconds).
+PASS: after backup/restore limit parity fix, all 18 focused automation tests
+      passed, 0 failures (9.423 seconds). Oversized sparse sources and JSON
+      are rejected before copying; no ZIP is published and originals survive.
 
 Real synthetic-media integration exercised analysis -> automatic recipe ->
 local score creation -> critique -> export -> media validation -> persistent receipt.
