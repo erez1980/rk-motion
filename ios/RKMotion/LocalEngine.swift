@@ -891,7 +891,13 @@ actor LocalEngine {
         switch session.status {
         case .completed: break
         case .cancelled: throw CancellationError()
-        default: throw session.error ?? AppError(message: "הייצוא נכשל באייפון.")
+        default:
+            guard let error = session.error as NSError? else {throw AppError(message: "הייצוא נכשל באייפון.")}
+            // AVFoundation says only that the operation could not be completed;
+            // its codes, and the one under it, say why.
+            let under = error.userInfo[NSUnderlyingErrorKey] as? NSError
+            logger.error("Export failed: \(error.domain, privacy: .public) \(error.code, privacy: .public), under \(under?.domain ?? "-", privacy: .public) \(under?.code ?? 0, privacy: .public)")
+            throw AppError(message: error.localizedDescription + " (\(error.code)" + (under.map {" / \($0.code)"} ?? "") + ")")
         }
     }
 }
