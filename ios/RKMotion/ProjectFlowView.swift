@@ -1256,6 +1256,7 @@ private struct ExportStep: View {
                 if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
                     ToggleRow(title: "מסגור חכם לפי האנשים", detail: "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז", isOn: flag("smartFrame", fallback: true))
                 }
+                ToggleRow(title: "מסך סיום עם הלוגו", detail: "בסוף הסרט התמונה עוברת למסך שבו הלוגו של RK Motion מופיע באנימציה", isOn: flag("outro", fallback: true))
                 if model.hasTelemetry {
                     ToggleRow(title: "נתוני הרכיבה על הסרט", detail: "מהירות, גובה ומרחק מה־GPS של ה־GoPro", isOn: flag("telemetry", fallback: true))
                 }

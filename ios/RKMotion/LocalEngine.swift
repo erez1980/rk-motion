@@ -112,7 +112,7 @@ actor LocalEngine {
               clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= project.duration && project.part(for: $0) != nil}) else {return nil}
         let overlap = transition == "cut" ? 0 : (fade.isFinite ? fade : 0.5)
         let planned = await synced(clips, project: project, edit: edit, speed: speed, overlap: overlap, total: project.duration)
-        return Self.timeline(clips: planned, speed: speed, transition: overlap).last?.end
+        return Outro.length(edit.settings, segments: Self.timeline(clips: planned, speed: speed, transition: overlap))
     }
     func sourceDimensions(_ source: URL) async throws -> CGSize {
         guard let video = try await AVURLAsset(url: source).loadTracks(withMediaType: .video).first else {return .zero}
@@ -444,6 +444,8 @@ actor LocalEngine {
         let audio: AVMutableAudioMix
         let length: Double
         let preset: String
+        /// Where the end screen stands alone, so the second pass leaves it as drawn; nil without one.
+        var outro: Double? = nil
         /// GoPro ride readings to draw over the movie, twice a second; empty when off.
         var overlay: [Telemetry.Frame] = []
     }
@@ -496,7 +498,8 @@ actor LocalEngine {
         }
         return result
     }
-    /// `closing` fades the end out; the joined videos shown as the source do not.
+    /// `closing` opens the movie from black and ends it on the end screen, or
+    /// fades it out when it has none; the joined videos shown as the source do neither.
     func prepare(_ project: LocalProject, edit: Edit, closing fadesOut: Bool = true, progress: Progress) async throws -> PreparedEdit {
         let sources = try await sources(project)
         let total = sources.last!.end
@@ -540,11 +543,14 @@ actor LocalEngine {
         let transforms = clips.indices.map {
             sources[from[$0]].transform(filling: size, focus: smartFrame ? Framing.focus(of: clips[$0], in: signals?.focus) : nil)
         }
-        let length = segments.last!.end
+        // Where the last shot ends, and the whole movie with the end screen after it.
+        let movieEnd = segments.last!.end
+        let outro = fadesOut && Outro.applies(edit.settings, segments: segments)
+        let length = movieEnd + (outro ? Outro.added : 0)
         // A short push in on the song's beats, when the edit asks for it.
         var punches: [Double] = []
         if edit.settings["beatZoom"]?.bool == true, let beats = await movieBeats(clips, project: project, edit: edit, speed: speed, overlap: overlap) {
-            punches = BeatPunch.times(beats, length: length)
+            punches = BeatPunch.times(beats, length: movieEnd)
         }
         let punch = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
             .concatenating(CGAffineTransform(scaleX: BeatPunch.scale, y: BeatPunch.scale))
@@ -579,6 +585,10 @@ actor LocalEngine {
             }
         }
         let closing = fadesOut ? min(1, segments.last!.duration / 2) : 0
+        // The opening from black, short enough to stay inside the first shot.
+        let opening = fadesOut ? min(Outro.fadeIn, segments[0].duration / 4, max(0, segments[0].duration - segments[0].outgoing) / 2) : 0
+        // The end screen comes in while the last shot is still leaving.
+        let outroStart = movieEnd - Outro.overlap
         for (index, segment) in segments.enumerated() {
             try Task.checkCancellation()
             let piece = sources[from[index]]
@@ -589,7 +599,8 @@ actor LocalEngine {
             if !audios.isEmpty {
                 let params = audioParams[segment.track]
                 params.audioTimePitchAlgorithm = .spectral
-                params.setVolume(1, at: time(segment.start))
+                if index == 0 && opening > 0 {params.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1, timeRange: CMTimeRange(start: .zero, duration: time(opening)))}
+                else {params.setVolume(1, at: time(segment.start))}
             }
             if let original = piece.audio, let audioRange = piece.audioRange, !muted {
                 // Camera audio may be slightly shorter than video; preserve silence in the tail.
@@ -601,7 +612,7 @@ actor LocalEngine {
                 let params = audioParams[segment.track]
                 if segment.incoming > 0 {params.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1, timeRange: CMTimeRange(start: time(segment.start), duration: time(segment.incoming)))}
                 if segment.outgoing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing)))}
-                if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
+                if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(movieEnd - closing), duration: time(closing)))}
             }
             await progress(Double(index + 1) / Double(clips.count) * 0.1, "הכנת העריכה באייפון…")
         }
@@ -609,8 +620,9 @@ actor LocalEngine {
         func layer(_ index: Int) -> AVMutableVideoCompositionLayerInstruction {
             let l = AVMutableVideoCompositionLayerInstruction(assetTrack: videos[segments[index].track]); l.setTransform(transforms[index], at: .zero); return l
         }
+        let last = segments.count - 1
         for (index, segment) in segments.enumerated() {
-            let passStart = segment.start + segment.incoming, passEnd = segment.end - segment.outgoing
+            let passStart = segment.start + segment.incoming, passEnd = index == last && outro ? outroStart : segment.end - segment.outgoing
             if passEnd > passStart {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(passStart), duration: time(passEnd - passStart))
@@ -619,7 +631,8 @@ actor LocalEngine {
                     l.setTransformRamp(fromStart: transforms[index].concatenating(punch), toEnd: transforms[index],
                                        timeRange: CMTimeRange(start: time(beat), duration: time(BeatPunch.span)))
                 }
-                if index == segments.count - 1 && closing > 0 {l.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
+                if index == 0 && opening > 0 {l.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: CMTimeRange(start: .zero, duration: time(opening)))}
+                if index == last && closing > 0 && !outro {l.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: CMTimeRange(start: time(movieEnd - closing), duration: time(closing)))}
                 instruction.layerInstructions = [l]; instructions.append(instruction)
             }
             if segment.outgoing > 0 {
@@ -654,6 +667,26 @@ actor LocalEngine {
                 instruction.layerInstructions = [front, back]; instructions.append(instruction)
             }
         }
+        if outro {
+            // The end screen under the last shot, which rushes towards the
+            // viewer and fades into it, then the end screen alone.
+            let file = try await Outro.file(size: size)
+            guard let screen = try await AVURLAsset(url: file).loadTracks(withMediaType: .video).first else {throw AppError(message: "יצירת מסך הסיום נכשלה.")}
+            let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: time(Outro.seconds)), of: screen, at: time(outroStart))
+            let leaving = CMTimeRange(start: time(outroStart), end: time(movieEnd))
+            let front = layer(last), back = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+            let grow = CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2)
+                .concatenating(CGAffineTransform(scaleX: 1.6, y: 1.6))
+                .concatenating(CGAffineTransform(translationX: size.width / 2, y: size.height / 2))
+            front.setTransformRamp(fromStart: transforms[last], toEnd: transforms[last].concatenating(grow), timeRange: leaving)
+            front.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: leaving)
+            let mix = AVMutableVideoCompositionInstruction()
+            mix.timeRange = leaving; mix.layerInstructions = [front, back]; instructions.append(mix)
+            let alone = AVMutableVideoCompositionInstruction()
+            alone.timeRange = CMTimeRange(start: time(movieEnd), end: time(length))
+            alone.layerInstructions = [AVMutableVideoCompositionLayerInstruction(assetTrack: track)]; instructions.append(alone)
+        }
         var parameters = audioParams
         if edit.settings["useMusic"]?.bool != false && !project.music.isEmpty {
             let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
@@ -677,7 +710,7 @@ actor LocalEngine {
             // The song gives way while people in the footage talk, laugh or cheer.
             let ducks = edit.settings["duckMusic"]?.bool != false && !audios.isEmpty
                 ? Ducking.intervals(clips: clips, segments: segments, speech: signals?.speech ?? [], cheer: signals?.cheer ?? [], speed: speed) : []
-            let points = Ducking.envelope(ducks, volume: volume, length: length)
+            let points = Ducking.envelope(ducks, volume: volume, length: length, fadeIn: opening)
             params.setVolume(points[0].volume, at: .zero)
             for (from, to) in zip(points, points.dropFirst()) where to.time > from.time + 0.0001 {
                 params.setVolumeRamp(fromStartVolume: from.volume, toEndVolume: to.volume, timeRange: CMTimeRange(start: time(from.time), end: time(to.time)))
@@ -685,11 +718,11 @@ actor LocalEngine {
             parameters.append(params)
         }
         // A soft whoosh under each seam that has a transition.
-        if edit.settings["whoosh"]?.bool == true, styles.contains(where: {$0 != "cut"}),
+        if edit.settings["whoosh"]?.bool == true, outro || styles.contains(where: {$0 != "cut"}),
            let file = try? Whoosh.file(), let sound = try await AVURLAsset(url: file).loadTracks(withMediaType: .audio).first {
             let soundRange = try await sound.load(.timeRange)
             let seams = styles.indices.filter {styles[$0] != "cut" && $0 < segments.count - 1}
-                .map {segments[$0].end - segments[$0].outgoing / 2}
+                .map {segments[$0].end - segments[$0].outgoing / 2} + (outro ? [movieEnd - Outro.overlap / 2] : [])
             let places = Whoosh.places(seams: seams, length: length)
             if !places.isEmpty {
                 let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
@@ -739,10 +772,10 @@ actor LocalEngine {
         }
         let mix = AVMutableAudioMix(); mix.inputParameters = parameters
         let preset = quality == "whatsapp" ? AVAssetExportPreset1280x720 : AVAssetExportPresetHighestQuality
-        var prepared = PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset)
+        var prepared = PreparedEdit(composition: composition, video: videoComposition, audio: mix, length: length, preset: preset, outro: outro ? movieEnd : nil)
         if edit.settings["telemetry"]?.bool != false {
             let samples = await telemetry(project)
-            prepared.overlay = Telemetry.frames(clips: clips, segments: segments, speed: speed, length: length, samples: samples)
+            prepared.overlay = Telemetry.frames(clips: clips, segments: segments, speed: speed, length: movieEnd, samples: samples)
         }
         return prepared
     }
@@ -839,9 +872,11 @@ actor LocalEngine {
         let untitled = output.deletingLastPathComponent().appendingPathComponent("untitled-\(UUID().uuidString).mp4")
         defer {try? FileManager.default.removeItem(at: untitled)}
         try await run(prepared.composition, video: prepared.video, audio: prepared.audio, preset: prepared.preset, length: prepared.length, to: untitled) {await progress(0.1 + $0 * 0.6, "ייצוא הסרט באייפון…")}
-        let movie = AVURLAsset(url: untitled), length = prepared.length
+        let movie = AVURLAsset(url: untitled), length = prepared.length, outro = prepared.outro
         let overlay = card.map {CIImage(cgImage: $0)}
         let titled = try await AVMutableVideoComposition.videoComposition(with: movie) {request in
+            let ending = outro.map {request.compositionTime.seconds >= $0} ?? false
+            guard !ending else {request.finish(with: request.sourceImage, context: nil); return}
             let graded = grade.map {Look.apply($0, to: request.sourceImage)} ?? request.sourceImage
             let frame = Telemetry.composite(graded, at: request.compositionTime.seconds, frames: rideFrames, panels: panels)
             let alpha = overlay == nil ? 0 : Self.titleOpacity(at: request.compositionTime.seconds, length: length)

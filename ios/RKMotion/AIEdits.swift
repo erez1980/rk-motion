@@ -94,10 +94,12 @@ enum Ducking {
         return merged
     }
     /// The music's volume through the movie as points joined by straight
-    /// ramps: down around each stretch, then out over the last `fade` seconds.
-    static func envelope(_ intervals: [(start: Double, end: Double)], volume: Float, length: Double, fade: Double = 3) -> [(time: Double, volume: Float)] {
+    /// ramps: in from silence over the first `fadeIn` seconds, down around
+    /// each stretch, then out over the last `fade` seconds.
+    static func envelope(_ intervals: [(start: Double, end: Double)], volume: Float, length: Double, fade: Double = 3, fadeIn: Double = 0) -> [(time: Double, volume: Float)] {
         guard length > 0 else {return [(0, volume)]}
         let fadeStart = max(0, length - min(fade, length))
+        let rising = fadeIn > 0 && fadeIn < fadeStart ? fadeIn : 0
         func level(_ time: Double) -> Float {
             var share: Float = 1
             for stretch in intervals {
@@ -107,9 +109,10 @@ enum Ducking {
                 else {value = min(1, (time - stretch.end) / ramp)}
                 share = min(share, low + (1 - low) * Float(value))
             }
-            return share
+            return rising > 0 && time < rising ? share * Float(time / rising) : share
         }
         var times = Set([0, fadeStart])
+        if rising > 0 {times.insert(rising)}
         for stretch in intervals {
             for time in [stretch.start - ramp, stretch.start, stretch.end, stretch.end + ramp] where time > 0 && time < fadeStart {times.insert(time)}
         }
