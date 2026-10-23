@@ -19,6 +19,7 @@ struct ProjectFlowView: View {
         VStack(spacing: 0) {
             StepBar(current: step, reachable: reachable) {step = $0}
                 .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 12)
+            if model.project != nil {AutomaticMovieButton(model: model)}
             content
         }
         .background(RK.bg.ignoresSafeArea())
@@ -45,7 +46,7 @@ struct ProjectFlowView: View {
             placed = true; step = model.project?.analyzed == true ? .edit : .video
         }
         .onChange(of: model.project?.analyzed) {old, new in
-            if new == true && old == false {step = .edit; revealing = model.project?.reading != nil && !Self.underUITest}
+            if new == true && old == false {step = .edit; revealing = model.project?.reading != nil && !Self.underUITest && !model.automaticRequested}
         }
         .onChange(of: model.project?.exports.count) {old, new in if let old, let new, new > old {step = .done}}
         .onChange(of: model.movieURL) {_, movie in if movie == nil && step == .done {step = .export}}

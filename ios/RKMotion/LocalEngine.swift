@@ -62,7 +62,7 @@ actor LocalEngine {
     /// Whether cuts move to the song's beat. Never for a video kept whole:
     /// its one clip is the rider's own edit, and its end is the video's end.
     static func syncsToBeat(_ edit: Edit, project: LocalProject) -> Bool {
-        edit.settings["beatSync"]?.bool != false && edit.settings["useMusic"]?.bool != false && !project.music.isEmpty
+        edit.settings["preserveEvents"]?.bool != true && edit.settings["beatSync"]?.bool != false && edit.settings["useMusic"]?.bool != false && !project.music.isEmpty
             && edit.settings["wholeVideo"]?.bool != true && !(edit.settings["wholeVideo"] == nil && project.wholeVideo)
     }
     /// The chosen clips with their slow motion: the rider's own marks, and
@@ -543,6 +543,7 @@ actor LocalEngine {
         }
         // Each clip framed on its own people when a wide video becomes a tall one.
         let smartFrame = edit.settings["smartFrame"]?.bool != false
+        let automaticFocus = edit.settings["automaticFrame"]?.bool == true ? signals?.focus.map(AutomaticDirector.focusPath) : nil
         let transforms = clips.indices.map {
             sources[from[$0]].transform(filling: size, focus: smartFrame ? Framing.focus(of: clips[$0], in: signals?.focus) : nil)
         }
@@ -559,6 +560,8 @@ actor LocalEngine {
         let composition = AVMutableComposition()
         let videos = (0..<2).map {_ in composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!}
         let muted = edit.settings["muteOriginal"]?.bool ?? false
+        let sourceVolume = Float(edit.settings["originalVolume"]?.string ?? "1") ?? 1
+        guard sourceVolume.isFinite, 0...1 ~= sourceVolume else {throw AppError(message: "הגדרות מוזיקה לא תקינות.")}
         let audios = sources.contains(where: {$0.audio != nil}) && !muted ? (0..<2).map {_ in composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!} : []
         let audioParams = audios.map {AVMutableAudioMixInputParameters(track: $0)}
         /// Lays a clip's source seconds onto the movie at `speed`, its slow-motion
@@ -595,7 +598,7 @@ actor LocalEngine {
             if !audios.isEmpty {
                 let params = audioParams[segment.track]
                 params.audioTimePitchAlgorithm = .spectral
-                params.setVolume(1, at: time(segment.start))
+                params.setVolume(sourceVolume, at: time(segment.start))
             }
             if let original = piece.audio, let audioRange = piece.audioRange, !muted {
                 // Camera audio may be slightly shorter than video; preserve silence in the tail.
@@ -605,9 +608,9 @@ actor LocalEngine {
                     try lay(audios[segment.track], original, range: available, clip: clips[index], offset: piece.start, at: audioStart, whole: available.duration.seconds / speed)
                 }
                 let params = audioParams[segment.track]
-                if segment.incoming > 0 {params.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1, timeRange: CMTimeRange(start: time(segment.start), duration: time(segment.incoming)))}
-                if segment.outgoing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing)))}
-                if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
+                if segment.incoming > 0 {params.setVolumeRamp(fromStartVolume: 0, toEndVolume: sourceVolume, timeRange: CMTimeRange(start: time(segment.start), duration: time(segment.incoming)))}
+                if segment.outgoing > 0 {params.setVolumeRamp(fromStartVolume: sourceVolume, toEndVolume: 0, timeRange: CMTimeRange(start: time(segment.end - segment.outgoing), duration: time(segment.outgoing)))}
+                if index == segments.count - 1 && closing > 0 {params.setVolumeRamp(fromStartVolume: sourceVolume, toEndVolume: 0, timeRange: CMTimeRange(start: time(length - closing), duration: time(closing)))}
             }
             await progress(Double(index + 1) / Double(clips.count) * 0.1, "הכנת העריכה באייפון…")
         }
@@ -621,6 +624,19 @@ actor LocalEngine {
                 let instruction = AVMutableVideoCompositionInstruction()
                 instruction.timeRange = CMTimeRange(start: time(passStart), duration: time(passEnd - passStart))
                 let l = layer(index)
+                if smartFrame, let automaticFocus, !automaticFocus.isEmpty, punches.isEmpty {
+                    func framed(_ at: Double) -> CGAffineTransform {
+                        let local = clips[index].footage(atScreen: at - segment.start, speed: speed)
+                        let second = min(automaticFocus.count - 1, max(0, Int(local)))
+                        return sources[from[index]].transform(filling: size, focus: automaticFocus[second])
+                    }
+                    var at = passStart
+                    while at < passEnd - 0.001 {
+                        let end = min(passEnd, at + 0.5)
+                        l.setTransformRamp(fromStart: framed(at), toEnd: framed(end), timeRange: CMTimeRange(start: time(at), end: time(end)))
+                        at = end
+                    }
+                }
                 for beat in punches where beat >= passStart && beat + BeatPunch.span <= passEnd {
                     l.setTransformRamp(fromStart: transforms[index].concatenating(punch), toEnd: transforms[index],
                                        timeRange: CMTimeRange(start: time(beat), duration: time(BeatPunch.span)))

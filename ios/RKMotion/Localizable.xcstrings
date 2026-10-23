@@ -8896,6 +8896,998 @@
           }
         }
       }
+    },
+    "אנשים בפריים": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אנשים בפריים"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "People in frame"
+          }
+        }
+      }
+    },
+    "אקשן אוטומטי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אקשן אוטומטי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic action"
+          }
+        }
+      }
+    },
+    "בדוק מוכנות לשטח": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדוק מוכנות לשטח"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check offline readiness"
+          }
+        }
+      }
+    },
+    "בודק את תחילת הרגע ואת הסיום שלו…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בודק את תחילת הרגע ואת הסיום שלו…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking the beginning and end of the moment…"
+          }
+        }
+      }
+    },
+    "בפעם הבאה: צילום רחב של המקום יעזור לפתוח את הסיפור.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בפעם הבאה: צילום רחב של המקום יעזור לפתוח את הסיפור."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next time, a wide shot of the location could help introduce the story."
+          }
+        }
+      }
+    },
+    "בפעם הבאה: תגובה קצרה של המשתתפים תוסיף לסיפור הקשר אישי.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בפעם הבאה: תגובה קצרה של המשתתפים תוסיף לסיפור הקשר אישי."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next time, a short reaction from the participants could add personal context."
+          }
+        }
+      }
+    },
+    "גבה את הפרויקט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גבה את הפרויקט"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back up project"
+          }
+        }
+      }
+    },
+    "גיבוי הפרויקט מוכן לשיתוף ולשמירה בקבצים.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גיבוי הפרויקט מוכן לשיתוף ולשמירה בקבצים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project backup is ready to share or save to Files."
+          }
+        }
+      }
+    },
+    "הגיבוי בוטל.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הגיבוי בוטל."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup cancelled."
+          }
+        }
+      }
+    },
+    "הגרסה הקודמת שוחזרה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הגרסה הקודמת שוחזרה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The previous version was restored."
+          }
+        }
+      }
+    },
+    "ההשוואה בוטלה. המקורות נשמרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההשוואה בוטלה. המקורות נשמרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparison cancelled. Your sources are safe."
+          }
+        }
+      }
+    },
+    "ההשוואה מוכנה. שני רגעים דומים מיושרים זה לצד זה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההשוואה מוכנה. שני רגעים דומים מיושרים זה לצד זה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparison ready. Two similar moments are aligned side by side."
+          }
+        }
+      }
+    },
+    "היצירה האוטומטית בוטלה. המקורות והגרסאות שהושלמו נשמרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "היצירה האוטומטית בוטלה. המקורות והגרסאות שהושלמו נשמרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic creation cancelled. Sources and completed versions were kept."
+          }
+        }
+      }
+    },
+    "המקורות והמוזיקה מוכנים לעבודה ללא רשת.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המקורות והמוזיקה מוכנים לעבודה ללא רשת."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sources and music are ready to use offline."
+          }
+        }
+      }
+    },
+    "הניתוח בוטל. הסרטונים נשמרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הניתוח בוטל. הסרטונים נשמרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysis cancelled. Your videos are safe."
+          }
+        }
+      }
+    },
+    "הסרט האוטומטי נשמר בתמונות.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט האוטומטי נשמר בתמונות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The automatic movie was saved to Photos."
+          }
+        }
+      }
+    },
+    "הסרט מוכן בפרויקט. לשמירה בתמונות נדרשת הרשאת מערכת.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט מוכן בפרויקט. לשמירה בתמונות נדרשת הרשאת מערכת."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your movie is ready in the project. Saving to Photos needs system permission."
+          }
+        }
+      }
+    },
+    "הסרט מוכן — הרגעים, המוזיקה והעריכה נבחרו באייפון.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט מוכן — הרגעים, המוזיקה והעריכה נבחרו באייפון."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your movie is ready. Moments, music and editing were chosen on your iPhone."
+          }
+        }
+      }
+    },
+    "הסרט נוצר בפרויקט, אך השמירה בתמונות נכשלה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט נוצר בפרויקט, אך השמירה בתמונות נכשלה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your movie is ready in the project, but saving to Photos failed."
+          }
+        }
+      }
+    },
+    "הצלילים של הרגע": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצלילים של הרגע"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sounds of the moment"
+          }
+        }
+      }
+    },
+    "השווה ניסיון אוטומטית": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השווה ניסיון אוטומטית"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare a take automatically"
+          }
+        }
+      }
+    },
+    "חזור לגרסה הקודמת": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזור לגרסה הקודמת"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore previous version"
+          }
+        }
+      }
+    },
+    "חסר מקור, מוזיקה או מקום פנוי לעבודה בשטח.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חסר מקור, מוזיקה או מקום פנוי לעבודה בשטח."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A source, music file or free space is missing for offline work."
+          }
+        }
+      }
+    },
+    "חסר קובץ מקור או מוזיקה בפרויקט.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חסר קובץ מקור או מוזיקה בפרויקט."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A source or music file is missing from the project."
+          }
+        }
+      }
+    },
+    "יוצר מוזיקה מקורית במכשיר…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יוצר מוזיקה מקורית במכשיר…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Composing original music on your device…"
+          }
+        }
+      }
+    },
+    "יצירה אוטומטית באייפון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יצירה אוטומטית באייפון"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic creation on iPhone"
+          }
+        }
+      }
+    },
+    "יש בחומר שילוב של הקשר ורגעים בולטים. המקורות נשארו זמינים לכל גרסה נוספת.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יש בחומר שילוב של הקשר ורגעים בולטים. המקורות נשארו זמינים לכל גרסה נוספת."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your footage includes context and standout moments. The sources remain available for more versions."
+          }
+        }
+      }
+    },
+    "לא הצלחתי להכין רגעים מהמקור הזה. הקבצים נשמרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא הצלחתי להכין רגעים מהמקור הזה. הקבצים נשמרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not prepare moments from this source. Your files are safe."
+          }
+        }
+      }
+    },
+    "לא נמצאה התאמה חזותית מספיק ברורה. לא נוצרה השוואה מטעה.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נמצאה התאמה חזותית מספיק ברורה. לא נוצרה השוואה מטעה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sufficiently clear visual match was found. No comparison was created."
+          }
+        }
+      }
+    },
+    "לא נשארו קטעים תקינים לייצוא.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נשארו קטעים תקינים לייצוא."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No valid clips remain to export."
+          }
+        }
+      }
+    },
+    "להשוואה אוטומטית צריך לפחות עוד פרויקט מנותח אחד.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "להשוואה אוטומטית צריך לפחות עוד פרויקט מנותח אחד."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic comparison needs at least one other analyzed project."
+          }
+        }
+      }
+    },
+    "לחיצה אחת: בחירת רגעים, מוזיקה מקומית, מסגור, בדיקה וייצוא. אין צורך להקליד או לכוון הגדרות.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לחיצה אחת: בחירת רגעים, מוזיקה מקומית, מסגור, בדיקה וייצוא. אין צורך להקליד או לכוון הגדרות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One tap chooses moments, local music and framing, checks the edit and exports. No typing or settings needed."
+          }
+        }
+      }
+    },
+    "מזהה רגעים ושומר את ההקשר…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מזהה רגעים ושומר את ההקשר…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finding moments and keeping their context…"
+          }
+        }
+      }
+    },
+    "מחפש רגע דומה בפרויקטים המקומיים…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחפש רגע דומה בפרויקטים המקומיים…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for a similar moment in local projects…"
+          }
+        }
+      }
+    },
+    "מייצא השוואה מסונכרנת…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מייצא השוואה מסונכרנת…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting an aligned comparison…"
+          }
+        }
+      }
+    },
+    "נבדקו %@ רגעים; %@ קטעים נבחרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נבדקו %@ רגעים; %@ קטעים נבחרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked %@ moments; chose %@ clips."
+          }
+        }
+      }
+    },
+    "סטודיו אוטומטי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סטודיו אוטומטי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic studio"
+          }
+        }
+      }
+    },
+    "סיפור משפחתי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיפור משפחתי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Family story"
+          }
+        }
+      }
+    },
+    "סרט אוטומטי מהחודש האחרון": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט אוטומטי מהחודש האחרון"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic movie from the last month"
+          }
+        }
+      }
+    },
+    "עדיין אין גרסה קודמת לשחזור.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עדיין אין גרסה קודמת לשחזור."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no previous version to restore yet."
+          }
+        }
+      }
+    },
+    "על מה הסתמכתי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "על מה הסתמכתי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What informed this edit"
+          }
+        }
+      }
+    },
+    "פסקול מקומי מקורי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פסקול מקומי מקורי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original local soundtrack"
+          }
+        }
+      }
+    },
+    "פריים יפה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פריים יפה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aesthetic frame"
+          }
+        }
+      }
+    },
+    "צור לי סרט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צור לי סרט"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make my movie"
+          }
+        }
+      }
+    },
+    "צחוק או עידוד": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צחוק או עידוד"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laughter or cheering"
+          }
+        }
+      }
+    },
+    "קולנועי אוטומטי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קולנועי אוטומטי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic cinematic"
+          }
+        }
+      }
+    },
+    "קטע דיבור": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קטע דיבור"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech passage"
+          }
+        }
+      }
+    },
+    "שינוי בנתוני הרכיבה": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שינוי בנתוני הרכיבה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change in ride data"
+          }
+        }
+      }
+    },
+    "שיתוף גיבוי הפרויקט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיתוף גיבוי הפרויקט"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share project backup"
+          }
+        }
+      }
+    },
+    "שיתוף הסיפור והמקורות": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיתוף הסיפור והמקורות"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share story and sources"
+          }
+        }
+      }
+    },
+    "שלושה סיפורים אוטומטיים": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלושה סיפורים אוטומטיים"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Three automatic stories"
+          }
+        }
+      }
+    },
+    "תנועה בולטת": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תנועה בולטת"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinct motion"
+          }
+        }
+      }
+    },
+    "לסרט קבוצתי צריך עוד פרויקט עם צילום מקביל ואודיו משותף.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לסרט קבוצתי צריך עוד פרויקט עם צילום מקביל ואודיו משותף."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A group movie needs another project with an overlapping recording and shared audio."
+          }
+        }
+      }
+    },
+    "מסנכרן מצלמות לפי הצלילים במקורות…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מסנכרן מצלמות לפי הצלילים במקורות…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronizing cameras using source audio…"
+          }
+        }
+      }
+    },
+    "לא נמצא אודיו משותף ברור. נדרשים שני צילומים מקבילים של 3 שניות עד 10 דקות, בהפרש התחלה של עד 30 שניות.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נמצא אודיו משותף ברור. נדרשים שני צילומים מקבילים של 3 שניות עד 10 דקות, בהפרש התחלה של עד 30 שניות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No clear shared audio was found. Two overlapping recordings of 3 seconds to 10 minutes are needed, starting within 30 seconds of each other."
+          }
+        }
+      }
+    },
+    "בוחר זוויות ומייצא סרט קבוצתי…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בוחר זוויות ומייצא סרט קבוצתי…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choosing angles and exporting a group movie…"
+          }
+        }
+      }
+    },
+    "הסרט הקבוצתי מוכן: שתי זוויות על אותו ציר זמן, עם סאונד רציף.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרט הקבוצתי מוכן: שתי זוויות על אותו ציר זמן, עם סאונד רציף."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group movie ready: two angles on one timeline with continuous sound."
+          }
+        }
+      }
+    },
+    "סרט קבוצתי אוטומטי": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט קבוצתי אוטומטי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic group movie"
+          }
+        }
+      }
+    },
+    "שחזר גיבוי פרויקט": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שחזר גיבוי פרויקט"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore project backup"
+          }
+        }
+      }
+    },
+    "בודק ומשחזר את גיבוי הפרויקט…": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בודק ומשחזר את גיבוי הפרויקט…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifying and restoring the project backup…"
+          }
+        }
+      }
+    },
+    "הפרויקט שוחזר עם המקורות והעריכה, בלי לשנות פרויקט קיים.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקט שוחזר עם המקורות והעריכה, בלי לשנות פרויקט קיים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project was restored with sources and edits. Existing projects were kept."
+          }
+        }
+      }
+    },
+    "השחזור בוטל. הפרויקטים הקיימים נשמרו.": {
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השחזור בוטל. הפרויקטים הקיימים נשמרו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore cancelled. Existing projects are safe."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

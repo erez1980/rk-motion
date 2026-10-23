@@ -1,0 +1,53 @@
+Automatic studio validation — 2026-10-23 (Asia/Jerusalem)
+Base: main b60e818; implementation: codex/automatic-studio; app 0.33.0.
+Environment: Xcode 27.1 (27A9275), Swift 6.4; iPhone 18 Pro simulator, iOS 27.0.
+
+PASS: python3 scripts/check-ios-store.py (Hebrew/English strings + metadata).
+PASS: git diff --check.
+PASS: full xcodebuild test — 166 unit tests, 0 failures; 5 UI tests, 0 failures.
+PASS: additional rendered-angle-switch test — 1 test, 0 failures.
+PASS: after final bounded-import/input guards, focused AutomaticDirectorTests +
+      AutomaticMediaTests — 17 tests, 0 failures (10.900 seconds).
+PASS: after backup/restore limit parity fix, all 18 focused automation tests
+      passed, 0 failures (9.423 seconds). Oversized sparse sources and JSON
+      are rejected before copying; no ZIP is published and originals survive.
+PASS: final source-note time conversion fix: all 19 focused automation tests
+      passed, 0 failures (10.203 seconds). Notes use file-local time across
+      joined/repeated sources and leave the render timeline unchanged.
+
+Real synthetic-media integration exercised analysis -> automatic recipe ->
+local score creation -> critique -> export -> media validation -> persistent receipt.
+Other probes exercised finite PCM/cancel cleanup, whole-event protection,
+source boundaries, audio alignment/silence rejection, persistent versions,
+ZIP backup+fresh-ID restore+hash equality, corrupt ZIP rejection, path rejection,
+actual alternating-angle output and source preservation.
+UI fixture uses a Debug-only flag to skip Photos permission; Photos itself,
+physical-device memory/thermal/battery, installed image-model inference,
+real shared-audio cameras and real repeated routes remain device gates.
+No claim that all 30 roadmap capabilities are complete.
+
+Device archive: PASS. Release iphoneos archive and unsigned IPA packaging.
+Source code commit: 063b9abfcf1c981b50abe103905f99a294a5b334
+IPA: RK-Motion-0.33.0-build3-063b9ab.ipa
+SHA-256: 433b681a64de4fe476b158b2292f0ac6015dab0b8a7e1a49f98970dd8304d6be
+Size: 1791210 bytes. ZIP CRC + Info.plist version/build/commit verified.
+This verification is recorded in a documentation-only follow-up commit.
+The IPA still requires signing for a standard physical iPhone.
+
+CI compatibility: first Xcode 26.3 run 40017702228 failed type-checking
+a compound tuple map/sort. Replaced it with a named RankedSecond and loop/sort;
+the local focused rerun passed all 17 automation tests. The final device
+archive was rebuilt from 063b9ab with the complete dependency notices
+verified inside the IPA. Latest CI results are recorded in the PR.
+
+Validation continued after midnight on 2026-10-24 (Asia/Jerusalem).
+CI run 40020515542: 172 passed / 1 process crash in an existing effects test.
+All 18 automatic tests and all 5 UI tests passed; full CI did not pass.
+Crash stack: libRPAC -> interposed_dispatch_group_wait -> CoreImage.
+TestAction-only checker workaround, with no skipped tests, is documented in
+ci-coreimage-checker-2026-10-24.md. Final complete rerun results are on PR #21.
+
+PASS: final complete local suite after source-time and scheme fixes: 169 unit
+      tests (20.326 seconds) and 5 UI tests (95.820 seconds), 0 failures.
+PASS: Release device archive rebuilt from 063b9ab, ZIP CRC, notices and
+      Info.plist version/build/commit verified; SHA-256 is recorded above.
