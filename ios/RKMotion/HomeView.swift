@@ -10,78 +10,89 @@ struct HomeView: View {
     let recap: (Recap.Span) -> Void
     @State private var deleting: LocalProject?
     @State private var recapping = false
+    @Environment(\.layoutDirection) private var layoutDirection
     var body: some View {
-        ScrollView {
-            // Lazy, so a long list asks only for the pictures on screen.
-            LazyVStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        (Text(verbatim: "RK ").foregroundStyle(RK.ink) + Text(verbatim: "Motion").foregroundStyle(RK.accent))
-                            .font(RK.font(28, 700, style: .largeTitle))
-                        Text("מכל סרטון לרגעים הטובים").font(RK.font(15)).foregroundStyle(RK.soft)
+        // A List, not a scroll of cards, so a project row swipes to delete the
+        // way rows do across iOS. Rows keep the card look: no separators, no
+        // row background, the old 18-point gap split between rows.
+        List {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    (Text(verbatim: "RK ").foregroundStyle(RK.ink) + Text(verbatim: "Motion").foregroundStyle(RK.accent))
+                        .font(RK.font(28, 700, style: .largeTitle))
+                    Text("מכל סרטון לרגעים הטובים").font(RK.font(15)).foregroundStyle(RK.soft)
+                }
+                Spacer()
+                Button(action: about) {
+                    Image(systemName: "questionmark").font(.system(size: 17, weight: .semibold)).foregroundStyle(RK.soft)
+                        .frame(width: 44, height: 44).background(RK.card, in: Circle())
+                }.buttonStyle(.plain).accessibilityLabel("עזרה")
+            }.padding(.top, 8).homeRow()
+            if model.busy {
+                ProgressCard(model: model).homeRow()
+                if model.project != nil {
+                    Button("חזרה לפרויקט הפעיל") {if let p = model.project {open(p)}}.buttonStyle(SecondaryButtonStyle()).homeRow()
+                }
+            }
+            Button(action: newRide) {
+                HStack(spacing: 14) {
+                    Image(systemName: "plus").font(.system(size: 22, weight: .bold))
+                        .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("סרטון חדש").font(RK.font(19, 700, style: .title3))
+                        Text("סרטון אחד או כמה, מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
                     }
                     Spacer()
-                    Button(action: about) {
-                        Image(systemName: "questionmark").font(.system(size: 17, weight: .semibold)).foregroundStyle(RK.soft)
-                            .frame(width: 44, height: 44).background(RK.card, in: Circle())
-                    }.accessibilityLabel("עזרה")
-                }.padding(.top, 8)
-                if model.busy {
-                    ProgressCard(model: model)
-                    if model.project != nil {
-                        Button("חזרה לפרויקט הפעיל") {if let p = model.project {open(p)}}.buttonStyle(SecondaryButtonStyle())
-                    }
                 }
-                Button(action: newRide) {
-                    HStack(spacing: 14) {
-                        Image(systemName: "plus").font(.system(size: 22, weight: .bold))
-                            .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("סרטון חדש").font(RK.font(19, 700, style: .title3))
-                            Text("סרטון אחד או כמה, מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
-                        }
-                        Spacer()
+                .foregroundStyle(RK.accentInk).padding(16)
+                .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1).homeRow()
+            Button {recapping = true} label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "photo.stack").font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
+                        .frame(width: 52, height: 52).background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("סיכום מהגלריה").font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
+                        Text("הטיול האחרון, החודש או השנה, בלי לבחור קבצים").font(RK.font(13)).foregroundStyle(RK.soft)
                     }
-                    .foregroundStyle(RK.accentInk).padding(16)
-                    .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
-                Button {recapping = true} label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: "photo.stack").font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
-                            .frame(width: 52, height: 52).background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("סיכום מהגלריה").font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
-                            Text("הטיול האחרון, החודש או השנה, בלי לבחור קבצים").font(RK.font(13)).foregroundStyle(RK.soft)
+                    Spacer()
+                }
+                .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }.buttonStyle(.plain).accessibilityIdentifier("home.recap").disabled(model.busy).opacity(model.busy ? 0.4 : 1).homeRow()
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
+                Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)
+            }.padding(.top, 4).homeRow()
+            if model.projects.isEmpty {
+                Text("בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם.").font(RK.font(15)).foregroundStyle(RK.soft).rkCard(padding: 16).homeRow()
+            }
+            ForEach(model.projects) {project in
+                Button {open(project)} label: {ProjectRow(project: project)}
+                    .buttonStyle(.plain).disabled(model.busy).accessibilityIdentifier("home.project")
+                    .contextMenu {
+                        if let movie = project.exports.last {
+                            ShareLink(item: LocalStore.file(movie.file, project: project.id)) {Label("שיתוף הסרט האחרון", systemImage: "square.and.arrow.up")}
                         }
-                        Spacer()
+                        Button(role: .destructive) {deleting = project} label: {Label("מחיקת הפרויקט מהאייפון", systemImage: "trash")}
+                            .disabled(model.busy)
                     }
-                    .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }.buttonStyle(.plain).accessibilityIdentifier("home.recap").disabled(model.busy).opacity(model.busy ? 0.4 : 1)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
-                    Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)
-                }.padding(.top, 4)
-                if model.projects.isEmpty {
-                    Text("בחרו סרטון כדי ליצור את הפרויקט הראשון שלכם.").font(RK.font(15)).foregroundStyle(RK.soft).rkCard(padding: 16)
-                }
-                ForEach(model.projects) {project in
-                    Button {open(project)} label: {ProjectRow(project: project)}
-                        .buttonStyle(.plain).disabled(model.busy)
-                        .contextMenu {
-                            if let movie = project.exports.last {
-                                ShareLink(item: LocalStore.file(movie.file, project: project.id)) {Label("שיתוף הסרט האחרון", systemImage: "square.and.arrow.up")}
-                            }
-                            Button(role: .destructive) {deleting = project} label: {Label("מחיקת הפרויקט מהאייפון", systemImage: "trash")}
-                                .disabled(model.busy)
-                        }
-                }
+                    // Swiping right to left reveals Delete on the right edge,
+                    // in Hebrew as in English. Not a destructive role: that
+                    // would pull the row out before the rider confirms.
+                    .swipeActions(edge: layoutDirection == .rightToLeft ? .leading : .trailing, allowsFullSwipe: true) {
+                        Button {deleting = project} label: {Label("מחיקה", systemImage: "trash")}.tint(.red).disabled(model.busy)
+                    }
+                    .homeRow()
+            }
+            Group {
                 MessageCard(model: model)
                 Text(AppVersion.line).font(RK.font(12, 400, style: .caption2)).monospacedDigit().foregroundStyle(RK.faint)
-                    .frame(maxWidth: .infinity).padding(.top, 8)
-            }.padding(.horizontal, 20).padding(.bottom, 24)
+                    .frame(maxWidth: .infinity).padding(.top, 8).padding(.bottom, 24)
+            }.homeRow()
         }
+        .listStyle(.plain).scrollContentBackground(.hidden).environment(\.defaultMinListRowHeight, 0)
         .background(RK.bg.ignoresSafeArea())
         .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: Binding(get: {deleting != nil}, set: {if !$0 {deleting = nil}}), titleVisibility: .visible, presenting: deleting) {project in
             Button("מחיקה", role: .destructive) {Task {await model.delete(project)}}
@@ -89,6 +100,14 @@ struct HomeView: View {
         .sheet(isPresented: $recapping) {RecapSheet(make: recap).presentationDetents([.medium, .large])}
         .navigationTitle("הפרויקטים")
         .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private extension View {
+    /// A home-screen row that looks like the scroll of cards it replaced.
+    func homeRow() -> some View {
+        listRowInsets(EdgeInsets(top: 9, leading: 20, bottom: 9, trailing: 20))
+            .listRowSeparator(.hidden).listRowBackground(Color.clear)
     }
 }
 

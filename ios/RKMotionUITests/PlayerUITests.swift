@@ -80,4 +80,36 @@ final class PlayerUITests: XCTestCase {
             app.terminate()
         }
     }
+
+    /// Asked for: swiping a project right to left offers Delete, as across
+    /// iOS, in Hebrew (right to left) as in English.
+    func testSwipeLeftDeletesAProject() throws {
+        for (language, delete) in [("en", "Delete"), ("he", "מחיקה")] {
+            let app = launch(language: language)
+            wait(for: app.buttons["step.0"], in: app, timeout: 120, "The fixture ride never opened in \(language)")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            let newRide = app.descendants(matching: .any)["home.newRide"]
+            wait(for: newRide, in: app, timeout: 10, "Back on the project list")
+            expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: newRide)
+            waitForExpectations(timeout: 90)
+            let rows = app.descendants(matching: .any).matching(identifier: "home.project")
+            let before = rows.count
+            XCTAssertGreaterThan(before, 0, "language \(language)")
+            rows.element(boundBy: 0).swipeLeft()
+            let action = app.buttons[delete].firstMatch
+            wait(for: action, in: app, timeout: 5, "A right-to-left swipe shows Delete in \(language)")
+            action.tap()
+            let title = language == "he" ? "למחוק את הפרויקט ואת הקבצים שלו מהאייפון?" : "Delete the project and its files from this iPhone?"
+            wait(for: app.staticTexts[title], in: app, timeout: 10, "Delete asks before the files go, in \(language)")
+            // The confirmation's own Delete button; the swipe's may still be on screen.
+            let buttons = app.buttons.matching(NSPredicate(format: "label == %@", delete)).allElementsBoundByIndex.filter(\.isHittable)
+            guard let confirm = buttons.last else {
+                XCTFail("No Delete button in the confirmation, in \(language). Screen:\n\(app.debugDescription)"); return
+            }
+            confirm.tap()
+            expectation(for: NSPredicate {_, _ in rows.count == before - 1}, evaluatedWith: app)
+            waitForExpectations(timeout: 15)
+            app.terminate()
+        }
+    }
 }
