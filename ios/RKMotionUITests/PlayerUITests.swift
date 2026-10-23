@@ -93,6 +93,8 @@ final class PlayerUITests: XCTestCase {
             expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: newRide)
             waitForExpectations(timeout: 90)
             let rows = app.descendants(matching: .any).matching(identifier: "home.project")
+            // The list can still be filling in when the button turns on.
+            wait(for: rows.firstMatch, in: app, timeout: 15, "No project in the list in \(language)")
             let before = rows.count
             XCTAssertGreaterThan(before, 0, "language \(language)")
             rows.element(boundBy: 0).swipeLeft()
