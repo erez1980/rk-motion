@@ -9,7 +9,7 @@ No prompt, music picker, face selection, trimming or output configuration is
 a required step of the new flow. Initial media choice and OS permission are
 unavoidable inputs, not editing steps.
 
-Base: `b60e818` on main (0.32.0). Implementation commit: `4b9a15e`.
+Base: `b60e818` on main (0.32.0). Initial implementation commit: `4b9a15e`; later compatibility/validation commits are on the same branch.
 Draft PR: https://github.com/erez1980/rk-motion/pull/21. Branch: `codex/automatic-studio`, app 0.33.0.
 Do not merge or publish a release just to save the work. The main branch's
 existing release workflow remains unchanged. The detailed 30-row status and
@@ -154,3 +154,12 @@ then cancellation, background interruption, low storage, offline operation,
 truly repeated locations. Record iPhone model, OS, free storage, peak memory,
 thermal state, elapsed time, battery change and quality failures. Retain all
 originals. An unsigned archive is a build artifact, not proof of installation.
+
+## CI toolchain compatibility
+
+The first Xcode 26.3 CI run (`40017702228`) found a Swift 6.2 type-checking
+complexity error in event ranking, despite successful Xcode 27.1 builds. The
+map/sort tuple expression was split into a named RankedSecond and explicit
+loop/sort with unchanged scoring. The branch contains this compatibility fix.
+Latest CI status is visible on PR #21; do not treat the old failed SHA as the
+current implementation.

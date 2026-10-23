@@ -101,6 +101,11 @@ struct AutomaticEvent: Codable, Equatable, Identifiable {
 }
 
 enum AutomaticDirector {
+    private struct RankedSecond {
+        var second: Int
+        var score: Double
+        var reason: AutomaticEvent.Reason
+    }
     static let eventLimit = 128
     static let analysisVersion = 1
     static func value(_ values: [Double], _ index: Int) -> Double {
@@ -123,7 +128,10 @@ enum AutomaticDirector {
         for part in project.pieces where part.duration.isFinite && part.duration > 0.2 && part.start.isFinite && part.start >= 0 && part.end.isFinite && part.end <= project.duration + 0.001 {
             let first = max(0, Int(part.start)), last = min(count - 1, Int(ceil(part.end)) - 1)
             guard first <= last else {continue}
-            let ranked = (first...last).map {second -> (Int, Double, AutomaticEvent.Reason) in
+            // Named intermediate values keep this tractable for the Swift 6.2
+            // type checker used by Xcode 26.3 as well as newer local toolchains.
+            var ranked: [RankedSecond] = []
+            for second in first...last {
                 let channels: [(AutomaticEvent.Reason, Double)] = [
                     (.motion, value(motion, second) * 0.75), (.speech, value(signals.speech, second) * 0.8),
                     (.reaction, value(signals.cheer, second)), (.scenery, value(signals.beauty ?? [], second) * 0.75),
@@ -132,10 +140,13 @@ enum AutomaticDirector {
                 ]
                 let best = channels.max {$0.1 < $1.1}!
                 let quality = second < poor.count && poor[second] ? 0.25 : 1.0
-                return (second, max(value(base, second), best.1) * quality, best.0)
-            }.sorted {$0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0}
+                let score = max(value(base, second), best.1) * quality
+                ranked.append(RankedSecond(second: second, score: score, reason: best.0))
+            }
+            ranked.sort {left, right in left.score != right.score ? left.score > right.score : left.second < right.second}
             var windows: [AutomaticEvent] = []
-            for (second, score, reason) in ranked {
+            for candidate in ranked {
+                let second = candidate.second, score = candidate.score, reason = candidate.reason
                 guard windows.count < 24, result.count + windows.count < eventLimit else {break}
                 let peak = min(part.end - 0.01, max(part.start, Double(second) + 0.5))
                 if windows.contains(where: {abs($0.peak - peak) < 6}) {continue}
