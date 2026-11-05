@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import YouTubeKit
 
@@ -62,6 +63,11 @@ enum YouTubeMusic {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(fileName(for: title))
         try await fetch(stream.url, to: target, progress: progress)
+        // A song that keeps its silent stretch is still a song, so a failed
+        // repair leaves the download as it came; a cancel still cancels.
+        do {try await trimToAudio(target)}
+        catch is CancellationError {try? FileManager.default.removeItem(at: target); throw CancellationError()}
+        catch {}
         return target
     }
 
@@ -77,6 +83,98 @@ enum YouTubeMusic {
             throw AppError(message: "לא נמצא בסרטון שמע שהאייפון יכול לנגן.")
         }
         return stream
+    }
+
+    /// YouTube's audio is a fragmented MP4 whose header already states the
+    /// song's whole length, and AVFoundation places the fragments after that
+    /// length, so the song reads as twice as long with half of it silent.
+    /// The samples are copied, without re-encoding and with the silent gap
+    /// closed, into a plain file that holds only the music. An export session
+    /// would keep the gap.
+    static func trimToAudio(_ file: URL) async throws {
+        let asset = AVURLAsset(url: file)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {return}
+        let declared = try await asset.load(.duration)
+        let audio = try audioLength(asset, track: track)
+        guard audio.seconds > 0, declared.seconds - audio.seconds > 0.5 else {return}
+        let output = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
+        do {
+            let reader = try AVAssetReader(asset: asset)
+            let samples = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            guard reader.canAdd(samples) else {throw damaged}
+            reader.add(samples)
+            let writer = try AVAssetWriter(outputURL: output, fileType: .m4a)
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: nil, sourceFormatHint: try await track.load(.formatDescriptions).first)
+            input.expectsMediaDataInRealTime = false
+            guard writer.canAdd(input) else {throw damaged}
+            writer.add(input)
+            guard reader.startReading() else {throw reader.error ?? damaged}
+            defer {reader.cancelReading()}
+            guard writer.startWriting() else {throw writer.error ?? damaged}
+            writer.startSession(atSourceTime: .zero)
+            var gaps = GapCloser()
+            while let sample = samples.copyNextSampleBuffer() {
+                let shift = gaps.shift(for: sample)
+                let moved = shift == .zero ? sample : try shifted(sample, by: shift)
+                while !input.isReadyForMoreMediaData {
+                    // A writer that fails (a full disk) never becomes ready again.
+                    guard writer.status == .writing else {throw writer.error ?? damaged}
+                    do {try await Task.sleep(nanoseconds: 2_000_000)} catch {writer.cancelWriting(); throw error}
+                }
+                guard input.append(moved) else {writer.cancelWriting(); throw writer.error ?? damaged}
+            }
+            guard reader.status == .completed else {writer.cancelWriting(); throw reader.error ?? damaged}
+            input.markAsFinished()
+            writer.endSession(atSourceTime: gaps.end)
+            await writer.finishWriting()
+            guard writer.status == .completed else {throw writer.error ?? damaged}
+            _ = try FileManager.default.replaceItemAt(file, withItemAt: output)
+        } catch {
+            try? FileManager.default.removeItem(at: output); throw error
+        }
+    }
+    /// How long the music lasts once silent gaps between samples are closed,
+    /// read from the samples themselves rather than from the file's header.
+    static func audioLength(_ asset: AVAsset, track: AVAssetTrack) throws -> CMTime {
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        guard reader.canAdd(output) else {throw damaged}
+        reader.add(output)
+        guard reader.startReading() else {throw reader.error ?? damaged}
+        defer {reader.cancelReading()}
+        var gaps = GapCloser()
+        while let sample = output.copyNextSampleBuffer() {_ = gaps.shift(for: sample)}
+        guard reader.status == .completed else {throw reader.error ?? damaged}
+        return gaps.end
+    }
+    /// Moves each sample back so it follows the one before it whenever a
+    /// silent gap of more than a tenth of a second lies between them.
+    struct GapCloser {
+        private(set) var end = CMTime.zero
+        private var offset = CMTime.zero
+        mutating func shift(for sample: CMSampleBuffer) -> CMTime {
+            let start = CMSampleBufferGetPresentationTimeStamp(sample), length = CMSampleBufferGetDuration(sample)
+            guard start.isNumeric else {return offset}
+            let placed = CMTimeAdd(start, offset)
+            if CMTimeSubtract(placed, end).seconds > 0.1 {offset = CMTimeSubtract(end, start)}
+            let finish = CMTimeAdd(CMTimeAdd(start, offset), length.isNumeric ? length : .zero)
+            if finish > end {end = finish}
+            return offset
+        }
+    }
+    private static func shifted(_ sample: CMSampleBuffer, by offset: CMTime) throws -> CMSampleBuffer {
+        var count: CMItemCount = 0
+        CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
+        var timing = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+        guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count) == noErr else {throw damaged}
+        for index in timing.indices {
+            timing[index].presentationTimeStamp = CMTimeAdd(timing[index].presentationTimeStamp, offset)
+            if timing[index].decodeTimeStamp.isNumeric {timing[index].decodeTimeStamp = CMTimeAdd(timing[index].decodeTimeStamp, offset)}
+        }
+        var copy: CMSampleBuffer?
+        guard CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: sample, sampleTimingEntryCount: count, sampleTimingArray: &timing, sampleBufferOut: &copy) == noErr,
+              let copy else {throw damaged}
+        return copy
     }
 
     /// Downloads `url` into `target` in ranged pieces. Each response streams
