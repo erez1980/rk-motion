@@ -2,9 +2,9 @@ name: iPhone standalone
 on:
   push:
     branches: [main, 'codex/**']
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', 'scripts/ci_ios_policy.py', 'scripts/ci_ios_test_summary.py', '.github/workflows/ios.yml']
   pull_request:
-    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'scripts/build-ios.sh', 'scripts/generate-ios-project.py', 'scripts/check-ios-store.py', 'scripts/make-altstore-source.py', 'scripts/ci_ios_policy.py', 'scripts/ci_ios_test_summary.py', '.github/workflows/ios.yml']
   workflow_dispatch:
 concurrency:
   group: ios-${{ github.head_ref || github.ref_name }}
@@ -12,7 +12,28 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  # codex/** pushes wait here, on Ubuntu, so a pull_request run for the same
+  # branch can cancel this run before a macOS runner starts. Do not finish
+  # this job with a skipped build: a skipped build check is reported as
+  # success and can satisfy a required check of that name. If nothing cancels
+  # the run, build still runs. workflow_dispatch and main do not wait.
+  prepare:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: deploy-ci
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait so a pull request run can take this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci_ios_policy.py
+
   build:
+    needs: prepare
+    if: "${{ needs.prepare.result == 'skipped' || needs.prepare.result == 'success' || needs.prepare.result == 'failure' }}"
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -26,9 +47,34 @@ jobs:
       - name: Compile simulator app
         run: bash scripts/build-ios.sh simulator
       - name: Test local analysis and export on simulator
+        shell: bash
         run: |
+          mkdir -p build/ios
           rk_sim=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for vs in d["devices"].values() for v in vs if v["name"].startswith("iPhone")))')
-          xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Debug -destination "platform=iOS Simulator,id=$rk_sim" -derivedDataPath build/ios/Tests -resultBundlePath build/ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO test
+          set +e
+          xcodebuild -project ios/RKMotion.xcodeproj -scheme RKMotion -configuration Debug -destination "platform=iOS Simulator,id=$rk_sim" -derivedDataPath build/ios/Tests -resultBundlePath build/ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/ios/xcodebuild-test.log
+          rk_status=${PIPESTATUS[0]}
+          set -e
+          python3 scripts/ci_ios_test_summary.py --log build/ios/xcodebuild-test.log --output build/ios/test-summary.md --exit-code "$rk_status" || echo "warning: concise test summary was not written"
+          exit "$rk_status"
+      - name: Publish concise test summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f build/ios/test-summary.md ]]; then
+            cat build/ios/test-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No simulator test summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # upload-artifact uses the Actions artifact quota, not the Actions cache
+      # pool (type=gha). retention-days does not expire GitHub Release assets.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RK-Motion-test-summary
+          path: build/ios/test-summary.md
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Build unsigned iPhone IPA
         env:
           RK_BUILD_NUMBER: ${{ github.run_number }}
@@ -38,23 +84,27 @@ jobs:
         with:
           name: RK-Motion-unsigned-IPA
           path: build/ios/RK-Motion-*.ipa
+          retention-days: 7
           if-no-files-found: error
 
       - name: Preserve native test diagnostics
-        if: always()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: RK-Motion-test-results
           path: build/ios/TestResults.xcresult
+          retention-days: 7
           if-no-files-found: ignore
 
   # Every green main build becomes a public GitHub Release with the IPA and a
   # SideStore/AltStore source, so the iPhone installs and updates on its own:
   # https://github.com/<repo>/releases/latest/download/source.json
+  # Those release assets stay until a later release replaces them. The 7-day
+  # artifact retention above does not apply to them.
   release:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: deploy-ci
     permissions:
       contents: write
     concurrency:

@@ -8,6 +8,7 @@ struct HomeView: View {
     let open: (LocalProject) -> Void
     let about: () -> Void
     let recap: (Recap.Span) -> Void
+    let automatic: () -> Void
     @State private var deleting: LocalProject?
     @State private var recapping = false
     @Environment(\.layoutDirection) private var layoutDirection
@@ -61,6 +62,10 @@ struct HomeView: View {
                 .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             }.buttonStyle(.plain).accessibilityIdentifier("home.recap").disabled(model.busy).opacity(model.busy ? 0.4 : 1).homeRow()
+            Button(action: automatic) {
+                Label("סרט אוטומטי מהחודש האחרון", systemImage: "sparkles.rectangle.stack")
+                    .font(RK.font(16, 600)).frame(maxWidth: .infinity, minHeight: 48)
+            }.buttonStyle(SecondaryButtonStyle()).disabled(model.busy).accessibilityIdentifier("home.automatic").homeRow()
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                 Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)

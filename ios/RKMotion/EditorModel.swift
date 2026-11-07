@@ -101,6 +101,10 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     @Published var addedSong: String?
     @Published var saveFailed = false
     @Published var photoPermissionDenied = false
+    @Published private(set) var automaticRun: AutomaticRun?
+    @Published private(set) var automaticPackage: URL?
+    @Published private(set) var automaticReadiness: AutomaticStore.Readiness?
+    @Published private(set) var automaticRequested = false
     private let persistence: ProjectPersistence
     init(persistence: ProjectPersistence = ProjectPersistence()) {self.persistence = persistence}
     private var saveTask: Task<Void, Never>?
@@ -142,6 +146,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(true)
         guard await save() else {setBusy(false); return}
         project = value; wholeVideo = value.wholeVideo; edit = value.edit; suppressedEdit = edit
+        automaticRun = AutomaticStore.read(AutomaticRun.self, name: "automatic-run.json", project: value.id)
+        if automaticRun?.edit != value.edit {automaticRun = nil}
+        automaticPackage = nil; automaticReadiness = nil
         undoStack = []; redoStack = []; updateUndo()
         movieURL = value.exports.last.map {LocalStore.file($0.file, project: value.id)}
         UserDefaults.standard.set(value.id, forKey: "localProject")
@@ -159,6 +166,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         project = nil; edit = Edit(clips: []); suppressedEdit = edit; movieURL = nil; previewEdit = nil; projectBytes = 0
         sourceDimensions = .zero; joinedSource = nil; undoStack = []; redoStack = []; updateUndo(); wholeVideo = false; message = ""
         loadSightings()
+        automaticRun = nil; automaticPackage = nil; automaticReadiness = nil
         UserDefaults.standard.removeObject(forKey: "localProject")
         setBusy(false)
     }
@@ -311,7 +319,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// pieces, and only then saves the project. An interruption leaves the
     /// manifest behind for `restore` to find; a cancellation removes this
     /// import's own partial copy and nothing else.
-    private func runImport(_ files: [URL], name named: String? = nil, settings: [String: Setting] = [:]) async {
+    private func runImport(_ files: [URL], name named: String? = nil, settings: [String: Setting] = [:], automatic: Bool = false) async {
+        automaticRequested = automatic
         guard await save() else {setBusy(false); return}
         guard let first = files.first else {setBusy(false); return}
         let copying = files.count > 1 ? NSLocalizedString("העתקת הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("העתקת הסרטון לאחסון המקומי…", comment: "Copying the video")
@@ -346,7 +355,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             sourceDimensions = (try? await engine.sourceDimensions(LocalStore.file(p.source, project: p.id))) ?? .zero
             await joinSource(p)
             previewEdit = nil; projectBytes = await persistence.bytes(p)
-            processingSucceeded = true; setBusy(false); analyze()
+            automaticRun = nil; automaticPackage = nil; automaticReadiness = nil
+            processingSucceeded = true; setBusy(false); analyze(automatic: automatic)
         } catch is CancellationError {finishImport(p.id, cancelled: true)}
         catch {finishImport(p.id, error: error)}
     }
@@ -359,7 +369,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         message = cancelled ? "ייבוא הסרטון בוטל" : error?.localizedDescription ?? ""
         if busy {setBusy(false)}
     }
-    func analyze() {
+    func analyze(automatic: Bool = false) {
         guard !busy, var p = project else {return}
         p.wholeVideo = wholeVideo; project = p
         setBusy(true, .analyzing); percent = 0; message = "ניתוח באייפון…"
@@ -367,6 +377,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         launchProcessing(title: "ניתוח סרטון") { [self] in
           operation = Task {
             guard await save() else {setBusy(false); return}
+            var analyzedSuccessfully = false
             do {
                 let result = try await engine.analyze(p.files.map {LocalStore.file($0, project: p.id)}, whole: whole) {[weak self] fraction, text in
                     await self?.progress(fraction, text)
@@ -392,10 +403,11 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 edit.settings.removeValue(forKey: "star")
                 loadSightings(result.signals)
                 previewEdit = nil; suppressedEdit = edit; undoStack = []; redoStack = []; updateUndo()
-                if await save() {processingSucceeded = true; message = result.clips.isEmpty ? "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
+                if await save() {processingSucceeded = true; analyzedSuccessfully = true; message = result.clips.isEmpty ? "לא נמצאו רגעים בולטים. שנו רגישות או הוסיפו קטע ידני." : "הניתוח הושלם — כל העיבוד נעשה באייפון"}
             } catch is CancellationError {message = "הניתוח בוטל. הסרטון נשמר ואפשר לנסות שוב."}
             catch {message = error.localizedDescription}
             setBusy(false)
+            if automatic && analyzedSuccessfully {automaticMovie()}
           }
         }
     }
@@ -654,8 +666,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     }
     /// Makes a project from the photo library: the latest trip, the last
     /// month or this year, aimed at a one-minute movie.
-    func makeRecap(_ span: Recap.Span) {
+    func makeRecap(_ span: Recap.Span, automatic: Bool = false) {
         guard !busy else {return}
+        automaticRequested = automatic
         wholeVideo = false
         setBusy(true, .importing); percent = 0; message = NSLocalizedString("מחפש בגלריה…", comment: "Reading the photo library for a recap")
         operation = Task {
@@ -677,7 +690,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                     await self?.progress(fraction, text)
                 }
                 try Task.checkCancellation()
-                await runImport(staged, name: Recap.name(span, interval: interval), settings: ["targetLength": .text("60")])
+                await runImport(staged, name: Recap.name(span, interval: interval), settings: ["targetLength": .text("60")], automatic: automatic)
             } catch is CancellationError {finishImport(nil, cancelled: true)}
             catch {finishImport(nil, error: error)}
             for url in staged where FileManager.default.fileExists(atPath: url.path) {try? FileManager.default.removeItem(at: url)}
@@ -761,7 +774,10 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 try Task.checkCancellation()
                 guard var current = project, current.id == p.id else {return}
                 current.exports.append(LocalExport(file: file, duration: duration)); project = current; movieURL = output
-                if await save() {processingSucceeded = true; projectBytes = await persistence.bytes(current); message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"}
+                if await save() {
+                    processingSucceeded = true; projectBytes = await persistence.bytes(current); message = "הסרט נוצר באייפון ומוכן לשמירה ושיתוף"
+                    learnAutomaticTaste(from: snapshot)
+                }
             } catch is CancellationError {try? FileManager.default.removeItem(at: output); message = "הייצוא בוטל. העריכה נשמרה."}
             catch {try? FileManager.default.removeItem(at: output); message = error.localizedDescription}
             setBusy(false)
@@ -942,4 +958,300 @@ private extension String {
 }
 private extension Array {
     subscript(safe index: Int) -> Element? {indices.contains(index) ? self[index] : nil}
+}
+
+// MARK: - Automatic studio. One owned, cancellable operation from scan to file.
+extension EditorModel {
+    private var automaticTaste: AutomaticTaste {
+        guard let data = UserDefaults.standard.data(forKey: "automaticTasteV1") else {return AutomaticTaste()}
+        return (try? JSONDecoder().decode(AutomaticTaste.self, from: data)) ?? AutomaticTaste()
+    }
+    private func learnAutomaticTaste(from edit: Edit) {
+        var taste = automaticTaste
+        var human = edit
+        if let p = project, human.settings["automatic"]?.bool == true,
+           let last = AutomaticStore.versions(p.id).last, last.edit != edit {human.settings["automatic"] = .flag(false)}
+        taste.learn(human)
+        if let data = try? JSONEncoder().encode(taste) {UserDefaults.standard.set(data, forKey: "automaticTasteV1")}
+    }
+    func automaticMovie(style: AutomaticStyle = .personal, allStories: Bool = false, savePhotos: Bool = true) {
+        guard !busy, let initial = project else {return}
+        automaticRequested = true
+        if !initial.analyzed || LocalStore.readSignals(project: initial.id) == nil {
+            // Do not lose a chosen recipe when a scan is necessary.
+            automaticScanAndMake(style: style, allStories: allStories, savePhotos: savePhotos)
+            return
+        }
+        setBusy(true, .exporting); percent = 0; automaticPackage = nil
+        if !allStories && style != .personal {
+            var taste = automaticTaste; taste.choose(style)
+            if let data = try? JSONEncoder().encode(taste) {UserDefaults.standard.set(data, forKey: "automaticTasteV1")}
+        }
+        launchProcessing(title: NSLocalizedString("יצירה אוטומטית באייפון", comment: "Automatic task title")) { [self] in
+          operation = Task {
+            var uncommitted: [URL] = []
+            var completedOutputs: [URL] = []
+            defer {
+                for file in uncommitted {try? FileManager.default.removeItem(at: file)}
+                setBusy(false)
+            }
+            do {
+                guard await save() else {return}
+                guard var current = project, current.id == initial.id,
+                      let signals = LocalStore.readSignals(project: initial.id) else {throw CocoaError(.fileReadCorruptFile)}
+                let ready = AutomaticStore.readiness(current); automaticReadiness = ready
+                guard ready.sourcesPresent else {throw AppError(message: "חסר קובץ מקור או מוזיקה בפרויקט.")}
+                let currentID = current.id
+                current.music.removeAll {!FileManager.default.fileExists(atPath: LocalStore.file($0.file, project: currentID).path)}
+                try LocalStore.checkSpace(required: 512 * 1024 * 1024)
+                progress(0.03, NSLocalizedString("מזהה רגעים ושומר את ההקשר…", comment: "Automatic stage"))
+                let telemetry = await engine.telemetry(current)
+                var events = AutomaticDirector.events(project: current, signals: signals, telemetry: telemetry)
+                events = try await AutomaticVision.refine(events, project: current) {[weak self] fraction, text in await self?.progress(0.03 + 0.04 * fraction, text)}
+                guard !events.isEmpty else {throw AppError(message: "לא הצלחתי להכין רגעים מהמקור הזה. הקבצים נשמרו.")}
+                let previous = edit
+                try AutomaticStore.checkpoint(previous, style: style, project: current.id)
+                let styles: [AutomaticStyle] = allStories ? [.action, .cinematic, .family] : [style == .personal ? (automaticTaste.preferredStyle ?? .personal) : style]
+                var lastOutput: URL?
+                for (index, recipe) in styles.enumerated() {
+                    try Task.checkCancellation()
+                    var next = previous
+                    let kind = current.reading?.kind ?? .general
+                    next.settings.merge(recipe.settings(kind: kind, taste: automaticTaste)) {$1}
+                    let groups = FaceGroups.groups(signals.sightings ?? [])
+                    var candidates = events
+                    if let star = groups.first {
+                        next.settings["star"] = .text(star.key)
+                        let presence = FaceGroups.presence(star, sightings: signals.sightings ?? [], count: signals.motion.count)
+                        for index in candidates.indices {
+                            let first = max(0, Int(candidates[index].start)), last = min(presence.count, Int(ceil(candidates[index].end)))
+                            if first < last {
+                                let share = Double(presence[first..<last].filter {$0}.count) / Double(last - first)
+                                candidates[index].score += share * (recipe == .family ? 0.3 : 0.1)
+                            }
+                        }
+                    } else {next.settings.removeValue(forKey: "star")}
+                    next.clips = AutomaticDirector.choose(candidates, seconds: recipe == .family ? 60 : 45, style: recipe, locked: previous.clips)
+                    // A reliable, measured title never invents a place or date.
+                    let title = recipe == .personal ? (current.reading?.kind.title ?? current.name) : recipe.title
+                    next.settings["titleText"] = .text(String(title.prefix(Edit.titleLimit)))
+                    next.settings["subtitleText"] = .text("")
+                    next.settings["caption"] = .text(events.filter {event in next.clips.contains {$0.uid == event.id}}.map(\.title).prefix(3).joined(separator: " · "))
+                    // Prefer an existing local song. Otherwise compose an original
+                    // instrumental; no YouTube request or account is necessary.
+                    let originalSongs = current.music.filter {!$0.file.hasPrefix("automatic-")}
+                    let matchingScore = current.music.first {$0.file.hasPrefix("automatic-" + recipe.rawValue + "-")}
+                    if next.settings["useMusic"]?.bool != false && originalSongs.isEmpty && matchingScore == nil {
+                        progress(0.08, NSLocalizedString("יוצר מוזיקה מקורית במכשיר…", comment: "Automatic stage"))
+                        let name = "automatic-" + recipe.rawValue + "-" + UUID().uuidString + ".caf"
+                        let target = LocalStore.file(name, project: current.id)
+                        uncommitted.append(target)
+                        try await AutomaticMusic.make(kind: kind, style: recipe, seconds: 120, at: target)
+                        current.music.append(LocalMusic(file: name, name: NSLocalizedString("פסקול מקומי מקורי", comment: "Original offline score"), duration: 120))
+                        project = current
+                        guard await save() else {current.music.removeAll {$0.file == name}; project = current; return}
+                        uncommitted.removeAll {$0 == target}
+                    }
+                    if let chosen = originalSongs.first ?? current.music.first(where: {$0.file.hasPrefix("automatic-" + recipe.rawValue + "-")}) {
+                        current.music.removeAll {$0.id == chosen.id}; current.music.insert(chosen, at: 0)
+                        next.setMusicStart(0, for: chosen.id)
+                    }
+                    let review = AutomaticDirector.review(&next, project: current, events: events)
+                    guard !next.clips.isEmpty else {throw AppError(message: "לא נשארו קטעים תקינים לייצוא.")}
+                    let base = Double(index) / Double(styles.count), share = 1 / Double(styles.count)
+                    let filename = "RK-Auto-" + recipe.rawValue + "-" + UUID().uuidString + ".mp4"
+                    let output = LocalStore.file(filename, project: current.id)
+                    uncommitted.append(output)
+                    var run = AutomaticRun(sourceFiles: current.files, style: recipe, events: events, review: review, edit: next)
+                    try AutomaticStore.save(run, name: "automatic-run.json", project: current.id)
+                    automaticRun = run
+                    // Publish one edit mutation, not dozens of transient setting saves.
+                    edit = next; suppressedEdit = next; wholeVideo = false; current.wholeVideo = false
+                    let length = try await engine.export(current, edit: next, output: output) {[weak self] fraction, text in
+                        await self?.progress(0.1 + 0.85 * (base + share * fraction), text)
+                    }
+                    try Task.checkCancellation()
+                    try await AutomaticStore.validateMovie(output, expected: length)
+                    current.edit = next; current.exports.append(LocalExport(file: filename, duration: length))
+                    project = current
+                    guard await save() else {current.exports.removeAll {$0.file == filename}; project = current; return}
+                    uncommitted.removeAll {$0 == output}
+                    run.output = filename; run.completed = true
+                    try AutomaticStore.save(run, name: "automatic-run.json", project: current.id)
+                    try AutomaticStore.checkpoint(next, style: recipe, project: current.id, output: filename)
+                    automaticRun = run; lastOutput = output; movieURL = output; completedOutputs.append(output)
+                    let insights = AutomaticInsights.make(run, signals: signals, project: current)
+                    try AutomaticStore.save(insights, name: "automatic-insights.json", project: current.id)
+                    try AutomaticInsights.sourceNotes(insights).write(to: LocalStore.file("automatic-source-notes.txt", project: current.id), atomically: true, encoding: .utf8)
+                }
+                try Task.checkCancellation()
+                undoStack.append(previous); redoStack = []; updateUndo()
+                projectBytes = await persistence.bytes(current)
+                processingSucceeded = true
+                message = NSLocalizedString("הסרט מוכן — הרגעים, המוזיקה והעריכה נבחרו באייפון.", comment: "Automatic completion")
+                var writesPhotos = savePhotos
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-RKSkipAutomaticPhotos") {writesPhotos = false}
+                #endif
+                if writesPhotos, lastOutput != nil {
+                    let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                    photoPermissionDenied = permission != .authorized && permission != .limited
+                    if !photoPermissionDenied {
+                        do {
+                            let filesToSave = completedOutputs
+                            try await PHPhotoLibrary.shared().performChanges {for file in filesToSave {PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file)}}
+                            message = NSLocalizedString("הסרט האוטומטי נשמר בתמונות.", comment: "Automatic Photos completion")
+                        } catch {message = NSLocalizedString("הסרט נוצר בפרויקט, אך השמירה בתמונות נכשלה.", comment: "Automatic Photos failure")}
+                    } else {message = NSLocalizedString("הסרט מוכן בפרויקט. לשמירה בתמונות נדרשת הרשאת מערכת.", comment: "Automatic Photos permission")}
+                }
+                percent = 100
+            } catch is CancellationError {message = NSLocalizedString("היצירה האוטומטית בוטלה. המקורות והגרסאות שהושלמו נשמרו.", comment: "Automatic cancellation")}
+            catch {message = error.localizedDescription}
+          }
+        }
+    }
+    private func automaticScanAndMake(style: AutomaticStyle, allStories: Bool, savePhotos: Bool) {
+        guard !busy, var current = project else {return}
+        setBusy(true, .analyzing)
+        operation = Task {
+            var success = false
+            do {
+                let result = try await engine.analyze(current.files.map {LocalStore.file($0, project: current.id)}, whole: false) {[weak self] fraction, text in await self?.progress(fraction, text)}
+                try Task.checkCancellation()
+                guard project?.id == current.id, let signals = result.signals else {throw CocoaError(.fileReadCorruptFile)}
+                try LocalStore.writeSignals(signals, project: current.id)
+                current.duration = result.duration; current.scores = result.scores; current.reading = result.reading; current.analyzed = true
+                if current.joinsVideos {current.parts = ProjectPart.laid(current.files, durations: result.durations)}
+                project = current; loadSightings(signals)
+                success = await save()
+            } catch is CancellationError {message = NSLocalizedString("הניתוח בוטל. הסרטונים נשמרו.", comment: "Automatic scan cancellation")}
+            catch {message = error.localizedDescription}
+            setBusy(false)
+            if success {automaticMovie(style: style, allStories: allStories, savePhotos: savePhotos)}
+        }
+    }
+    func automaticCheck() {
+        guard !busy, let project else {return}
+        automaticReadiness = AutomaticStore.readiness(project)
+        message = NSLocalizedString(automaticReadiness?.ready == true ? "המקורות והמוזיקה מוכנים לעבודה ללא רשת." : "חסר מקור, מוזיקה או מקום פנוי לעבודה בשטח.", comment: "Offline readiness result")
+    }
+    func automaticRestoreVersion() {
+        guard !busy, let p = project else {return}
+        let versions = AutomaticStore.versions(p.id)
+        guard let version = versions.reversed().first(where: {$0.edit != edit}) else {message = NSLocalizedString("עדיין אין גרסה קודמת לשחזור.", comment: "No persistent version"); return}
+        let previous = edit
+        edit = version.edit; suppressedEdit = edit; undoStack.append(previous); redoStack = []; updateUndo(); scheduleSave()
+        wholeVideo = edit.settings["wholeVideo"]?.bool ?? false; project?.wholeVideo = wholeVideo
+        automaticRun = nil
+        message = NSLocalizedString("הגרסה הקודמת שוחזרה.", comment: "Persistent version restored")
+    }
+    func automaticArchive() {
+        guard !busy, let p = project else {return}
+        setBusy(true); percent = 0
+        operation = Task {
+            defer {setBusy(false)}
+            do {
+                guard await save() else {return}
+                automaticPackage = try await AutomaticStore.archive(p, edit: edit)
+                processingSucceeded = true
+                message = NSLocalizedString("גיבוי הפרויקט מוכן לשיתוף ולשמירה בקבצים.", comment: "Project package ready")
+            } catch is CancellationError {message = NSLocalizedString("הגיבוי בוטל.", comment: "Package cancellation")}
+            catch {message = error.localizedDescription}
+        }
+    }
+}
+
+extension EditorModel {
+    /// Inspect a bounded set of library sources, then export only a confident
+    /// visual match. No manual reference, in/out points or synchronization.
+    func automaticComparison() {
+        guard !busy, let current = project else {return}
+        let references = projects.filter {$0.id != current.id && $0.analyzed}.prefix(5)
+        guard !references.isEmpty else {message = NSLocalizedString("להשוואה אוטומטית צריך לפחות עוד פרויקט מנותח אחד.", comment: "No automatic comparison source"); return}
+        setBusy(true, .analyzing); percent = 0
+        operation = Task {
+            var unfinished: URL?
+            defer {if let unfinished {try? FileManager.default.removeItem(at: unfinished)}; setBusy(false)}
+            do {
+                guard await save() else {return}
+                var best: (LocalProject, AutomaticVision.Match)?
+                for (index, reference) in references.enumerated() {
+                    try Task.checkCancellation()
+                    progress(Double(index) / Double(references.count) * 0.5, NSLocalizedString("מחפש רגע דומה בפרויקטים המקומיים…", comment: "Automatic comparison progress"))
+                    if let found = try await AutomaticVision.match(LocalStore.file(current.source, project: current.id), LocalStore.file(reference.source, project: reference.id)), best == nil || found.distance < best!.1.distance {best = (reference, found)}
+                }
+                guard let best else {message = NSLocalizedString("לא נמצאה התאמה חזותית מספיק ברורה. לא נוצרה השוואה מטעה.", comment: "Ambiguous comparison result"); return}
+                let filename = "RK-Comparison-" + UUID().uuidString + ".mp4"
+                let output = LocalStore.file(filename, project: current.id); unfinished = output
+                progress(0.55, NSLocalizedString("מייצא השוואה מסונכרנת…", comment: "Automatic comparison progress"))
+                let duration = try await AutomaticComparison.export(left: LocalStore.file(current.source, project: current.id), right: LocalStore.file(best.0.source, project: best.0.id), match: best.1, output: output)
+                try Task.checkCancellation()
+                guard var updated = project, updated.id == current.id else {return}
+                let previous = updated
+                updated.exports.append(LocalExport(file: filename, duration: duration)); project = updated
+                guard await save() else {project = previous; return}
+                unfinished = nil; movieURL = output; processingSucceeded = true; percent = 100
+                message = NSLocalizedString("ההשוואה מוכנה. שני רגעים דומים מיושרים זה לצד זה.", comment: "Automatic comparison completed")
+            } catch is CancellationError {message = NSLocalizedString("ההשוואה בוטלה. המקורות נשמרו.", comment: "Automatic comparison cancelled")}
+            catch {message = error.localizedDescription}
+        }
+    }
+}
+
+extension EditorModel {
+    func automaticMulticam() {
+        guard !busy, let current = project else {return}
+        let references = Array(projects.filter {$0.id != current.id}.prefix(5))
+        guard !references.isEmpty else {message = NSLocalizedString("לסרט קבוצתי צריך עוד פרויקט עם צילום מקביל ואודיו משותף.", comment: "Multicam needs sources"); return}
+        setBusy(true, .analyzing); percent = 0
+        operation = Task {
+            var unfinished: URL?
+            defer {if let unfinished {try? FileManager.default.removeItem(at: unfinished)}; setBusy(false)}
+            do {
+                guard await save() else {return}
+                progress(0.05, NSLocalizedString("מסנכרן מצלמות לפי הצלילים במקורות…", comment: "Multicam progress"))
+                guard let pair = try await AutomaticMulticam.find(current, references: references) else {
+                    message = NSLocalizedString("לא נמצא אודיו משותף ברור. נדרשים שני צילומים מקבילים של 3 שניות עד 10 דקות, בהפרש התחלה של עד 30 שניות.", comment: "Multicam unsupported or ambiguous"); return
+                }
+                let filename = "RK-Multicam-" + UUID().uuidString + ".mp4"
+                let output = LocalStore.file(filename, project: current.id); unfinished = output
+                progress(0.5, NSLocalizedString("בוחר זוויות ומייצא סרט קבוצתי…", comment: "Multicam progress"))
+                let length = try await AutomaticComparison.export(left: LocalStore.file(current.source, project: current.id), right: LocalStore.file(pair.reference.source, project: pair.reference.id), match: pair.match, output: output, alternating: true)
+                try Task.checkCancellation()
+                guard var updated = project, updated.id == current.id else {return}
+                let previous = updated
+                updated.exports.append(LocalExport(file: filename, duration: length)); project = updated
+                guard await save() else {project = previous; return}
+                unfinished = nil; movieURL = output; processingSucceeded = true; percent = 100
+                message = NSLocalizedString("הסרט הקבוצתי מוכן: שתי זוויות על אותו ציר זמן, עם סאונד רציף.", comment: "Multicam done")
+            } catch is CancellationError {message = NSLocalizedString("היצירה האוטומטית בוטלה. המקורות והגרסאות שהושלמו נשמרו.", comment: "Automatic cancellation")}
+            catch {message = error.localizedDescription}
+        }
+    }
+}
+
+extension EditorModel {
+    func automaticRestorePackage(_ file: URL) {
+        guard !busy else {return}
+        setBusy(true, .importing)
+        operation = Task {
+            var restored: LocalProject?
+            do {
+                guard await save() else {setBusy(false); return}
+                message = NSLocalizedString("בודק ומשחזר את גיבוי הפרויקט…", comment: "Package restore progress")
+                let imported = try await AutomaticPackage.restore(file)
+                restored = imported
+                try Task.checkCancellation()
+                revision += 1; try await persistence.save(imported, revision: revision)
+                refreshLibrary(imported)
+                processingSucceeded = true; setBusy(false)
+                await open(imported)
+                message = NSLocalizedString("הפרויקט שוחזר עם המקורות והעריכה, בלי לשנות פרויקט קיים.", comment: "Package restore completed")
+            } catch {
+                if let restored {try? FileManager.default.removeItem(at: LocalStore.folder(restored.id))}
+                message = error is CancellationError ? NSLocalizedString("השחזור בוטל. הפרויקטים הקיימים נשמרו.", comment: "Restore cancelled") : error.localizedDescription
+                setBusy(false)
+            }
+        }
+    }
 }

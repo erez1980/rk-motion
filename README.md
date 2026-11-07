@@ -19,6 +19,24 @@ upload, no server.
 - **Exports** a finished movie with transitions, an opening title and a
   vertical or source frame, saved to Photos.
 
+## Automatic studio (0.33.0)
+
+Tap **Make my movie** in a project to choose complete moments, make a local
+instrumental when no music is present, frame, check and export the movie.
+The home-screen monthly movie also chooses its source media. System Photos
+permission may be needed once; typing a prompt or choosing music is optional.
+The studio offers three audience recipes, persistent version restore,
+verified project ZIP backup/restore, conservative visual comparison and
+an experimental audio-synchronized two-camera movie.
+
+The full 10 + 20 roadmap is tracked honestly as implemented, partial or
+research in [Automatic studio plan](docs/AUTOMATIC_STUDIO_PLAN.md).
+For continuation, read [Engineering handoff](docs/AUTOMATIC_STUDIO_HANDOFF.md)
+and [Original product research](docs/PRODUCT_AI_RESEARCH_2026-10-23.he.md).
+These are proposals plus a working first implementation, not a claim that
+all thirty capabilities have shipped. New image-model assistance is optional,
+local-only and gated on SDK/OS/model availability.
+
 ## Install
 
 Add this source in SideStore on the iPhone, then install and update from there:
