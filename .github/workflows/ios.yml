@@ -19,7 +19,7 @@ jobs:
   # the run, build still runs. workflow_dispatch and main do not wait.
   prepare:
     if: github.event_name == 'push' && github.ref != 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: deploy-ci
     timeout-minutes: 5
     permissions:
       contents: read
@@ -104,7 +104,7 @@ jobs:
   release:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: deploy-ci
     permissions:
       contents: write
     concurrency:
