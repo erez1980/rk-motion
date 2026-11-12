@@ -1889,22 +1889,6 @@
         }
       }
     },
-    "המשך לעריכה": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue to editing"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "המשך לעריכה"
-          }
-        }
-      }
-    },
     "המתינו לסיום הפעולה הנוכחית": {
       "localizations": {
         "en": {
@@ -2477,38 +2461,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "הפרויקטים שלי"
-          }
-        }
-      }
-    },
-    "הצעה": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suggestion"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "הצעה"
-          }
-        }
-      }
-    },
-    "הצעה לכותרת ולכיתוב ✨": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suggest a title and caption ✨"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "הצעה לכותרת ולכיתוב ✨"
           }
         }
       }
@@ -4177,22 +4129,6 @@
         }
       }
     },
-    "מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shown over the first seconds of the movie. Leave it empty for no title."
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "מופיעה בשניות הראשונות של הסרט. השאירו ריק לסרט בלי כותרת."
-          }
-        }
-      }
-    },
     "מורידה את השמע מ־YouTube…": {
       "localizations": {
         "en": {
@@ -4909,22 +4845,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ניתוח באייפון…"
-          }
-        }
-      }
-    },
-    "ניתוח הסרטון": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Analyze the video"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ניתוח הסרטון"
           }
         }
       }
@@ -8465,38 +8385,6 @@
         }
       }
     },
-    "סיכום מהגלריה": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recap from your library"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "סיכום מהגלריה"
-          }
-        }
-      }
-    },
-    "הטיול האחרון, החודש או השנה, בלי לבחור קבצים": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your latest trip, the month or the year, with nothing to pick"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "הטיול האחרון, החודש או השנה, בלי לבחור קבצים"
-          }
-        }
-      }
-    },
     "הטיול האחרון": {
       "localizations": {
         "en": {
@@ -8881,22 +8769,6 @@
         }
       }
     },
-    "אבחר בעצמי סרטונים ותמונות מהגלריה, מפוזרים לאורך הזמן ומועדפים קודם, ואערוך מהם סרט של דקה.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I'll choose videos and photos from your library myself, spread over the time and favorites first, and edit a one-minute movie from them."
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "אבחר בעצמי סרטונים ותמונות מהגלריה, מפוזרים לאורך הזמן ומועדפים קודם, ואערוך מהם סרט של דקה."
-          }
-        }
-      }
-    },
     "אנשים בפריים": {
       "localizations": {
         "he": {
@@ -8925,22 +8797,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Automatic action"
-          }
-        }
-      }
-    },
-    "בדוק מוכנות לשטח": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "בדוק מוכנות לשטח"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Check offline readiness"
           }
         }
       }
@@ -8989,22 +8845,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Next time, a short reaction from the participants could add personal context."
-          }
-        }
-      }
-    },
-    "גבה את הפרויקט": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "גבה את הפרויקט"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Back up project"
           }
         }
       }
@@ -9213,38 +9053,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sounds of the moment"
-          }
-        }
-      }
-    },
-    "השווה ניסיון אוטומטית": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "השווה ניסיון אוטומטית"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Compare a take automatically"
-          }
-        }
-      }
-    },
-    "חזור לגרסה הקודמת": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "חזור לגרסה הקודמת"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restore previous version"
           }
         }
       }
@@ -9505,22 +9313,6 @@
         }
       }
     },
-    "סרט אוטומטי מהחודש האחרון": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "סרט אוטומטי מהחודש האחרון"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Automatic movie from the last month"
-          }
-        }
-      }
-    },
     "עדיין אין גרסה קודמת לשחזור.": {
       "localizations": {
         "he": {
@@ -9533,22 +9325,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "There is no previous version to restore yet."
-          }
-        }
-      }
-    },
-    "על מה הסתמכתי": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "על מה הסתמכתי"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "What informed this edit"
           }
         }
       }
@@ -9825,22 +9601,6 @@
         }
       }
     },
-    "שחזר גיבוי פרויקט": {
-      "localizations": {
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "שחזר גיבוי פרויקט"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restore project backup"
-          }
-        }
-      }
-    },
     "בודק ומשחזר את גיבוי הפרויקט…": {
       "localizations": {
         "he": {
@@ -9905,22 +9665,6 @@
         }
       }
     },
-    "בסוף הסרט התמונה עוברת למסך שבו הלוגו של RK Motion מופיע באנימציה": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The movie ends by moving into a screen where the RK Motion logo animates in"
-          }
-        },
-        "he": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "בסוף הסרט התמונה עוברת למסך שבו הלוגו של RK Motion מופיע באנימציה"
-          }
-        }
-      }
-    },
     "יצירת מסך הסיום נכשלה.": {
       "localizations": {
         "en": {
@@ -9933,6 +9677,806 @@
           "stringUnit": {
             "state": "translated",
             "value": "יצירת מסך הסיום נכשלה."
+          }
+        }
+      }
+    },
+    "45 שניות לפי מה שזיהיתי ולפי הסגנון שבחרת עד עכשיו": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "45 seconds, from what I detected and the style you have chosen so far"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "45 שניות לפי מה שזיהיתי ולפי הסגנון שבחרת עד עכשיו"
+          }
+        }
+      }
+    },
+    "אדם %1$@, נראה %2$@ פעמים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Person %1$@, seen %2$@ times"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אדם %1$@, נראה %2$@ פעמים"
+          }
+        }
+      }
+    },
+    "אלחין באייפון קטע מקורי לפי סוג הסרטון, בלי רשת ובלי לחפש שיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll compose an original track on your iPhone for this kind of video, with no network and no song search"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אלחין באייפון קטע מקורי לפי סוג הסרטון, בלי רשת ובלי לחפש שיר"
+          }
+        }
+      }
+    },
+    "אנשים, דיבור וצחוק קודם, דקה שלמה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "People, talk and laughter first, a full minute"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אנשים, דיבור וצחוק קודם, דקה שלמה"
+          }
+        }
+      }
+    },
+    "אפשר לבקש במילים, למשל: חצי דקה, או תמצא את הים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask in words, for example: half a minute, or find the sea"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לבקש במילים, למשל: חצי דקה, או תמצא את הים"
+          }
+        }
+      }
+    },
+    "אקשן, קולנועי ומשפחתי, מאותם הצילומים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Action, cinematic and family, from the same footage"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אקשן, קולנועי ומשפחתי, מאותם הצילומים"
+          }
+        }
+      }
+    },
+    "בדיקה שאפשר לעבוד בלי רשת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check you can work offline"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדיקה שאפשר לעבוד בלי רשת"
+          }
+        }
+      }
+    },
+    "בחרו לפחות קטע אחד לסרט.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose at least one clip for the movie."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו לפחות קטע אחד לסרט."
+          }
+        }
+      }
+    },
+    "בלי כותרת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No title"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי כותרת"
+          }
+        }
+      }
+    },
+    "בלי כותרת פתיחה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No opening title"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי כותרת פתיחה"
+          }
+        }
+      }
+    },
+    "בלי לבחור קבצים: רגעים, מוזיקה וסיום נבחרים לבד": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No files to pick: moments, music and ending are chosen for you"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בלי לבחור קבצים: רגעים, מוזיקה וסיום נבחרים לבד"
+          }
+        }
+      }
+    },
+    "גיבוי הפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back up the project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גיבוי הפרויקט"
+          }
+        }
+      }
+    },
+    "גיבוי ושחזור": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup and restore"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "גיבוי ושחזור"
+          }
+        }
+      }
+    },
+    "דיבור וצחוק עם הקול המקורי, בלי שיר": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk and laughter with the original sound, no song"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דיבור וצחוק עם הקול המקורי, בלי שיר"
+          }
+        }
+      }
+    },
+    "הוספת כותרת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a title"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת כותרת"
+          }
+        }
+      }
+    },
+    "הזזה למטה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move down"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הזזה למטה"
+          }
+        }
+      }
+    },
+    "הזזה למעלה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move up"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הזזה למעלה"
+          }
+        }
+      }
+    },
+    "המשך לעריכה ידנית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue to manual editing"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך לעריכה ידנית"
+          }
+        }
+      }
+    },
+    "הסרטונים בפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos in the project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטונים בפרויקט"
+          }
+        }
+      }
+    },
+    "העריכה הקודמת שנשמרה, גם אחרי סגירת האפליקציה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The previous saved edit, even after the app was closed"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "העריכה הקודמת שנשמרה, גם אחרי סגירת האפליקציה"
+          }
+        }
+      }
+    },
+    "הצעה חדשה ✨": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New suggestion ✨"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצעה חדשה ✨"
+          }
+        }
+      }
+    },
+    "השוואה וזוויות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparison and angles"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השוואה וזוויות"
+          }
+        }
+      }
+    },
+    "השוואה לצילום קודם באותו מקום": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare with earlier footage of the same place"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השוואה לצילום קודם באותו מקום"
+          }
+        }
+      }
+    },
+    "חזרה לגרסה הקודמת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to the previous version"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזרה לגרסה הקודמת"
+          }
+        }
+      }
+    },
+    "יצירת המוזיקה בוטלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Composing the music was cancelled."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יצירת המוזיקה בוטלה."
+          }
+        }
+      }
+    },
+    "כללי קטעים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip rules"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כללי קטעים"
+          }
+        }
+      }
+    },
+    "לא בסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא בסרט"
+          }
+        }
+      }
+    },
+    "לוגו RK Motion בסוף הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The RK Motion logo at the end of the movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לוגו RK Motion בסוף הסרט"
+          }
+        }
+      }
+    },
+    "למה הרגעים האלה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why these moments"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "למה הרגעים האלה"
+          }
+        }
+      }
+    },
+    "מוזיקה מקורית לסרטון הזה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original music for this video"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוזיקה מקורית לסרטון הזה"
+          }
+        }
+      }
+    },
+    "מופיעה בשניות הראשונות של הסרט.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown in the first seconds of the movie."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מופיעה בשניות הראשונות של הסרט."
+          }
+        }
+      }
+    },
+    "מוצא בפרויקט אחר את הפריים הדומה ומציג את שניהם זה לצד זה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finds the matching frame in another project and shows both side by side"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מוצא בפרויקט אחר את הפריים הדומה ומציג את שניהם זה לצד זה"
+          }
+        }
+      }
+    },
+    "מחבר צילום מקביל מפרויקט אחר לפי הקול המשותף": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Joins footage filmed at the same time in another project, matched by shared sound"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחבר צילום מקביל מפרויקט אחר לפי הקול המשותף"
+          }
+        }
+      }
+    },
+    "מסך סיום": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End screen"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מסך סיום"
+          }
+        }
+      }
+    },
+    "נוספה מוזיקה מקורית לפרויקט.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original music was added to the project."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נוספה מוזיקה מקורית לפרויקט."
+          }
+        }
+      }
+    },
+    "ניתוח ועריכה ידנית": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze and edit manually"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח ועריכה ידנית"
+          }
+        }
+      }
+    },
+    "נשמר בתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשמר בתמונות"
+          }
+        }
+      }
+    },
+    "סרט אוטומטי מהגלריה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic movie from your library"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרט אוטומטי מהגלריה"
+          }
+        }
+      }
+    },
+    "סרטים אוטומטיים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic movies"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סרטים אוטומטיים"
+          }
+        }
+      }
+    },
+    "עוד אפשרויות ייצוא": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More export options"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עוד אפשרויות ייצוא"
+          }
+        }
+      }
+    },
+    "עוד רעיונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More ideas"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עוד רעיונות"
+          }
+        }
+      }
+    },
+    "פותח גיבוי כפרויקט חדש, בלי לדרוס פרויקט קיים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens a backup as a new project, without overwriting an existing one"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פותח גיבוי כפרויקט חדש, בלי לדרוס פרויקט קיים"
+          }
+        }
+      }
+    },
+    "פריימים יפים ונופים, מעברי המסה רכים": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beautiful frames and scenery, soft dissolves"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פריימים יפים ונופים, מעברי המסה רכים"
+          }
+        }
+      }
+    },
+    "צריך עוד פרויקט באייפון שצולם באותו זמן.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs another project on this iPhone filmed at the same time."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צריך עוד פרויקט באייפון שצולם באותו זמן."
+          }
+        }
+      }
+    },
+    "צריך עוד פרויקט מנותח באייפון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs another analyzed project on this iPhone."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צריך עוד פרויקט מנותח באייפון."
+          }
+        }
+      }
+    },
+    "קובץ ZIP עם המקורות, המוזיקה והעריכה, לשמירה או לשיתוף": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A ZIP file with the sources, music and edit, to keep or share"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קובץ ZIP עם המקורות, המוזיקה והעריכה, לשמירה או לשיתוף"
+          }
+        }
+      }
+    },
+    "רגע %1$@ מתוך %2$@, מ־%3$@ עד %4$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moment %1$@ of %2$@, %3$@ to %4$@"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רגע %1$@ מתוך %2$@, מ־%3$@ עד %4$@"
+          }
+        }
+      }
+    },
+    "שהמקורות, המוזיקה והמקום הפנוי כולם באייפון": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That the sources, music and free space are all on this iPhone"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שהמקורות, המוזיקה והמקום הפנוי כולם באייפון"
+          }
+        }
+      }
+    },
+    "שחזור פרויקט מגיבוי": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore a project from a backup"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שחזור פרויקט מגיבוי"
+          }
+        }
+      }
+    },
+    "תנועה ושיאים קודם, פתיח הוק וזום על הביט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion and peaks first, a hook opening and beat zoom"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תנועה ושיאים קודם, פתיח הוק וזום על הביט"
           }
         }
       }

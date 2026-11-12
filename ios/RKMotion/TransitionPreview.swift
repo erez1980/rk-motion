@@ -12,7 +12,22 @@ struct TransitionPreview: View {
     static let loop = 2.4, hold = 0.8
     /// The styles "smart" cycles through, one each loop.
     static let smartCycle = ["zoom", "dissolve", "slide", "flash", "fade"]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        if reduceMotion {
+            // Reduce Motion: the middle of the transition, held still.
+            GeometryReader {geometry in
+                picture(style == SmartTransitions.name ? Self.smartCycle[0] : style, t: 0.5, width: geometry.size.width)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            .clipped()
+            .environment(\.layoutDirection, .leftToRight)
+            .accessibilityHidden(true)
+        } else {
+            looping
+        }
+    }
+    private var looping: some View {
         TimelineView(.animation) {context in
             let time = context.date.timeIntervalSinceReferenceDate
             let round = Int(time / Self.loop)
@@ -82,14 +97,14 @@ struct TransitionPicker: View {
                         VStack(spacing: 4) {
                             TransitionPreview(style: option, first: first, second: second)
                                 .frame(height: 54)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
                             Text(verbatim: StyleSheetNames.transition(option)).font(RK.font(13, picked ? 600 : 400))
                                 .lineLimit(1).minimumScaleFactor(0.7)
                                 .foregroundStyle(picked ? RK.ink : RK.soft)
                         }
                         .padding(5)
-                        .background(picked ? RK.accentSoft : RK.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(picked ? RK.accent : Color.clear, lineWidth: 2))
+                        .background(picked ? RK.accentSoft : RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous).stroke(picked ? RK.accent : Color.clear, lineWidth: 2))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

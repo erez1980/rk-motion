@@ -33,9 +33,7 @@ struct RootView: View {
             }, open: {project in
                 Task {await model.open(project); if model.project?.id == project.id {path = [.project]}}
             }, about: {path = [.about]}, recap: {span in
-                Task {await model.close(); if model.project == nil {path = [.project]; model.makeRecap(span)}}
-            }, automatic: {
-                Task {await model.close(); if model.project == nil {path = [.project]; model.makeRecap(.month, automatic: true)}}
+                Task {await model.close(); if model.project == nil {path = [.project]; model.makeRecap(span, automatic: true)}}
             })
             .navigationDestination(for: Route.self) {route in
                 switch route {

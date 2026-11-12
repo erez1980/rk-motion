@@ -719,6 +719,46 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         } catch {if let imported {try? FileManager.default.removeItem(at: LocalStore.file(imported, project: p.id))}; message = error.localizedDescription}
         setBusy(false)
     }
+    /// Composes an original score on the iPhone for what the scan found and
+    /// adds it as the project's song: no search, network or file to pick.
+    func composeOriginalMusic() {
+        guard !busy, project != nil else {return}
+        setBusy(true); percent = 0
+        message = NSLocalizedString("יוצר מוזיקה מקורית במכשיר…", comment: "Automatic stage")
+        operation = Task {
+            defer {setBusy(false)}
+            guard await save(), var p = project else {return}
+            let name = "automatic-" + AutomaticStyle.personal.rawValue + "-" + UUID().uuidString + ".caf"
+            let target = LocalStore.file(name, project: p.id)
+            // Long enough for the movie with its end screen, within the composer's bounds.
+            let seconds = min(600, max(60, (movieDuration ?? 60) + 10))
+            do {
+                try await AutomaticMusic.make(kind: p.reading?.kind ?? .general, style: .personal, seconds: seconds, at: target)
+                try Task.checkCancellation()
+                guard project?.id == p.id else {try? FileManager.default.removeItem(at: target); return}
+                p = project ?? p
+                p.music.append(LocalMusic(file: name, name: NSLocalizedString("פסקול מקומי מקורי", comment: "Original offline score"), duration: seconds))
+                project = p; previewEdit = nil
+                if await save() {message = NSLocalizedString("נוספה מוזיקה מקורית לפרויקט.", comment: "An original score was added to the project")}
+                else {p.music.removeAll {$0.file == name}; project = p; try? FileManager.default.removeItem(at: target)}
+            } catch {
+                try? FileManager.default.removeItem(at: target)
+                message = error is CancellationError ? NSLocalizedString("יצירת המוזיקה בוטלה.", comment: "Composing the original score was cancelled") : error.localizedDescription
+            }
+        }
+    }
+    /// Remembers which movies are already in Photos, so the finished movie
+    /// offers sharing instead of a second copy.
+    func markSavedToPhotos(_ files: [URL]) async {
+        guard var p = project else {return}
+        let names = Set(files.map(\.lastPathComponent))
+        var changed = false
+        for index in p.exports.indices where names.contains(p.exports[index].file) && p.exports[index].savedToPhotos != true {
+            p.exports[index].savedToPhotos = true; changed = true
+        }
+        guard changed else {return}
+        project = p; refreshLibrary(p); await save()
+    }
     /// Downloads a song's audio from a YouTube link, then adds it exactly as a
     /// song picked from Files would be added.
     func importYouTube(_ text: String) {
@@ -932,7 +972,10 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         photoPermissionDenied = permission != .authorized && permission != .limited
         guard !photoPermissionDenied else {message = "אפשרו שמירה בתמונות בהגדרות האייפון"; return}
-        do {try await PHPhotoLibrary.shared().performChanges {PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file)}; message = "הסרט נשמר בתמונות"}
+        do {
+            try await PHPhotoLibrary.shared().performChanges {PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file)}
+            await markSavedToPhotos([file]); message = "הסרט נשמר בתמונות"
+        }
         catch {message = error.localizedDescription}
     }
 }
@@ -1100,6 +1143,7 @@ extension EditorModel {
                         do {
                             let filesToSave = completedOutputs
                             try await PHPhotoLibrary.shared().performChanges {for file in filesToSave {PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file)}}
+                            await markSavedToPhotos(filesToSave)
                             message = NSLocalizedString("הסרט האוטומטי נשמר בתמונות.", comment: "Automatic Photos completion")
                         } catch {message = NSLocalizedString("הסרט נוצר בפרויקט, אך השמירה בתמונות נכשלה.", comment: "Automatic Photos failure")}
                     } else {message = NSLocalizedString("הסרט מוכן בפרויקט. לשמירה בתמונות נדרשת הרשאת מערכת.", comment: "Automatic Photos permission")}

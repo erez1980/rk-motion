@@ -14,6 +14,16 @@ enum AutomaticStyle: String, Codable, CaseIterable, Identifiable {
         case .natural: return NSLocalizedString("הצלילים של הרגע", comment: "Automatic original-sound recipe")
         }
     }
+    /// What the recipe does, in a line under its name.
+    var detail: String {
+        switch self {
+        case .personal: return NSLocalizedString("45 שניות לפי מה שזיהיתי ולפי הסגנון שבחרת עד עכשיו", comment: "Automatic recipe detail: personal")
+        case .action: return NSLocalizedString("תנועה ושיאים קודם, פתיח הוק וזום על הביט", comment: "Automatic recipe detail: action")
+        case .cinematic: return NSLocalizedString("פריימים יפים ונופים, מעברי המסה רכים", comment: "Automatic recipe detail: cinematic")
+        case .family: return NSLocalizedString("אנשים, דיבור וצחוק קודם, דקה שלמה", comment: "Automatic recipe detail: family")
+        case .natural: return NSLocalizedString("דיבור וצחוק עם הקול המקורי, בלי שיר", comment: "Automatic recipe detail: original sound")
+        }
+    }
     var symbol: String {
         switch self {
         case .personal: return "sparkles"

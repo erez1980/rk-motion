@@ -19,7 +19,7 @@ struct MusicStartView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 12) {
                         Image(systemName: "music.note").font(.system(size: 18, weight: .medium)).foregroundStyle(RK.accent)
-                            .frame(width: 44, height: 44).background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .frame(width: 44, height: 44).background(RK.raised, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verbatim: song.name).font(RK.font(16, 500)).foregroundStyle(RK.ink).lineLimit(2)
                             Text(verbatim: RK.clock(song.duration)).font(RK.font(13, 400, style: .footnote)).monospacedDigit().foregroundStyle(RK.soft)
@@ -116,7 +116,7 @@ struct MusicStartView: View {
         }
         .frame(height: 96)
         .padding(12)
-        .background(RK.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
         .environment(\.layoutDirection, .leftToRight)
         .accessibilityElement()
         .accessibilityLabel("נקודת ההתחלה בשיר")
