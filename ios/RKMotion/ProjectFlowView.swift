@@ -241,6 +241,17 @@ private struct VideoStep: View {
                         SourceVideoRow(project: project, part: part, number: index + 1).rkRow(top: 3, bottom: 3)
                     }
                 }
+                // More of the same day joins this project's movie, at its end.
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("הוספת סרטון לפרויקט").font(RK.font(15, 500)).foregroundStyle(RK.ink)
+                    Text("הסרטון מתווסף בסוף, רק הוא נסרק, והרגעים הטובים שלו נכנסים לסרט.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                    HStack(spacing: 10) {
+                        PhotosPicker(selection: $picked, maxSelectionCount: 30, selectionBehavior: .ordered, matching: .any(of: [.videos, .images]), preferredItemEncoding: .current) {SourceTile(title: "מהתמונות", symbol: "photo.on.rectangle")}
+                            .accessibilityIdentifier("video.addPhotos")
+                        Button {showImporter = true} label: {SourceTile(title: "מהקבצים", symbol: "folder")}
+                            .accessibilityIdentifier("video.addFiles")
+                    }.buttonStyle(.plain)
+                }.rkCard().disabled(model.busy).rkRow(top: 10)
             } else {
                 Text("בחרו סרטונים ותמונות").font(RK.font(22, 700, style: .title2)).foregroundStyle(RK.ink).rkRow(top: 4)
                 Text("כמה סרטונים מתחברים לסרט אחד, לפי סדר הצילום. תמונות יקבלו תנועה משלהן.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).rkRow(top: 0)
@@ -277,11 +288,11 @@ private struct VideoStep: View {
         }
         .onChange(of: picked) {_, items in
             guard !items.isEmpty else {return}
-            model.importPickedVideos(items); picked = []
+            model.importPickedVideos(items, adding: model.project != nil); picked = []
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.movie, .image], allowsMultipleSelection: true) {result in
             switch result {
-            case .success(let sources): Task {await model.importVideos(sources)}
+            case .success(let sources): Task {await model.importVideos(sources, adding: model.project != nil)}
             case .failure(let error): model.message = error.localizedDescription
             }
         }
