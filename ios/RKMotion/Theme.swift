@@ -2,8 +2,9 @@ import SwiftUI
 import UIKit
 import CoreText
 
-/// The web app's colours, so the phone and the Mac look like one product.
-/// Night is the brand; day follows the web app's light theme.
+/// The app's colours. Night is the brand; day is its light theme.
+/// Small text in both themes keeps at least 4.5:1 on the background, a card
+/// and a raised surface.
 enum RK {
     enum UI {
         static let bg = pair(0x0a0d0b, 0xf4f8f3)
@@ -11,8 +12,8 @@ enum RK {
         static let raised = pair(0x1b231c, 0xeef4ec)
         static let ink = pair(0xf0f6f0, 0x17211a)
         static let soft = pair(0x9fb4a7, 0x586b5e)
-        // Day text at 4.6:1 on the background, the floor for small type.
-        static let faint = pair(0x6f8577, 0x617467)
+        // At least 4.7:1 on the background, a card and a raised surface, in both themes.
+        static let faint = pair(0x7a9082, 0x5c6f62)
         static let line = pair(0x263029, 0xdce5da)
         static let accent = pair(0xc8f542, 0x3f6d0a)
         static let accentInk = pair(0x182505, 0xffffff)
@@ -44,6 +45,15 @@ enum RK {
     static let danger = Color(uiColor: UI.danger)
     static let barIdle = Color(uiColor: UI.barIdle)
     static let barSkipped = Color(uiColor: UI.barSkipped)
+    /// The brand lime whatever the theme, for marks drawn over video.
+    static let lime = Color(uiColor: UI.accent.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)))
+
+    /// The three corner sizes: small tiles and chips, rows, and cards.
+    enum Radius {
+        static let small: CGFloat = 12
+        static let row: CGFloat = 16
+        static let card: CGFloat = 20
+    }
 
     /// Rubik ships as one variable font, so a weight is a point on its axis
     /// rather than a separate face.
@@ -80,7 +90,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .font(RK.font(17, 700, style: .headline))
             .foregroundStyle(RK.accentInk)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(RK.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(RK.accent, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
             .opacity(enabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
     }
 }
@@ -92,8 +102,8 @@ struct SecondaryButtonStyle: ButtonStyle {
             .font(RK.font(15, 500))
             .foregroundStyle(configuration.role == .destructive ? RK.danger : RK.ink)
             .frame(maxWidth: .infinity, minHeight: height)
-            .background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(RK.line))
+            .background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.row, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: RK.Radius.row, style: .continuous).stroke(RK.line))
             .opacity(enabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
     }
 }
@@ -106,7 +116,7 @@ struct IconButtonStyle: ButtonStyle {
             .font(.system(size: 20, weight: .medium))
             .foregroundStyle(RK.soft)
             .frame(width: size, height: size)
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(RK.line))
+            .overlay(RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous).stroke(RK.line))
             .contentShape(Rectangle())
             .opacity(enabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
     }
@@ -123,7 +133,7 @@ extension View {
     }
     func rkCard(padding: CGFloat = 14) -> some View {
         self.padding(padding).frame(maxWidth: .infinity, alignment: .leading)
-            .background(RK.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
     }
     /// A list row that draws its own card instead of the system's grouped cell.
     func rkRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
@@ -132,6 +142,13 @@ extension View {
     }
     func rkScreen() -> some View {
         self.listStyle(.plain).scrollContentBackground(.hidden).background(RK.bg.ignoresSafeArea())
+    }
+    /// A player as wide as the screen at the picture's own shape, never
+    /// taller than `maxHeight`, so a portrait movie stays in view.
+    func rkPlayerFrame(ratio: CGFloat, maxHeight: CGFloat = 360) -> some View {
+        self.aspectRatio(ratio.isFinite && ratio > 0 ? ratio : 16 / 9, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
+            .frame(maxWidth: .infinity, maxHeight: maxHeight)
     }
 }
 
@@ -154,10 +171,16 @@ struct ChoiceGroup: View {
     @Binding var selection: String
     /// Options per row; all in one row unless there are too many to read.
     var columns: Int?
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// Large text gets two options a row instead of shrinking back to small.
+    private var perRow: Int {
+        let wanted = max(1, columns ?? options.count)
+        return typeSize >= .xLarge && wanted > 2 ? 2 : wanted
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: max(1, columns ?? options.count)), spacing: 3) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: perRow), spacing: 3) {
                 ForEach(options, id: \.1) {option in
                     let (label, value) = option
                     let picked = value == selection
@@ -166,12 +189,12 @@ struct ChoiceGroup: View {
                             .lineLimit(1).minimumScaleFactor(0.7)
                             .foregroundStyle(picked ? RK.accentInk : RK.soft)
                             .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(picked ? RK.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .background(picked ? RK.accent : Color.clear, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
                             .contentShape(Rectangle())
                     }.buttonStyle(.plain)
                     .accessibilityAddTraits(picked ? .isSelected : [])
                 }
-            }.padding(3).background(RK.card, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            }.padding(3).background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
         }
     }
 }
@@ -261,7 +284,7 @@ struct MessageCard: View {
                 }
             }
             .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .background(RK.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(RK.raised, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
         }
     }
 }

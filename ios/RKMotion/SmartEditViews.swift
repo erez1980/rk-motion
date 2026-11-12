@@ -4,6 +4,8 @@ import UIKit
 /// "Tell me what to change": an edit or a search in the rider's own words.
 struct AskCard: View {
     @ObservedObject var model: EditorModel
+    /// Called once a request was handled, to close the sheet it sits in.
+    var done: (() -> Void)?
     @State private var text = ""
     @State private var asking = false
     @FocusState private var focused: Bool
@@ -16,7 +18,7 @@ struct AskCard: View {
                     .font(RK.font(15)).lineLimit(1...3).focused($focused).submitLabel(.send)
                     .onSubmit(send)
                     .padding(.horizontal, 12).padding(.vertical, 10)
-                    .background(RK.raised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(RK.raised, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
                     .accessibilityIdentifier("ask.field")
                 Button(action: send) {
                     Group {
@@ -45,6 +47,7 @@ struct AskCard: View {
         .rkCard()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ask.card")
+        .onAppear {focused = true}
     }
     private func send() {
         let request = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -53,6 +56,7 @@ struct AskCard: View {
         Task {
             await model.chat(request)
             text = ""; asking = false
+            done?()
         }
     }
 }
@@ -60,18 +64,24 @@ struct AskCard: View {
 /// The people seen in the footage; the one tapped becomes the movie's star.
 struct StarCard: View {
     @ObservedObject var model: EditorModel
+    /// Inside the detection card: a smaller row, without a card of its own.
+    var embedded = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("כוכב הסרט", systemImage: "star.circle").font(RK.font(15, 600)).foregroundStyle(RK.ink)
+        if embedded {content.padding(.top, 4)} else {content.rkCard()}
+    }
+    private var side: CGFloat {embedded ? 48 : 60}
+    private var content: some View {
+        VStack(alignment: .leading, spacing: embedded ? 8 : 10) {
+            Label("כוכב הסרט", systemImage: "star.circle").font(RK.font(embedded ? 14 : 15, 600)).foregroundStyle(RK.ink)
             Text("בחרו אדם, והסרט יתמקד ברגעים שהוא בפריים.").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(model.people) {person in
+                    ForEach(Array(model.people.enumerated()), id: \.element.id) {index, person in
                         let picked = model.star == person.key
                         Button {model.setStar(picked ? nil : person.key)} label: {
                             VStack(spacing: 4) {
                                 FacePicture(model: model, person: person)
-                                    .frame(width: 60, height: 60).clipShape(Circle())
+                                    .frame(width: side, height: side).clipShape(Circle())
                                     .overlay(Circle().stroke(picked ? RK.accent : RK.line, lineWidth: picked ? 3 : 1))
                                     .overlay(alignment: .bottomTrailing) {
                                         if picked {
@@ -84,14 +94,15 @@ struct StarCard: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(picked ? Text("הכוכב שנבחר") : Text("בחירה ככוכב"))
+                        // Each face is told apart: its number and how often it is seen.
+                        .accessibilityLabel(Text(verbatim: String(format: NSLocalizedString("אדם %1$@, נראה %2$@ פעמים", comment: "A person to pick as the movie's star, for VoiceOver"), "\(index + 1)", "\(person.members.count)")))
+                        .accessibilityHint(picked ? Text("הכוכב שנבחר") : Text("בחירה ככוכב"))
                         .accessibilityAddTraits(picked ? .isSelected : [])
                     }
                 }.padding(.vertical, 2)
             }
             .environment(\.layoutDirection, .leftToRight)
         }
-        .rkCard()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("star.card")
     }
@@ -110,42 +121,5 @@ private struct FacePicture: View {
             guard let spot = model.picture(of: person) else {return}
             image = await FaceGroups.picture(spot.file, at: spot.seconds, face: spot.face)
         }
-    }
-}
-
-/// A movie made from the library by itself: the latest trip, the month or the year.
-struct RecapSheet: View {
-    let make: (Recap.Span) -> Void
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("אבחר בעצמי סרטונים ותמונות מהגלריה, מפוזרים לאורך הזמן ומועדפים קודם, ואערוך מהם סרט של דקה.")
-                    .font(RK.font(14)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
-                ForEach(Recap.Span.allCases) {span in
-                    Button {dismiss(); make(span)} label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: span.symbol).font(.system(size: 18, weight: .semibold)).foregroundStyle(RK.accent)
-                                .frame(width: 44, height: 44).background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: span.title).font(RK.font(16, 600)).foregroundStyle(RK.ink)
-                                Text(verbatim: span.detail).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.forward").font(.system(size: 13, weight: .semibold)).foregroundStyle(RK.faint)
-                        }
-                        .padding(10).background(RK.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain).accessibilityIdentifier("recap." + span.rawValue)
-                }
-                Spacer()
-            }
-            .padding(20)
-            .background(RK.bg.ignoresSafeArea())
-            .navigationTitle("סיכום מהגלריה").navigationBarTitleDisplayMode(.inline)
-            .toolbar {ToolbarItem(placement: .cancellationAction) {Button("ביטול") {dismiss()}}}
-        }
-        .tint(RK.accent)
-        .environment(\.layoutDirection, AppLanguage.direction)
     }
 }

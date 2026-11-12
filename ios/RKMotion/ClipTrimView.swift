@@ -20,17 +20,19 @@ struct ClipTrimView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Group {
                         if let player {VideoPlayer(player: player)} else {RK.card}
-                    }.frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }.frame(height: 220).clipShape(RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
                     filmstrip
                     VStack(alignment: .leading, spacing: 12) {
                         Text(String(format: NSLocalizedString("התחלה: %@ שניות", comment: "Clip start readout"), fixed(clip.start)))
                             .font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
                         Slider(value: $clip.start, in: lower...max(lower + 0.01, min(upper, clip.end) - 0.01), step: 0.01).tint(RK.accent)
                             .accessibilityLabel("תחילת הקטע בשניות")
+                            .accessibilityAdjustableAction {direction in clip.start = stepped(clip.start, direction, in: lower...max(lower, clip.end - 0.1))}
                         Text(String(format: NSLocalizedString("סיום: %@ שניות", comment: "Clip end readout"), fixed(clip.end)))
                             .font(RK.font(15, 500)).monospacedDigit().foregroundStyle(RK.ink)
                         Slider(value: $clip.end, in: min(upper - 0.01, max(lower, clip.start) + 0.01)...upper, step: 0.01).tint(RK.accent)
                             .accessibilityLabel("סיום הקטע בשניות")
+                            .accessibilityAdjustableAction {direction in clip.end = stepped(clip.end, direction, in: min(upper, clip.start + 0.1)...upper)}
                         Text(String(format: NSLocalizedString("משך הקטע: %@ שניות", comment: "Clip length readout"), fixed(max(0, clip.end - clip.start))))
                             .font(RK.font(13, 400, style: .footnote)).monospacedDigit().foregroundStyle(RK.soft)
                     }.rkCard()
@@ -94,7 +96,7 @@ struct ClipTrimView: View {
                 RoundedRectangle(cornerRadius: 6).stroke(RK.accent, lineWidth: 3)
                     .frame(width: max(6, x(clip.end) - x(clip.start))).offset(x: x(clip.start))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged {drag in
                 let time = min(upper, max(lower, lower + Double(drag.location.x / width) * duration))
@@ -112,13 +114,18 @@ struct ClipTrimView: View {
             TextField("שניות", value: value, format: .number.precision(.fractionLength(0...2)))
                 .keyboardType(.decimalPad).multilineTextAlignment(.center).font(RK.font(15)).monospacedDigit()
                 .frame(maxWidth: .infinity, minHeight: 40)
-                .background(RK.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(RK.bg, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
                 .accessibilityLabel(label)
         }.frame(maxWidth: .infinity)
     }
     // Formatting the number apart from the sentence keeps the catalog key
     // stable, instead of depending on how SwiftUI spells an interpolation.
     private func fixed(_ value: Double) -> String {String(format: "%.2f", value)}
+    /// VoiceOver moves an edge half a second a swipe, not a hundredth.
+    private func stepped(_ value: Double, _ direction: AccessibilityAdjustmentDirection, in range: ClosedRange<Double>) -> Double {
+        let step = direction == .increment ? 0.5 : direction == .decrement ? -0.5 : 0
+        return min(range.upperBound, max(range.lowerBound, value + step))
+    }
     /// The moment on screen in the player, inside the clip, as a timeline second.
     private var slowPoint: Double {
         let shown = (player?.currentTime().seconds ?? 0) + offset

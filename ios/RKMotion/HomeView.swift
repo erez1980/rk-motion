@@ -7,10 +7,9 @@ struct HomeView: View {
     let newRide: () -> Void
     let open: (LocalProject) -> Void
     let about: () -> Void
+    /// A finished movie from the library, chosen, edited and exported by itself.
     let recap: (Recap.Span) -> Void
-    let automatic: () -> Void
     @State private var deleting: LocalProject?
-    @State private var recapping = false
     @Environment(\.layoutDirection) private var layoutDirection
     var body: some View {
         // A List, not a scroll of cards, so a project row swipes to delete the
@@ -38,7 +37,7 @@ struct HomeView: View {
             Button(action: newRide) {
                 HStack(spacing: 14) {
                     Image(systemName: "plus").font(.system(size: 22, weight: .bold))
-                        .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .frame(width: 52, height: 52).background(RK.accentInk.opacity(0.12), in: RoundedRectangle(cornerRadius: RK.Radius.row, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("סרטון חדש").font(RK.font(19, 700, style: .title3))
                         Text("סרטון אחד או כמה, מהתמונות או מהקבצים").font(RK.font(14)).opacity(0.75)
@@ -46,26 +45,36 @@ struct HomeView: View {
                     Spacer()
                 }
                 .foregroundStyle(RK.accentInk).padding(16)
-                .background(RK.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(RK.accent, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
             }.buttonStyle(.plain).accessibilityIdentifier("home.newRide").disabled(model.busy).opacity(model.busy ? 0.4 : 1).homeRow()
-            Button {recapping = true} label: {
+            // One automatic way in: each span is one tap to a finished movie.
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 14) {
-                    Image(systemName: "photo.stack").font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
-                        .frame(width: 52, height: 52).background(RK.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    Image(systemName: "sparkles.rectangle.stack").font(.system(size: 20, weight: .semibold)).foregroundStyle(RK.accent)
+                        .frame(width: 52, height: 52).background(RK.accentSoft, in: RoundedRectangle(cornerRadius: RK.Radius.row, style: .continuous))
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("סיכום מהגלריה").font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
-                        Text("הטיול האחרון, החודש או השנה, בלי לבחור קבצים").font(RK.font(13)).foregroundStyle(RK.soft)
+                        Text("סרט אוטומטי מהגלריה").font(RK.font(17, 600, style: .headline)).foregroundStyle(RK.ink)
+                        Text("בלי לבחור קבצים: רגעים, מוזיקה וסיום נבחרים לבד").font(RK.font(13)).foregroundStyle(RK.soft)
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            }.buttonStyle(.plain).accessibilityIdentifier("home.recap").disabled(model.busy).opacity(model.busy ? 0.4 : 1).homeRow()
-            Button(action: automatic) {
-                Label("סרט אוטומטי מהחודש האחרון", systemImage: "sparkles.rectangle.stack")
-                    .font(RK.font(16, 600)).frame(maxWidth: .infinity, minHeight: 48)
-            }.buttonStyle(SecondaryButtonStyle()).disabled(model.busy).accessibilityIdentifier("home.automatic").homeRow()
+                HStack(spacing: 8) {
+                    ForEach(Recap.Span.allCases) {span in
+                        Button {recap(span)} label: {
+                            Label(span.title, systemImage: span.symbol).font(RK.font(13, 500, style: .footnote)).lineLimit(1).minimumScaleFactor(0.8)
+                                .foregroundStyle(RK.accentSoftInk).frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RK.accentSoft, in: Capsule())
+                        }
+                        .buttonStyle(.plain).accessibilityHint(Text(verbatim: span.detail))
+                        .accessibilityIdentifier("recap." + span.rawValue)
+                    }
+                }
+            }
+            .padding(14).background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
+            .disabled(model.busy).opacity(model.busy ? 0.4 : 1)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("home.recap").homeRow()
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("הפרויקטים שלי").font(RK.font(17, 500, style: .headline)).foregroundStyle(RK.ink)
                 Text(verbatim: "\(model.projects.count)").font(RK.font(13)).foregroundStyle(RK.soft)
@@ -102,7 +111,6 @@ struct HomeView: View {
         .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: Binding(get: {deleting != nil}, set: {if !$0 {deleting = nil}}), titleVisibility: .visible, presenting: deleting) {project in
             Button("מחיקה", role: .destructive) {Task {await model.delete(project)}}
         }
-        .sheet(isPresented: $recapping) {RecapSheet(make: recap).presentationDetents([.medium, .large])}
         .navigationTitle("הפרויקטים")
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -133,7 +141,7 @@ private struct ProjectRow: View {
                 }
             }
             .environment(\.layoutDirection, .leftToRight)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)).accessibilityHidden(true)
+            .clipShape(RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: project.name).font(RK.font(16, 500)).foregroundStyle(RK.ink).lineLimit(1)
                 Text(verbatim: meta).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft).lineLimit(1)
@@ -142,7 +150,7 @@ private struct ProjectRow: View {
             Spacer(minLength: 0)
             Image(systemName: "chevron.forward").font(.system(size: 14, weight: .semibold)).foregroundStyle(RK.faint)
         }
-        .padding(10).background(RK.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(10).background(RK.card, in: RoundedRectangle(cornerRadius: RK.Radius.card, style: .continuous))
         .contentShape(Rectangle())
         .task(id: project.exports.last?.file ?? project.source) {
             // A missing thumbnail must not block opening a saved project.

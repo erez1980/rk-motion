@@ -180,6 +180,8 @@ struct LocalExport: Codable, Identifiable {
     var file: String
     var created = Date()
     var duration: Double
+    /// Set once this app saved the movie to Photos; nil for older movies.
+    var savedToPhotos: Bool?
 }
 struct LocalMusic: Codable, Identifiable {
     var id = UUID().uuidString
