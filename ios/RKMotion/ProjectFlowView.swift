@@ -16,7 +16,9 @@ struct ProjectFlowView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var studio = false
-    var body: some View {
+    // The screen and its reactions are two expressions, so the type checker
+    // does not have to solve one very long modifier chain at once.
+    private var framed: some View {
         VStack(spacing: 0) {
             StepBar(current: step, reachable: reachable) {step = $0}
                 .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 12)
@@ -44,26 +46,30 @@ struct ProjectFlowView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {Spacer(); Button("בוצע") {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)}}
         }
+    }
+    private var reacting: some View {
+        framed
         // Only the first appearance picks the step: SwiftUI can call onAppear
         // again while the screen stays up, which threw the rider back to Edit.
         .onAppear {
             guard !placed else {return}
             placed = true; step = model.project?.analyzed == true ? .edit : .video
         }
-        .onChange(of: model.project?.analyzed) {old, new in
-            if new == true && old == false {step = .edit; revealing = model.project?.reading != nil && !Self.underUITest && !model.automaticRequested}
-        }
+        .onChange(of: model.project?.analyzed) {old, new in analyzedChanged(from: old, to: new)}
         .onChange(of: model.project?.exports.count) {old, new in if let old, let new, new > old {step = .done}}
         .onChange(of: model.movieURL) {_, movie in if movie == nil && step == .done {step = .export}}
         .onChange(of: model.project?.id) {old, new in if old != nil && new == nil {dismiss()}}
+        // A finished movie and a newly blocked edit are felt as well as seen.
+        .sensoryFeedback(.success, trigger: model.project?.exports.count ?? 0) {old, new in new > old}
+        .sensoryFeedback(.error, trigger: model.editValidationMessage) {old, new in old == nil && new != nil}
+    }
+    var body: some View {
+        reacting
         .confirmationDialog("למחוק את הפרויקט ואת הקבצים שלו מהאייפון?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("מחיקה", role: .destructive) {Task {await model.reset()}}
         }
         .sheet(isPresented: $showAbout) {NavigationStack {AboutView(clean: {await model.cleanTemporaryFiles()})}}
         .sheet(isPresented: $studio) {AutomaticStudioView(model: model)}
-        // A finished movie and a newly blocked edit are felt as well as seen.
-        .sensoryFeedback(.success, trigger: model.project?.exports.count ?? 0) {old, new in new > old}
-        .sensoryFeedback(.error, trigger: model.editValidationMessage) {old, new in old == nil && new != nil}
         .sheet(isPresented: $revealing) {
             RevealSheet(model: model, quick: {
                 revealing = false; step = model.project?.music.isEmpty == false ? .export : .music
@@ -88,6 +94,14 @@ struct ProjectFlowView: View {
             case .done: DoneStep(model: model) {step = .edit}
             }
         }
+    }
+    /// A finished scan moves on to the edit, showing what was found unless
+    /// the movie is being made automatically or under a UI test.
+    private func analyzedChanged(from old: Bool?, to new: Bool?) {
+        guard new == true, old == false else {return}
+        step = .edit
+        let read = model.project?.reading != nil
+        revealing = read && !Self.underUITest && !model.automaticRequested
     }
     /// UI tests drive the edit step straight after the scan.
     private static var underUITest: Bool {
