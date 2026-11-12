@@ -10480,6 +10480,118 @@
           }
         }
       }
+    },
+    "ניתוח הסרטונים החדשים באייפון…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanning the new videos on your iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוח הסרטונים החדשים באייפון…"
+          }
+        }
+      }
+    },
+    "הסרטונים נוספו לפרויקט והרגעים שלהם נכנסו לסרט. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The videos were added to the project and their moments are in the movie. You can undo this change."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטונים נוספו לפרויקט והרגעים שלהם נכנסו לסרט. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "הסרטון נוסף לפרויקט והרגעים שלו נכנסו לסרט. ניתן לבטל את השינוי.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The video was added to the project and its moments are in the movie. You can undo this change."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטון נוסף לפרויקט והרגעים שלו נכנסו לסרט. ניתן לבטל את השינוי."
+          }
+        }
+      }
+    },
+    "הפרויקט עודכן. אפשר ליצור את הסרט.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project was updated. You can make the movie now."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הפרויקט עודכן. אפשר ליצור את הסרט."
+          }
+        }
+      }
+    },
+    "הוספת הסרטון בוטלה. הפרויקט נשאר כמו שהיה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding the video was cancelled. The project is unchanged."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת הסרטון בוטלה. הפרויקט נשאר כמו שהיה."
+          }
+        }
+      }
+    },
+    "הוספת סרטון לפרויקט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a video to the project"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת סרטון לפרויקט"
+          }
+        }
+      }
+    },
+    "הסרטון מתווסף בסוף, רק הוא נסרק, והרגעים הטובים שלו נכנסים לסרט.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It goes at the end. Only the new video is scanned, and its best moments join the movie."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הסרטון מתווסף בסוף, רק הוא נסרק, והרגעים הטובים שלו נכנסים לסרט."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

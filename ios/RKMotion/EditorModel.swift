@@ -220,8 +220,9 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// One operation from the picker to a saved project, so "cancel" reaches
     /// whichever part is running: the picker's hand-over or the copy.
     func importPickedVideo(_ item: PhotosPickerItem) {importPickedVideos([item])}
-    /// Several picked videos become one project, in the order they were filmed.
-    func importPickedVideos(_ items: [PhotosPickerItem]) {
+    /// Several picked videos become one project, in the order they were
+    /// filmed; `adding` puts them at the end of the open project instead.
+    func importPickedVideos(_ items: [PhotosPickerItem], adding: Bool = false) {
         guard !busy, !items.isEmpty else {return}
         setBusy(true, .importing); percent = 0; message = "האייפון מכין את הקובץ…"
         operation = Task {
@@ -242,7 +243,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                     }
                     try Task.checkCancellation()
                 }
-                await runImport(await Self.chronological(staged))
+                let ordered = await Self.chronological(staged)
+                if adding {await appendVideos(ordered)} else {await runImport(ordered)}
             } catch is CancellationError {finishImport(nil, cancelled: true)}
             catch {finishImport(nil, error: error)}
             // Moved into the project when the import succeeded; otherwise it
@@ -251,7 +253,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         }
     }
     func importVideo(_ file: URL) async {await importVideos([file])}
-    func importVideos(_ files: [URL]) async {
+    func importVideos(_ files: [URL], adding: Bool = false) async {
         guard !busy else {message = "המתינו לסיום הפעולה הנוכחית"; return}
         guard !files.isEmpty else {return}
         setBusy(true, .importing); percent = 0
@@ -273,7 +275,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                 }
             } catch is CancellationError {finishImport(nil, cancelled: true); return}
             catch {finishImport(nil, error: error); return}
-            await runImport(await Self.chronological(sources))
+            let ordered = await Self.chronological(sources)
+            if adding {await appendVideos(ordered)} else {await runImport(ordered)}
         }
         operation = task
         await task.value
@@ -359,6 +362,82 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             processingSucceeded = true; setBusy(false); analyze(automatic: automatic)
         } catch is CancellationError {finishImport(p.id, cancelled: true)}
         catch {finishImport(p.id, error: error)}
+    }
+    /// Puts more videos at the end of the open project, in the order they
+    /// were filmed. Only the new videos are scanned, and their signals join
+    /// the saved ones; the clips already made keep their place and trims, and
+    /// every new video gives the movie its best moments, as one change to
+    /// undo. A failure or a cancellation removes only this addition's copies.
+    private func appendVideos(_ files: [URL]) async {
+        guard project != nil else {await runImport(files); return}
+        guard !files.isEmpty, await save(), let p = project else {setBusy(false); return}
+        let copying = files.count > 1 ? NSLocalizedString("העתקת הסרטונים לאחסון המקומי…", comment: "Copying several videos") : NSLocalizedString("העתקת הסרטון לאחסון המקומי…", comment: "Copying the video")
+        message = copying
+        var copied: [String] = []
+        func discard() {for name in copied {try? FileManager.default.removeItem(at: LocalStore.file(name, project: p.id))}}
+        do {
+            for (index, file) in files.enumerated() {
+                let share = 1 / Double(files.count), base = Double(index) * share
+                copied.append(try await LocalStore.importFile(file, project: p.id, prefix: "source") {[weak self] fraction in
+                    await self?.progress(base + fraction * share, copying)
+                })
+                try Task.checkCancellation()
+            }
+            guard let parts = await LocalStore.laidOut(p.files + copied, project: p.id) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
+            let before = parts[p.files.count].start, added = Array(parts.suffix(copied.count))
+            let signals = p.analyzed && !p.wholeVideo ? LocalStore.readSignals(project: p.id) : nil
+            var extended: LocalEngine.Extension?
+            if let signals {
+                setBusy(true, .analyzing); percent = 0; message = NSLocalizedString("ניתוח הסרטונים החדשים באייפון…", comment: "Scanning the videos added to a project")
+                extended = try await engine.extend(signals, before: before, adding: copied.map {LocalStore.file($0, project: p.id)}) {[weak self] fraction, text in
+                    await self?.progress(fraction, text)
+                }
+                try Task.checkCancellation()
+            }
+            guard var current = project, current.id == p.id else {discard(); setBusy(false); return}
+            if let extended {try LocalStore.writeSignals(extended.signals, project: p.id)}
+            let previous = edit
+            current.parts = parts; current.duration = parts.last?.end ?? current.duration
+            if let extended {
+                // A kind the rider chose stays; otherwise the edit follows what the whole timeline now reads as.
+                let chosen = current.reading.flatMap {$0.kind != $0.detected ? $0.kind : nil}
+                var reading = extended.reading
+                if let chosen {reading.kind = chosen}
+                current.reading = reading
+                project = current
+                apply(reading.kind, signals: extended.signals)
+                if chosen == nil {edit.settings["contentKind"] = .text(reading.kind.rawValue); edit.settings["muteOriginal"] = .flag(reading.kind.mutesOriginal)}
+                let scores = project?.scores ?? []
+                let found = ProjectPart.fit(LocalEngine.ranges(scores: scores, duration: current.duration, threshold: threshold), into: parts).filter {$0.start >= before - 0.0001}
+                let limit = ClipRules.maxLength(edit.settings)
+                var fresh = ClipRules.capped(found, limit: limit, scores: scores)
+                // The rider added these videos to see them, so each one gives at least one moment.
+                for part in added where !fresh.contains(where: {ClipRules.inside($0, part)}) && part.duration > 0.2 {
+                    let length = min(part.duration, limit ?? ClipRules.coverLength, ClipRules.coverLength)
+                    let window = ClipRules.best(scores, length: length, from: part.start, to: part.end)
+                    fresh.append(Clip(start: window.start, end: window.end, score: ClipRules.score(scores, from: window.start, to: window.end) ?? 0))
+                }
+                fresh.sort {$0.start < $1.start}
+                let combined = edit.clips.filter {$0.manual != true} + fresh + edit.clips.filter {$0.manual == true}
+                edit.clips = Edit.capped(fittedToLength(combined, settings: edit.settings))
+                loadSightings(extended.signals)
+            } else {
+                project = current
+                // A whole, already edited video keeps every added video whole too.
+                if current.wholeVideo && current.analyzed {edit.clips = Edit.capped(edit.clips + added.map {Clip(start: $0.start, end: $0.end)})}
+            }
+            if edit != previous {changed(from: previous); suppressedEdit = edit}
+            guard await save() else {setBusy(false); return}
+            await joinSource(project ?? current)
+            previewEdit = nil; projectBytes = await persistence.bytes(project ?? current)
+            automaticRun = nil; automaticPackage = nil; automaticReadiness = nil
+            processingSucceeded = true; setBusy(false)
+            message = files.count > 1 ? NSLocalizedString("הסרטונים נוספו לפרויקט והרגעים שלהם נכנסו לסרט. ניתן לבטל את השינוי.", comment: "Videos added to a project") : NSLocalizedString("הסרטון נוסף לפרויקט והרגעים שלו נכנסו לסרט. ניתן לבטל את השינוי.", comment: "A video added to a project")
+            // A project that was never scanned, or lost its saved signals, is scanned whole now.
+            if extended == nil && !current.wholeVideo && current.analyzed {analyze()}
+            else if !current.analyzed {message = NSLocalizedString("הפרויקט עודכן. אפשר ליצור את הסרט.", comment: "Videos added to a project that was not scanned yet")}
+        } catch is CancellationError {discard(); message = NSLocalizedString("הוספת הסרטון בוטלה. הפרויקט נשאר כמו שהיה.", comment: "Adding a video cancelled"); setBusy(false)}
+        catch {discard(); message = error.localizedDescription; setBusy(false)}
     }
     /// Prepares the joined videos to play as the source; nothing for one video.
     private func joinSource(_ p: LocalProject) async {

@@ -170,6 +170,44 @@ actor LocalEngine {
         let clips = ProjectPart.fit(Self.ranges(scores: scores, duration: total), into: parts)
         return Analysis(duration: total, scores: scores, clips: clips, signals: signals, reading: reading, durations: durations)
     }
+    /// What adding videos to a scanned project found: the whole timeline's
+    /// signals and reading, and each added video's length, in order.
+    struct Extension {
+        let signals: Signals
+        let reading: ContentReading
+        let durations: [Double]
+    }
+    /// Scans only the videos added to the end of a project and joins their
+    /// signals to the saved ones, which cover the first `before` seconds, so
+    /// the project is read again as one timeline without scanning it twice.
+    func extend(_ previous: Signals, before: Double, adding sources: [URL], progress: @escaping Progress) async throws -> Extension {
+        try Task.checkCancellation()
+        guard !sources.isEmpty, before > 0 else {throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")}
+        var assets: [AVURLAsset] = [], durations: [Double] = []
+        for source in sources {
+            let asset = AVURLAsset(url: source)
+            let duration = try await asset.load(.duration).seconds
+            guard duration.isFinite, duration > 0, !(try await asset.loadTracks(withMediaType: .video)).isEmpty else {
+                throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")
+            }
+            assets.append(asset); durations.append(duration)
+        }
+        let added = durations.reduce(0, +)
+        guard before + added <= 24 * 3600 else {throw AppError(message: "בחרו סרטון תקין באורך של עד 24 שעות.")}
+        var measured: [(signals: Signals, start: Double, duration: Double)] = [(previous, 0, before)]
+        var cursor = before
+        for (index, asset) in assets.enumerated() {
+            let share = durations[index] / added, base = (cursor - before) / added
+            let signals = try await measure(asset, duration: durations[index]) {fraction, text in await progress(base + fraction * share, text)}
+            measured.append((signals, cursor, durations[index]))
+            cursor += durations[index]
+        }
+        let signals = Signals.joined(measured)
+        let reading = await ModelReading.refine(ContentReading.read(signals), signals: signals)
+        logger.info("Extension completed: addedSeconds=\(added, privacy: .public), videos=\(sources.count, privacy: .public), kind=\(reading.kind.rawValue, privacy: .public)")
+        await progress(1, "הניתוח הושלם באייפון")
+        return Extension(signals: signals, reading: reading, durations: durations)
+    }
     /// One video's per-second signals: motion from small frames, then what
     /// is in frame, then the sound.
     private func measure(_ asset: AVURLAsset, duration: Double, progress: Progress) async throws -> Signals {
