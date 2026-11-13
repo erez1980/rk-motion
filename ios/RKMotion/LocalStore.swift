@@ -103,6 +103,15 @@ enum LocalStore {
         let bytes = Int64(try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
         try checkSpace(required: bytes + 256 * 1024 * 1024)
     }
+    /// Whether `url` sits directly in `folder`, compared as resolved paths.
+    /// On the iPhone the app's folders are under /var, a link to
+    /// /private/var, and a folder listing can name the same file either way,
+    /// so comparing the URLs as they are would call a hand-over a stranger
+    /// and copy it instead of moving it.
+    static func isInside(_ url: URL, _ folder: URL) -> Bool {
+        url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+            == folder.resolvingSymlinksInPath().standardizedFileURL.path
+    }
     static func checkSpace(required: Int64) throws {
         let values = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         let fallback = (try FileManager.default.attributesOfFileSystem(forPath: root.path)[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
@@ -115,7 +124,7 @@ enum LocalStore {
         try FileManager.default.createDirectory(at: folder(project), withIntermediateDirectories: true)
         let name = named ?? prefix + "-" + UUID().uuidString + "." + (source.pathExtension.isEmpty ? "mov" : source.pathExtension)
         let target = file(name, project: project)
-        if source.deletingLastPathComponent() == imports {
+        if isInside(source, imports) {
             try FileManager.default.moveItem(at: source, to: target)
         } else {
             try checkSpace(at: source)
@@ -201,6 +210,8 @@ enum LocalStore {
     }
     struct Recovery {
         var rescued: [LocalProject] = []
+        /// Copies of one rescued video made by earlier launches, removed.
+        var duplicates = 0
         /// Pieces that could not become a project. Kept until the rider
         /// chooses to clean up, never removed on their own.
         var fragmentBytes: Int64 = 0
@@ -255,12 +266,36 @@ enum LocalStore {
             do {
                 p.source = try await importFile(url, project: p.id, prefix: "source")
                 try save(p); report.rescued.append(p)
+                // Rescued once: the hand-over must not stay behind to be rescued again.
+                if FileManager.default.fileExists(atPath: url.path) {try? FileManager.default.removeItem(at: url)}
             } catch {
                 // Put the movie back where it was rather than lose it.
                 if !p.source.isEmpty {try? FileManager.default.moveItem(at: file(p.source, project: p.id), to: url)}
                 try? FileManager.default.removeItem(at: folder(p.id))
             }
         }
+        report.duplicates = removeRescuedCopies()
         return report
+    }
+    /// Names a rescued project is given, in either language, so copies made
+    /// while the phone was set to the other one are found too.
+    static let rescuedNames: Set<String> = ["סרטון ששוחזר", "Rescued video", NSLocalizedString("סרטון ששוחזר", comment: "Name of a project rescued from an interrupted import")]
+    /// Earlier versions copied a rescued video out of `imports` instead of
+    /// moving it, so every launch rescued the same video again. Of rescued
+    /// projects nobody touched (no scan, clips, music or movie) whose video is
+    /// byte for byte the same, the first one stays and the rest go.
+    static func removeRescuedCopies() -> Int {
+        let untouched = load().filter {
+            rescuedNames.contains($0.name) && $0.parts == nil && !$0.analyzed && $0.edit.clips.isEmpty && $0.music.isEmpty && $0.exports.isEmpty
+        }.sorted {$0.created < $1.created}
+        func size(_ p: LocalProject) -> Int64 {Int64((try? file(p.source, project: p.id).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1)}
+        var kept: [LocalProject] = [], removed = 0
+        for p in untouched {
+            let mine = size(p)
+            let original = kept.first {size($0) == mine && mine > 0 &&
+                FileManager.default.contentsEqual(atPath: file($0.source, project: $0.id).path, andPath: file(p.source, project: p.id).path)}
+            if original != nil, (try? FileManager.default.removeItem(at: folder(p.id))) != nil {removed += 1} else {kept.append(p)}
+        }
+        return removed
     }
 }

@@ -97,3 +97,50 @@ import XCTest
         XCTAssertTrue(FileManager.default.fileExists(atPath: LocalStore.file(rescued.source, project: rescued.id).path))
     }
 }
+
+/// On the iPhone the app's folders sit behind /var → /private/var, so a
+/// rescued hand-over was copied instead of moved and rescued again on every
+/// launch, filling the list with "Rescued video".
+@MainActor final class RescuedCopiesTests: XCTestCase {
+    private var before: Set<String> = []
+    override func setUp() async throws {before = Set(LocalStore.projectFolders().map(\.lastPathComponent))}
+    override func tearDown() async throws {
+        for folder in LocalStore.projectFolders() where !before.contains(folder.lastPathComponent) {try? FileManager.default.removeItem(at: folder)}
+    }
+    private func newProjects() -> [LocalProject] {LocalStore.load().filter {!before.contains($0.id)}}
+
+    func testAFileIsInsideItsFolderBehindASymlink() throws {
+        let real = URL(fileURLWithPath: "/private/tmp/rk-\(UUID().uuidString)", isDirectory: true)
+        let linked = URL(fileURLWithPath: "/tmp/" + real.lastPathComponent, isDirectory: true)
+        XCTAssertTrue(LocalStore.isInside(real.appendingPathComponent("a.mov"), linked))
+        XCTAssertTrue(LocalStore.isInside(linked.appendingPathComponent("a.mov"), real))
+        XCTAssertFalse(LocalStore.isInside(real.appendingPathComponent("x/a.mov"), linked))
+    }
+    func testAHandOverIsRescuedOnlyOnce() async throws {
+        let picked = LocalStore.imports.appendingPathComponent(UUID().uuidString + ".mov")
+        try await UITestFixture.makeRide(picked, seconds: 1, width: 160, height: 120)
+        _ = await LocalStore.recoverImports()
+        _ = await LocalStore.recoverImports()
+        XCTAssertEqual(newProjects().count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: picked.path), "The hand-over leaves imports once it is a project")
+    }
+    func testCopiesOfOneRescuedVideoCollapseToOne() async throws {
+        let ride = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        defer {try? FileManager.default.removeItem(at: ride)}
+        try await UITestFixture.makeRide(ride, seconds: 1, width: 160, height: 120)
+        var made: [LocalProject] = []
+        for index in 0..<3 {
+            var p = LocalProject(name: "סרטון ששוחזר", source: "")
+            p.created = Date(timeIntervalSince1970: TimeInterval(1_000 + index))
+            p.source = try await LocalStore.importFile(ride, project: p.id, prefix: "source")
+            try LocalStore.save(p); made.append(p)
+        }
+        // A rescued video the rider already scanned is theirs and stays.
+        var touched = LocalProject(name: "סרטון ששוחזר", source: "")
+        touched.source = try await LocalStore.importFile(ride, project: touched.id, prefix: "source")
+        touched.analyzed = true
+        try LocalStore.save(touched)
+        XCTAssertEqual(LocalStore.removeRescuedCopies(), 2)
+        XCTAssertEqual(Set(newProjects().map(\.id)), [made[0].id, touched.id], "The first copy and the scanned one stay")
+    }
+}
