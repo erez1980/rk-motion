@@ -93,7 +93,7 @@ actor LocalEngine {
     /// timeline `export` will make: slow motion and beat moves included.
     func peakTime(_ project: LocalProject, edit: Edit) async -> Double? {
         let clips = Self.shaped(edit.clips.filter {$0.selected != false}, project: project, edit: edit)
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let speed = WholeSlow.speed(edit.settings)
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
         guard !clips.isEmpty, speed > 0, speed.isFinite, !project.scores.isEmpty else {return nil}
@@ -105,7 +105,7 @@ actor LocalEngine {
     /// moves included; nil when the edit cannot be exported as it stands.
     func plannedLength(_ project: LocalProject, edit: Edit) async -> Double? {
         let clips = Self.shaped(edit.clips.filter {$0.selected != false}, project: project, edit: edit)
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let speed = WholeSlow.speed(edit.settings)
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
         guard !clips.isEmpty, speed > 0, speed.isFinite, project.duration > 0,
@@ -548,14 +548,14 @@ actor LocalEngine {
         let sources = try await sources(project)
         let total = sources.last!.end
         var clips = Self.shaped(edit.clips.filter {$0.selected != false}, project: project, edit: edit)
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let speed = WholeSlow.speed(edit.settings)
         let transition = edit.settings["transition"]?.string ?? "cut"
         let fade = Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5
         // Each clip comes from one video.
         func source(of clip: Clip) -> Int? {
             sources.firstIndex {clip.start >= $0.start - 0.0001 && clip.end <= $0.end + 0.0001}
         }
-        guard !clips.isEmpty, clips.count <= Edit.clipLimit, [1.0, 1.25, 1.5, 2.0].contains(speed),
+        guard !clips.isEmpty, clips.count <= Edit.clipLimit, WholeSlow.speeds.contains(WholeSlow.chosenSpeed(edit.settings)), speed.isFinite, speed > 0,
               Self.transitions.contains(transition), fade.isFinite, 0.1...3 ~= fade,
               clips.allSatisfy({$0.start.isFinite && $0.end.isFinite && 0 <= $0.start && $0.start < $0.end && $0.end <= total && source(of: $0) != nil}) else {
             throw AppError(message: "בדקו את בחירת הקטעים, הזמנים והגדרות הייצוא.")

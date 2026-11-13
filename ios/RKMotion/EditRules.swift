@@ -82,6 +82,29 @@ enum ClipRules {
     }
 }
 
+/// Slow motion over the whole movie, as a percentage of normal speed: 100
+/// leaves the movie as it is, 50 plays every shot twice as long. It
+/// multiplies the edit's speed choice, so the slow motion on a peak still
+/// slows further on top of it. Only the footage and its own sound slow down;
+/// the song keeps its own pace.
+enum WholeSlow {
+    static let range = 25.0...100.0, step = 5.0
+    /// The speed choices the edit offers; the whole-movie percentage applies on top.
+    static let speeds = [1.0, 1.25, 1.5, 2.0]
+    static func percent(_ settings: [String: Setting]) -> Double {
+        guard let value = settings["slowAll"].flatMap({Double($0.string)}), value.isFinite, range.contains(value) else {return 100}
+        return min(range.upperBound, max(range.lowerBound, (value / step).rounded() * step))
+    }
+    /// The speed chosen in the edit, before the whole-movie percentage.
+    static func chosenSpeed(_ settings: [String: Setting]) -> Double {
+        Double(settings["speed"]?.string ?? "1") ?? 1
+    }
+    /// How fast the footage plays: the edit's speed times the percentage.
+    static func speed(_ settings: [String: Setting]) -> Double {
+        chosenSpeed(settings) * percent(settings) / 100
+    }
+}
+
 /// Where the movie slows down: nowhere but the clips the rider marked, on
 /// the strongest moment of the whole movie, or on the strongest moment of
 /// every clip.
