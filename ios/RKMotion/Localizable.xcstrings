@@ -10656,6 +10656,182 @@
           }
         }
       }
+    },
+    "פתיח": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intro"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתיח"
+          }
+        }
+      }
+    },
+    "סיומת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיומת"
+          }
+        }
+      }
+    },
+    "תמונה · %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image · %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמונה · %@ שניות"
+          }
+        }
+      }
+    },
+    "וידאו · %@ שניות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video · %@ seconds"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "וידאו · %@ שניות"
+          }
+        }
+      }
+    },
+    "לוגו או סרטון קצר בתחילת כל סרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A logo or short video at the start of every movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לוגו או סרטון קצר בתחילת כל סרט"
+          }
+        }
+      }
+    },
+    "לוגו או סרטון קצר בסוף כל סרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A logo or short video at the end of every movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לוגו או סרטון קצר בסוף כל סרט"
+          }
+        }
+      }
+    },
+    "בחירה מהתמונות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose from Photos"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירה מהתמונות"
+          }
+        }
+      }
+    },
+    "בחירת סיומת": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose outro"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירת סיומת"
+          }
+        }
+      }
+    },
+    "בחירת פתיח": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose intro"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחירת פתיח"
+          }
+        }
+      }
+    },
+    "החלפה": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החלפה"
+          }
+        }
+      }
+    },
+    "הכנת הפתיח או הסיומת נכשלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the intro or outro failed."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הכנת הפתיח או הסיומת נכשלה."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

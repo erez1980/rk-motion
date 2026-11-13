@@ -549,7 +549,9 @@ private struct EditStep: View {
         else if slow == "each", model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בכל קטע", comment: "Style summary: slow motion on every clip"))}
         let marked = model.edit.clips.filter {$0.selected != false && $0.slowAt != nil}.count
         if marked > 0 {parts.append(String(format: NSLocalizedString("%@ קטעים מסומנים להאטה", comment: "Style summary: clips the rider marked for slow motion"), "\(marked)"))}
-        if settings["outro"]?.bool != false {parts.append(NSLocalizedString("מסך סיום", comment: "Style summary: the movie ends on the logo end screen"))}
+        if Brand.shot(.intro, settings: settings) != nil {parts.append(NSLocalizedString("פתיח", comment: "Style summary: the movie opens on the rider's own brand opening"))}
+        if Brand.shot(.outro, settings: settings) != nil {parts.append(NSLocalizedString("סיומת", comment: "Style summary: the movie ends on the rider's own brand closing"))}
+        else if settings["outro"]?.bool != false {parts.append(NSLocalizedString("מסך סיום", comment: "Style summary: the movie ends on the logo end screen"))}
         return parts.joined(separator: " · ")
     }
     private func showSource() {
@@ -935,7 +937,9 @@ private struct RevealSheet: View {
         var parts = [RK.clock(length), clipCount(chosen.count)]
         parts.append(String(format: NSLocalizedString("מעברים: %@", comment: "Style summary: the transitions"), StyleSheet.transitionName(model.edit.settings["transition"]?.string ?? "cut")))
         if model.edit.settings["aspect"]?.string == "9:16" {parts.append(NSLocalizedString("סטורי 9:16", comment: "Story framing"))}
-        if model.edit.settings["outro"]?.bool != false {parts.append(NSLocalizedString("מסך סיום", comment: "Style summary: the movie ends on the logo end screen"))}
+        if Brand.shot(.intro, settings: model.edit.settings) != nil {parts.append(NSLocalizedString("פתיח", comment: "Style summary: the movie opens on the rider's own brand opening"))}
+        if Brand.shot(.outro, settings: model.edit.settings) != nil {parts.append(NSLocalizedString("סיומת", comment: "Style summary: the movie ends on the rider's own brand closing"))}
+        else if model.edit.settings["outro"]?.bool != false {parts.append(NSLocalizedString("מסך סיום", comment: "Style summary: the movie ends on the logo end screen"))}
         return parts.joined(separator: " · ")
     }
 }
@@ -1509,10 +1513,14 @@ private struct ExportStep: View {
                 if model.edit.settings["aspect"]?.string == "9:16", model.project?.reading != nil {
                     ToggleRow(title: "מסגור חכם לפי האנשים", detail: "החיתוך האנכי עוקב אחרי האנשים בכל קטע במקום להישאר במרכז", isOn: flag("smartFrame", fallback: true))
                 }
-                HStack(spacing: 12) {
-                    OutroThumbnail().accessibilityHidden(true)
-                    ToggleRow(title: "מסך סיום עם הלוגו", detail: "לוגו RK Motion בסוף הסרט", isOn: flag("outro", fallback: true))
-                        .accessibilityIdentifier("export.outro")
+                BrandRow(model: model, slot: .intro)
+                BrandRow(model: model, slot: .outro)
+                if !brandClosing {
+                    HStack(spacing: 12) {
+                        OutroThumbnail().accessibilityHidden(true)
+                        ToggleRow(title: "מסך סיום עם הלוגו", detail: "לוגו RK Motion בסוף הסרט", isOn: flag("outro", fallback: true))
+                            .accessibilityIdentifier("export.outro")
+                    }
                 }
                 if model.hasTelemetry {
                     ToggleRow(title: "נתוני הרכיבה על הסרט", detail: "מהירות, גובה ומרחק מה־GPS של ה־GoPro", isOn: flag("telemetry", fallback: true))
@@ -1633,6 +1641,11 @@ private struct ExportStep: View {
     private func flag(_ key: String, fallback: Bool) -> Binding<Bool> {
         Binding(get: {model.edit.settings[key]?.bool ?? fallback}, set: {model.edit.settings[key] = .flag($0)})
     }
+    /// Whether the rider's own closing plays, in place of the RK Motion end screen.
+    private var brandClosing: Bool {
+        _ = model.brandVersion
+        return Brand.shot(.outro, settings: model.edit.settings) != nil
+    }
     private var title: String {model.edit.settings["titleText"]?.string ?? ""}
     private var titleOff: Bool {model.edit.settings["titleOff"]?.bool == true}
     /// An empty title is filled from what the scan found, without a tap, unless
@@ -1670,6 +1683,75 @@ private struct ExportStep: View {
             .font(RK.font(15)).foregroundStyle(RK.ink).submitLabel(.done)
             .padding(.horizontal, 12).frame(minHeight: 44)
             .background(RK.raised, in: RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous))
+    }
+}
+
+/// The rider's own opening or closing: a logo picture or a short video
+/// from Photos, kept for every movie. Choosing one is never needed.
+private struct BrandRow: View {
+    @ObservedObject var model: EditorModel
+    let slot: Brand.Slot
+    @State private var picked: PhotosPickerItem?
+    @State private var thumbnail: CGImage?
+    private var asset: Brand.Asset? {_ = model.brandVersion; return Brand.asset(slot)}
+    private var on: Binding<Bool> {
+        Binding(get: {model.edit.settings[slot.setting]?.bool ?? true}, set: {model.edit.settings[slot.setting] = .flag($0)})
+    }
+    private var name: LocalizedStringKey {slot == .intro ? "פתיח" : "סיומת"}
+    private var detail: String {
+        guard let asset else {
+            return slot == .intro ? NSLocalizedString("לוגו או סרטון קצר בתחילת כל סרט", comment: "Brand opening row when none is chosen")
+                : NSLocalizedString("לוגו או סרטון קצר בסוף כל סרט", comment: "Brand closing row when none is chosen")
+        }
+        let seconds = String(format: "%.1f", asset.seconds)
+        return asset.kind == .image ? String(format: NSLocalizedString("תמונה · %@ שניות", comment: "Brand shot is a picture shown for some seconds"), seconds)
+            : String(format: NSLocalizedString("וידאו · %@ שניות", comment: "Brand shot is a video of some seconds"), seconds)
+    }
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let thumbnail {Image(decorative: thumbnail, scale: 1).resizable().scaledToFit()}
+                else {Image(systemName: slot == .intro ? "play.rectangle" : "flag.checkered").foregroundStyle(RK.soft)}
+            }
+            .frame(width: 64, height: 40).background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: RK.Radius.small, style: .continuous)).accessibilityHidden(true)
+            if asset != nil {
+                Toggle(isOn: on) {label}.tint(RK.accent).accessibilityIdentifier("export.brand.\(slot.rawValue)")
+            } else {
+                label.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if model.brandLoading == slot {ProgressView().tint(RK.accent)}
+            else {
+                Menu {
+                    PhotosPicker(selection: $picked, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                        Label(asset == nil ? LocalizedStringKey("בחירה מהתמונות") : LocalizedStringKey("החלפה"), systemImage: "photo.on.rectangle")
+                    }
+                    if asset != nil {
+                        Button(role: .destructive) {model.removeBrand(slot)} label: {Label("הסרה", systemImage: "trash")}
+                    }
+                } label: {
+                    Image(systemName: asset == nil ? "plus.circle" : "ellipsis.circle").font(.title3).foregroundStyle(RK.accent)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(Text(slot == .intro ? LocalizedStringKey("בחירת פתיח") : LocalizedStringKey("בחירת סיומת")))
+                .accessibilityIdentifier("export.brand.\(slot.rawValue).choose")
+            }
+        }
+        .onChange(of: picked) {_, item in
+            guard let item else {return}
+            picked = nil
+            model.setBrand(item, slot: slot)
+        }
+        .task(id: model.brandVersion) {
+            thumbnail = nil
+            if let asset {thumbnail = await Brand.thumbnail(asset, side: 192)}
+        }
+    }
+    private var label: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(name).font(RK.font(15, 500)).foregroundStyle(RK.ink)
+            Text(verbatim: detail).font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+        }
     }
 }
 

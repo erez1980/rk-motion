@@ -63,7 +63,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         let clips = project.map {LocalEngine.shaped(selectedClips, project: $0, edit: edit)} ?? selectedClips
-        return Outro.length(edit.settings, segments: LocalEngine.timeline(clips: clips, speed: speed, transition: fade)) ?? 0
+        return LocalEngine.layout(clips: clips, speed: speed, transition: fade, settings: edit.settings).length
     }
     /// The exported movie's length as the engine will really make it, beat
     /// moves included, worked out again shortly after every change.
@@ -1037,6 +1037,45 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
             setBusy(false)
           }
         }
+    }
+    /// Which brand slot is being filled from Photos, for its spinner.
+    @Published private(set) var brandLoading: Brand.Slot?
+    /// Bumped whenever a brand choice changes, so the rows show it.
+    @Published private(set) var brandVersion = 0
+    /// Keeps a picture or a video from Photos as the opening or closing of
+    /// every movie from now on, and shows the edit with it at once.
+    func setBrand(_ item: PhotosPickerItem, slot: Brand.Slot) {
+        guard brandLoading == nil else {return}
+        brandLoading = slot
+        Task {
+            var staged: URL?
+            do {
+                if !item.supportedContentTypes.contains(where: {$0.conforms(to: .movie)}),
+                   item.supportedContentTypes.contains(where: {$0.conforms(to: .image)}) {
+                    guard let data = try await item.loadTransferable(type: Data.self) else {throw AppError(message: "לא ניתן לקרוא את התמונה שנבחרה.")}
+                    try Brand.setImage(data, for: slot)
+                } else {
+                    guard let picked = try await item.loadTransferable(type: PickedMovie.self) else {throw AppError(message: "לא ניתן לקרוא את הסרטון שנבחר.")}
+                    staged = picked.url
+                    try await Brand.setVideo(picked.url, for: slot)
+                }
+                brandChanged(slot, on: true)
+            } catch {message = error.localizedDescription}
+            if let staged, FileManager.default.fileExists(atPath: staged.path) {try? FileManager.default.removeItem(at: staged)}
+            brandLoading = nil
+        }
+    }
+    func removeBrand(_ slot: Brand.Slot) {
+        Brand.remove(slot)
+        brandChanged(slot, on: nil)
+    }
+    private func brandChanged(_ slot: Brand.Slot, on: Bool?) {
+        brandVersion += 1
+        // Changing the edit refreshes its length, and the preview is built again with the new shot.
+        edit.settings[slot.setting] = on.map {Setting.flag($0)}
+        guard project?.analyzed == true, !busy else {return}
+        previewEdit = nil
+        preview()
     }
     func cleanTemporaryFiles() async {
         guard !busy else {return}
