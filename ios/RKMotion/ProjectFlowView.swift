@@ -1682,6 +1682,9 @@ private struct DoneStep: View {
                     }
                 }
             }.rkRow(top: 0)
+            // What just happened is read before the movie, not below the fold.
+            if model.busy {ProgressCard(model: model).rkRow()}
+            MessageCard(model: model).rkRow()
             Group {
                 if let player {VideoPlayer(player: player)} else {RK.card}
             }
@@ -1721,8 +1724,6 @@ private struct DoneStep: View {
                     ReasonsCard(model: model, run: run).rkRow()
                 }
             }
-            if model.busy {ProgressCard(model: model).rkRow()}
-            MessageCard(model: model).rkRow()
             if !earlier.isEmpty {
                 Text("סרטים קודמים בפרויקט").font(RK.font(15, 500)).foregroundStyle(RK.soft).rkRow(top: 14)
                 ForEach(earlier) {result in
