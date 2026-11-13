@@ -10593,6 +10593,54 @@
         }
       }
     },
+    "הילוך איטי לכל הסרט": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slow motion for the whole movie"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הילוך איטי לכל הסרט"
+          }
+        }
+      }
+    },
+    "כל הסרט ב־%@ מהירות": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole movie at %@ speed"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כל הסרט ב־%@ מהירות"
+          }
+        }
+      }
+    },
+    "מהירות רגילה היא 100. ב־50 כל הסרט מואט פי 2, והמוזיקה נשארת במהירות שלה.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal speed is 100. At 50 the whole movie plays 2x slower, and the music keeps its own pace."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מהירות רגילה היא 100. ב־50 כל הסרט מואט פי 2, והמוזיקה נשארת במהירות שלה."
+          }
+        }
+      }
+    },
     "הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.": {
       "localizations": {
         "en": {

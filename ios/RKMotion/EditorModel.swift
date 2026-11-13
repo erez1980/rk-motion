@@ -59,7 +59,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     var selectedClips: [Clip] {edit.clips.filter {$0.selected != false && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start}}
     /// The finished movie's length, or nil while nothing exportable is chosen.
     var expectedDuration: Double? {
-        let speed = Double(edit.settings["speed"]?.string ?? "1") ?? 1
+        let speed = WholeSlow.speed(edit.settings)
         let fade = (edit.settings["transition"]?.string ?? "cut") != "cut" ? (Double(edit.settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         guard !selectedClips.isEmpty, speed > 0 else {return nil}
         let clips = project.map {LocalEngine.shaped(selectedClips, project: $0, edit: edit)} ?? selectedClips
@@ -600,7 +600,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// The length is measured with the edit's slow motion, as the export plays it.
     private static func picked(_ clips: [Clip], seconds: Double, settings: [String: Setting], parts: [ProjectPart], scores: [Double]) -> [Clip] {
         guard !clips.isEmpty else {return clips}
-        let speed = Double(settings["speed"]?.string ?? "1") ?? 1
+        let speed = WholeSlow.speed(settings)
         let overlap = (settings["transition"]?.string ?? "cut") != "cut" ? (Double(settings["transitionDuration"]?.string ?? "0.5") ?? 0.5) : 0
         let groups = ClipRules.everyVideo(settings) ? ClipRules.groups(clips, parts: parts) : nil
         return ClipPicker.autoPick(clips, seconds: seconds, speed: speed.isFinite && speed > 0 ? speed : 1, transition: overlap.isFinite ? overlap : 0, groups: groups,
