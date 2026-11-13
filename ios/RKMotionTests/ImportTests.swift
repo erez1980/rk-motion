@@ -110,8 +110,12 @@ import XCTest
     private func newProjects() -> [LocalProject] {LocalStore.load().filter {!before.contains($0.id)}}
 
     func testAFileIsInsideItsFolderBehindASymlink() throws {
-        let real = URL(fileURLWithPath: "/private/tmp/rk-\(UUID().uuidString)", isDirectory: true)
-        let linked = URL(fileURLWithPath: "/tmp/" + real.lastPathComponent, isDirectory: true)
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("rk-\(UUID().uuidString)", isDirectory: true)
+        let real = base.appendingPathComponent("real", isDirectory: true)
+        let linked = base.appendingPathComponent("linked", isDirectory: true)
+        try FileManager.default.createDirectory(at: real.appendingPathComponent("x"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: linked, withDestinationURL: real)
+        defer {try? FileManager.default.removeItem(at: base)}
         XCTAssertTrue(LocalStore.isInside(real.appendingPathComponent("a.mov"), linked))
         XCTAssertTrue(LocalStore.isInside(linked.appendingPathComponent("a.mov"), real))
         XCTAssertFalse(LocalStore.isInside(real.appendingPathComponent("x/a.mov"), linked))

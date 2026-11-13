@@ -132,9 +132,11 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         guard !busy, projects.isEmpty, project == nil else {return}
         setBusy(true)
         let recovery = await LocalStore.recoverImports()
+        // Once at launch, after the rescue: the copies older versions made of one video.
+        let duplicates = LocalStore.removeRescuedCopies()
         projects = await persistence.load(); setBusy(false)
-        if recovery.duplicates > 0 {
-            message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(recovery.duplicates)")
+        if duplicates > 0 {
+            message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(duplicates)")
         } else if !recovery.rescued.isEmpty {
             message = String(format: NSLocalizedString("שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.", comment: "Videos rescued from an interrupted import"), "\(recovery.rescued.count)")
         } else if recovery.fragmentBytes > 0 {

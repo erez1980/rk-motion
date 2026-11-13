@@ -109,8 +109,13 @@ enum LocalStore {
     /// so comparing the URLs as they are would call a hand-over a stranger
     /// and copy it instead of moving it.
     static func isInside(_ url: URL, _ folder: URL) -> Bool {
-        url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
-            == folder.resolvingSymlinksInPath().standardizedFileURL.path
+        let parent = url.deletingLastPathComponent().resolvingSymlinksInPath(), folder = folder.resolvingSymlinksInPath()
+        // The file system's own identity of the two folders, when both exist.
+        if let mine = try? parent.resourceValues(forKeys: [.fileResourceIdentifierKey]).fileResourceIdentifier,
+           let theirs = try? folder.resourceValues(forKeys: [.fileResourceIdentifierKey]).fileResourceIdentifier {
+            return mine.isEqual(theirs)
+        }
+        return parent.standardizedFileURL.path == folder.standardizedFileURL.path
     }
     static func checkSpace(required: Int64) throws {
         let values = try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
@@ -210,8 +215,6 @@ enum LocalStore {
     }
     struct Recovery {
         var rescued: [LocalProject] = []
-        /// Copies of one rescued video made by earlier launches, removed.
-        var duplicates = 0
         /// Pieces that could not become a project. Kept until the rider
         /// chooses to clean up, never removed on their own.
         var fragmentBytes: Int64 = 0
@@ -274,7 +277,6 @@ enum LocalStore {
                 try? FileManager.default.removeItem(at: folder(p.id))
             }
         }
-        report.duplicates = removeRescuedCopies()
         return report
     }
     /// Names a rescued project is given, in either language, so copies made
