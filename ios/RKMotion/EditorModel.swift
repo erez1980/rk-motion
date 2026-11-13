@@ -133,7 +133,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(true)
         let recovery = await LocalStore.recoverImports()
         // Once at launch, after the rescue: the copies older versions made of one video.
-        let duplicates = LocalStore.removeRescuedCopies()
+        // It reads whole videos to compare them, so it runs off the main thread.
+        let duplicates = await Task.detached(priority: .userInitiated) {LocalStore.removeRescuedCopies()}.value
         projects = await persistence.load(); setBusy(false)
         if duplicates > 0 {
             message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(duplicates)")
