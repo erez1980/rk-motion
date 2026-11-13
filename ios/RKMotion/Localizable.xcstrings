@@ -10640,6 +10640,22 @@
           }
         }
       }
+    },
+    "הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed %@ duplicate copies of a rescued video. One copy of each video is kept."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
