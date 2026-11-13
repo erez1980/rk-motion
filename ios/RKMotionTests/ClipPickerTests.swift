@@ -67,4 +67,26 @@ final class ClipPickerTests: XCTestCase {
         XCTAssertEqual(model.edit.settings["speed"]?.string, "2")
         XCTAssertGreaterThan(model.edit.clips.filter {$0.selected != false}.count, before)
     }
+    /// Slowing the whole movie makes every shot longer, so fewer clips fill the same length.
+    @MainActor func testSlowingTheWholeMovieChoosesFewerClipsForTheSameLength() {
+        let clips = (0..<12).map {clip(Double($0) * 20, Double($0) * 20 + 10, 0.5 + Double($0 % 5) * 0.1)}
+        let model = EditorModel()
+        model.edit.clips = model.fittedToLength(clips, settings: [:])
+        let before = model.edit.clips.filter {$0.selected != false}.count
+        model.setTiming("slowAll", "50")
+        XCTAssertEqual(WholeSlow.percent(model.edit.settings), 50)
+        XCTAssertLessThan(model.edit.clips.filter {$0.selected != false}.count, before)
+        let length = model.expectedDuration ?? 0
+        XCTAssertGreaterThanOrEqual(length, 45)
+    }
+    func testTheWholeMoviePercentageMultipliesTheSpeed() {
+        XCTAssertEqual(WholeSlow.speed([:]), 1)
+        XCTAssertEqual(WholeSlow.speed(["slowAll": .text("50")]), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(WholeSlow.speed(["slowAll": .text("50"), "speed": .text("2")]), 1, accuracy: 1e-9)
+        XCTAssertEqual(WholeSlow.percent(["slowAll": .text("5")]), 100)
+        XCTAssertEqual(WholeSlow.percent(["slowAll": .text("abc")]), 100)
+        XCTAssertEqual(WholeSlow.percent(["slowAll": .text("62")]), 60)
+        let clip = Clip(start: 0, end: 4)
+        XCTAssertEqual(LocalEngine.timeline(clips: [clip], speed: WholeSlow.speed(["slowAll": .text("25")]), transition: 0).last?.end ?? 0, 16, accuracy: 1e-9)
+    }
 }

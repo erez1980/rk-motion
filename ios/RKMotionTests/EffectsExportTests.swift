@@ -44,11 +44,13 @@ final class EffectsExportTests: XCTestCase {
             ("beat sync", ["beatSync": .flag(true)]),
             ("smart transitions", ["transition": .text(SmartTransitions.name)]),
             ("speed 1.5", ["speed": .text("1.5")]),
+            ("whole movie 50%", ["slowAll": .text("50")]),
+            ("whole movie 25% with slow peak x4", ["slowAll": .text("25"), "slowMode": .text("peak"), "slowRate": .text("4")]),
             ("everything", ["slowMode": .text("each"), "slowRate": .text("3"), "slowLength": .text("1.5"), "speedRamp": .flag(true),
                             "hook": .flag(true), "beatZoom": .flag(true), "whoosh": .flag(true), "transition": .text(SmartTransitions.name)]),
         ]
         let engine = LocalEngine()
-        var failures: [String] = []
+        var failures: [String] = [], lengths: [String: Double] = [:]
         for (name, settings) in cases {
             var edit = base
             edit.settings.merge(settings) {$1}
@@ -58,11 +60,16 @@ final class EffectsExportTests: XCTestCase {
                 let written = try await AVURLAsset(url: output).load(.duration).seconds
                 if abs(written - length) > 0.15 {failures.append("\(name): wrote \(written) s for a \(length) s movie")}
                 print("EFFECTS: \(name) exported \(length) s")
+                lengths[name] = length
             } catch {
                 failures.append("\(name): \(Self.describe(error))")
             }
         }
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
+        // Half speed over the whole movie makes the shots about twice as long; the end screen stays as it is.
+        if let plain = lengths["plain"], let half = lengths["whole movie 50%"] {
+            XCTAssertGreaterThan(half, plain * 1.6, "50% should nearly double \(plain) s, made \(half) s")
+        }
     }
 
     /// An error and every error under it, with domain and code: AVFoundation's

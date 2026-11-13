@@ -542,6 +542,8 @@ private struct EditStep: View {
         let transition = settings["transition"]?.string ?? "cut"
         var parts = [String(format: NSLocalizedString("מעברים: %@", comment: "Style summary: the transitions"), StyleSheet.transitionName(transition))]
         if let speed = settings["speed"]?.string, speed != "1" {parts.append(speed + "×")}
+        let whole = WholeSlow.percent(settings)
+        if whole < 100 {parts.append(String(format: NSLocalizedString("כל הסרט ב־%@ מהירות", comment: "Style summary: the whole movie in slow motion at a percentage of normal speed"), "\(Int(whole))%"))}
         let slow = SlowMotion.mode(settings)
         if slow == "peak", model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בשיא", comment: "Style summary: slow motion on the peak"))}
         else if slow == "each", model.project?.scores.isEmpty == false {parts.append(NSLocalizedString("האטה בכל קטע", comment: "Style summary: slow motion on every clip"))}
@@ -938,6 +940,43 @@ private struct RevealSheet: View {
     }
 }
 
+/// Slow motion over the whole movie as a percentage of normal speed. The
+/// movie is changed once the finger lets go, so the clips are not chosen
+/// again on every step of a drag.
+private struct WholeSlowRow: View {
+    @ObservedObject var model: EditorModel
+    @State private var draft: Double?
+    @State private var dragging = false
+    private var value: Double {draft ?? WholeSlow.percent(model.edit.settings)}
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("הילוך איטי לכל הסרט").font(RK.font(13, 400, style: .footnote)).foregroundStyle(RK.soft)
+                Spacer()
+                Text(verbatim: "\(Int(value))%").font(RK.font(15, 600)).monospacedDigit().foregroundStyle(value < 100 ? RK.accent : RK.ink)
+            }
+            Slider(value: Binding(get: {value}, set: {new in if dragging {draft = new} else {commit(new)}}),
+                   in: WholeSlow.range, step: WholeSlow.step,
+                   onEditingChanged: {editing in
+                       dragging = editing
+                       if !editing, let draft {commit(draft)}
+                   })
+                .tint(RK.accent)
+                .accessibilityLabel(Text("הילוך איטי לכל הסרט"))
+                .accessibilityValue(Text(verbatim: "\(Int(value))%"))
+                .accessibilityIdentifier("edit.slowAll")
+            Text("מהירות רגילה היא 100. ב־50 כל הסרט מואט פי 2, והמוזיקה נשארת במהירות שלה.")
+                .font(RK.font(12, 400, style: .caption1)).foregroundStyle(RK.soft).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    private func commit(_ new: Double) {
+        draft = nil
+        let percent = Int((new / WholeSlow.step).rounded() * WholeSlow.step)
+        guard Double(percent) != WholeSlow.percent(model.edit.settings) else {return}
+        model.setTiming("slowAll", String(percent))
+    }
+}
+
 /// How the movie moves: transitions, speed and slow motion, behind one row
 /// of the edit step so the clips stay in view.
 private struct StyleSheet: View {
@@ -971,6 +1010,7 @@ private struct StyleSheet: View {
                     ChoiceGroup(title: "מהירות", options: ["1", "1.25", "1.5", "2"].map {($0 + "×", $0)}, selection: setting("speed", fallback: "1"))
                     VStack(alignment: .leading, spacing: 10) {
                         Label("הילוך איטי", systemImage: "tortoise").font(RK.font(15, 600)).foregroundStyle(RK.ink)
+                        WholeSlowRow(model: model)
                         if model.project?.scores.isEmpty == false {
                             ChoiceGroup(title: "איפה", options: SlowMotion.modes.map {(Self.slowModeName($0), $0)},
                                         selection: Binding(get: {SlowMotion.mode(model.edit.settings)}, set: {model.setTiming("slowMode", $0)}))
