@@ -76,8 +76,9 @@ final class ClipPickerTests: XCTestCase {
         model.setTiming("slowAll", "50")
         XCTAssertEqual(WholeSlow.percent(model.edit.settings), 50)
         XCTAssertLessThan(model.edit.clips.filter {$0.selected != false}.count, before)
+        // Each clip now lasts 20 s on screen, so the closest fit to 45 s is two of them and the end screen.
         let length = model.expectedDuration ?? 0
-        XCTAssertGreaterThanOrEqual(length, 45)
+        XCTAssertGreaterThanOrEqual(length, 38); XCTAssertLessThanOrEqual(length, 66)
     }
     func testTheWholeMoviePercentageMultipliesTheSpeed() {
         XCTAssertEqual(WholeSlow.speed([:]), 1)
