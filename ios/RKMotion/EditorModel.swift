@@ -885,7 +885,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(false)
     }
     func exportMovie() {
-        guard !busy, let p = project, p.analyzed else {return}
+        // A brand pick still loading would be missing from the movie.
+        guard !busy, brandLoading == nil, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit
         setBusy(true, .exporting); percent = 0; message = "ייצוא באייפון…"
@@ -913,7 +914,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
     /// Exports the edit once for each of `lengths`, choosing the clips for
     /// each from the same suggestions; every version is kept with the others.
     func exportVersions(_ lengths: [Double] = EditorModel.versionLengths) {
-        guard !busy, let p = project, p.analyzed, edit.settings["wholeVideo"]?.bool != true, !edit.clips.isEmpty else {return}
+        guard !busy, brandLoading == nil, let p = project, p.analyzed, edit.settings["wholeVideo"]?.bool != true, !edit.clips.isEmpty else {return}
         if let problem = editValidationMessage {message = problem; return}
         let versions = lengths.map {seconds -> Edit in
             var version = edit
@@ -1025,7 +1026,8 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
         setBusy(false)
     }
     func preview() {
-        guard !busy, let p = project, p.analyzed else {return}
+        // A brand pick still loading would be missing from the movie.
+        guard !busy, brandLoading == nil, let p = project, p.analyzed else {return}
         if let problem = editValidationMessage {message = problem; return}
         let snapshot = edit; setBusy(true, .previewing); percent = 0
         launchProcessing(title: "תצוגה מקדימה של העריכה") { [self] in
@@ -1059,6 +1061,7 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
                     staged = picked.url
                     try await Brand.setVideo(picked.url, for: slot)
                 }
+                brandLoading = nil
                 brandChanged(slot, on: true)
             } catch {message = error.localizedDescription}
             if let staged, FileManager.default.fileExists(atPath: staged.path) {try? FileManager.default.removeItem(at: staged)}
@@ -1141,7 +1144,7 @@ extension EditorModel {
         if let data = try? JSONEncoder().encode(taste) {UserDefaults.standard.set(data, forKey: "automaticTasteV1")}
     }
     func automaticMovie(style: AutomaticStyle = .personal, allStories: Bool = false, savePhotos: Bool = true) {
-        guard !busy, let initial = project else {return}
+        guard !busy, brandLoading == nil, let initial = project else {return}
         automaticRequested = true
         if !initial.analyzed || LocalStore.readSignals(project: initial.id) == nil {
             // Do not lose a chosen recipe when a scan is necessary.
