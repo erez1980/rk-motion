@@ -1593,6 +1593,8 @@ private struct ExportStep: View {
                 HStack(spacing: 8) {
                     Button {model.exportMovie()} label: {Label("ייצוא הסרט", systemImage: "film.stack")}
                         .buttonStyle(PrimaryButtonStyle())
+                        // Waits for a picked intro or outro, so the movie has it.
+                        .disabled(model.brandLoading != nil)
                     if model.edit.settings["wholeVideo"]?.bool != true, model.edit.clips.count > 1 {
                         Menu {
                             Button {model.exportVersions()} label: {Label("3 גרסאות: סטורי 15, ריל 30, וואטסאפ 60", systemImage: "square.stack.3d.up")}
