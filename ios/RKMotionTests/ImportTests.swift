@@ -147,4 +147,18 @@ import XCTest
         XCTAssertEqual(LocalStore.removeRescuedCopies(), 2)
         XCTAssertEqual(Set(newProjects().map(\.id)), [made[0].id, touched.id], "The first copy and the scanned one stay")
     }
+    func testCopiesAreComparedFromSamples() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer {try? FileManager.default.removeItem(at: folder)}
+        var bytes = Data((0..<(4 * LocalStore.sampleBytes)).map {UInt8(truncatingIfNeeded: $0 &* 31)})
+        let a = folder.appendingPathComponent("a.mov"), b = folder.appendingPathComponent("b.mov")
+        try bytes.write(to: a); try bytes.write(to: b)
+        XCTAssertTrue(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
+        // A different header means a different video.
+        bytes[10] ^= 0xFF; try bytes.write(to: b)
+        XCTAssertFalse(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
+        bytes[10] ^= 0xFF; bytes[bytes.count - 5] ^= 0xFF; try bytes.write(to: b)
+        XCTAssertFalse(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
+    }
 }

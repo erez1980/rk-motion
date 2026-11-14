@@ -286,18 +286,37 @@ enum LocalStore {
     /// moving it, so every launch rescued the same video again. Of rescued
     /// projects nobody touched (no scan, clips, music or movie) whose video is
     /// byte for byte the same, the first one stays and the rest go.
-    static func removeRescuedCopies() -> Int {
+    static func removeRescuedCopies(progress: (@Sendable (Double) -> Void)? = nil) -> Int {
         let untouched = load().filter {
             rescuedNames.contains($0.name) && $0.parts == nil && !$0.analyzed && $0.edit.clips.isEmpty && $0.music.isEmpty && $0.exports.isEmpty
         }.sorted {$0.created < $1.created}
         func size(_ p: LocalProject) -> Int64 {Int64((try? file(p.source, project: p.id).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1)}
         var kept: [LocalProject] = [], removed = 0
-        for p in untouched {
+        for (index, p) in untouched.enumerated() {
             let mine = size(p)
             let original = kept.first {size($0) == mine && mine > 0 &&
-                FileManager.default.contentsEqual(atPath: file($0.source, project: $0.id).path, andPath: file(p.source, project: p.id).path)}
+                sameBytes(file($0.source, project: $0.id), file(p.source, project: p.id), size: mine)}
             if original != nil, (try? FileManager.default.removeItem(at: folder(p.id))) != nil {removed += 1} else {kept.append(p)}
+            progress?(Double(index + 1) / Double(untouched.count) * 100)
         }
         return removed
+    }
+    /// Bytes read from each place a copy is compared at.
+    static let sampleBytes = 1 << 20
+    /// Whether two files of the same size are copies of one video. Reading
+    /// many whole videos kept the app on its launch card for minutes, so
+    /// larger files are compared at their start, middle and end only: a
+    /// different video of exactly the same size differs in its header.
+    static func sameBytes(_ a: URL, _ b: URL, size: Int64) -> Bool {
+        let sample = Int64(sampleBytes)
+        guard size > sample * 3 else {return FileManager.default.contentsEqual(atPath: a.path, andPath: b.path)}
+        guard let first = try? FileHandle(forReadingFrom: a), let second = try? FileHandle(forReadingFrom: b) else {return false}
+        defer {try? first.close(); try? second.close()}
+        for offset in [0, size / 2 - sample / 2, size - sample] {
+            guard (try? first.seek(toOffset: UInt64(offset))) != nil, (try? second.seek(toOffset: UInt64(offset))) != nil,
+                  let left = try? first.read(upToCount: sampleBytes), let right = try? second.read(upToCount: sampleBytes),
+                  left.count == sampleBytes, left == right else {return false}
+        }
+        return true
     }
 }

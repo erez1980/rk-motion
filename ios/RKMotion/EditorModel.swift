@@ -130,11 +130,15 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 
     func restore() async {
         guard !busy, projects.isEmpty, project == nil else {return}
-        setBusy(true)
+        setBusy(true); percent = 0
+        message = NSLocalizedString("מכין את הפרויקטים באייפון…", comment: "Launch: rescuing interrupted imports and removing duplicate copies")
         let recovery = await LocalStore.recoverImports()
         // Once at launch, after the rescue: the copies older versions made of one video.
-        // It reads whole videos to compare them, so it runs off the main thread.
-        let duplicates = await Task.detached(priority: .userInitiated) {LocalStore.removeRescuedCopies()}.value
+        // It reads from the videos to compare them, so it runs off the main thread.
+        let duplicates = await Task.detached(priority: .userInitiated) {
+            LocalStore.removeRescuedCopies {value in Task {@MainActor [weak self] in self?.percent = value}}
+        }.value
+        message = ""
         projects = await persistence.load(); setBusy(false)
         if duplicates > 0 {
             message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(duplicates)")
