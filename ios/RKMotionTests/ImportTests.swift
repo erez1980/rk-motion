@@ -160,5 +160,9 @@ import XCTest
         XCTAssertFalse(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
         bytes[10] ^= 0xFF; bytes[bytes.count - 5] ^= 0xFF; try bytes.write(to: b)
         XCTAssertFalse(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
+        // Matching samples are not enough to remove a project: the rest is read too.
+        bytes[bytes.count - 5] ^= 0xFF; bytes[LocalStore.sampleBytes + 100] ^= 0xFF; try bytes.write(to: b)
+        XCTAssertTrue(LocalStore.samplesMatch(a, b, size: Int64(bytes.count)))
+        XCTAssertFalse(LocalStore.sameBytes(a, b, size: Int64(bytes.count)))
     }
 }
