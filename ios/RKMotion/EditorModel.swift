@@ -130,21 +130,39 @@ enum Work {case importing, analyzing, exporting, previewing, downloading, other}
 
     func restore() async {
         guard !busy, projects.isEmpty, project == nil else {return}
-        setBusy(true)
+        setBusy(true); percent = 0
+        message = NSLocalizedString("מכין את הפרויקטים באייפון…", comment: "Launch: rescuing interrupted imports and removing duplicate copies")
         let recovery = await LocalStore.recoverImports()
-        // Once at launch, after the rescue: the copies older versions made of one video.
-        // It reads whole videos to compare them, so it runs off the main thread.
-        let duplicates = await Task.detached(priority: .userInitiated) {LocalStore.removeRescuedCopies()}.value
+        message = ""
         projects = await persistence.load(); setBusy(false)
-        if duplicates > 0 {
-            message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(duplicates)")
-        } else if !recovery.rescued.isEmpty {
+        // The copies older versions made of one video are found after the
+        // home screen is up: comparing whole videos can take minutes.
+        Task {await removeRescuedCopies()}
+        if !recovery.rescued.isEmpty {
             message = String(format: NSLocalizedString("שוחזרו %@ סרטונים מייבוא שנקטע. הם מופיעים ברשימת הפרויקטים.", comment: "Videos rescued from an interrupted import"), "\(recovery.rescued.count)")
         } else if recovery.fragmentBytes > 0 {
             message = String(format: NSLocalizedString("נשארו %@ מייבוא שנקטע. אפשר לפנות אותם מתפריט הפרויקט ← ניקוי קבצים זמניים.", comment: "Pieces of an interrupted import that can be cleaned up"), ByteCountFormatter.string(fromByteCount: recovery.fragmentBytes, countStyle: .file))
         }
         guard project == nil, let id = UserDefaults.standard.string(forKey: "localProject"), let saved = projects.first(where: {$0.id == id}) else {return}
         await open(saved)
+    }
+    /// Removes the untouched copies of one rescued video, keeping the first,
+    /// without holding the home screen. A copy that is open or busy stays
+    /// for the next launch.
+    func removeRescuedCopies() async {
+        let copies = await Task.detached(priority: .utility) {LocalStore.rescuedCopies()}.value
+        var removed = 0
+        for id in copies {
+            // Checked again now: the rider may have opened or changed it meanwhile.
+            guard !busy, project?.id != id, let p = projects.first(where: {$0.id == id}),
+                  !p.analyzed, p.edit.clips.isEmpty, p.music.isEmpty, p.exports.isEmpty,
+                  // Removed here on the main actor, with no wait in between.
+                  (try? FileManager.default.removeItem(at: LocalStore.folder(id))) != nil else {continue}
+            projects.removeAll {$0.id == id}; removed += 1
+            await Thumbnails.shared.forget(id)
+        }
+        guard removed > 0, !busy, message.isEmpty else {return}
+        message = String(format: NSLocalizedString("הוסרו %@ עותקים כפולים של סרטון ששוחזר. נשאר עותק אחד מכל סרטון.", comment: "Duplicate rescued projects removed"), "\(removed)")
     }
     func open(_ value: LocalProject) async {
         guard !busy, project?.id != value.id else {return}

@@ -10832,6 +10832,23 @@
           }
         }
       }
+    },
+    "מכין את הפרויקטים באייפון…": {
+      "comment": "Launch: rescuing interrupted imports and removing duplicate copies",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing your projects on iPhone…"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מכין את הפרויקטים באייפון…"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
