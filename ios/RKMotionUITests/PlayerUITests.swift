@@ -69,6 +69,30 @@ final class PlayerUITests: XCTestCase {
         wait(for: app.buttons["step.0"], in: app, timeout: 10, "A tap on the words starts a new ride")
     }
 
+    /// Reported on the iPhone (0.38.2): the + beside Intro and Outro did
+    /// nothing, as a PhotosPicker inside a Menu never opened. A tap must
+    /// bring up the Photos picker.
+    func testTheIntroPlusOpensPhotos() throws {
+        let app = launch()
+        let export = app.buttons["step.3"]
+        wait(for: app.buttons["edit.showEdit"], in: app, timeout: 120, "The fixture ride never reached the edit step")
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: export)
+        waitForExpectations(timeout: 90)
+        export.tap()
+        let plus = app.buttons["export.brand.intro.choose"]
+        for _ in 0..<8 where !(plus.exists && plus.isHittable) {app.swipeUp()}
+        wait(for: plus, in: app, timeout: 10, "The export step shows the intro's + button")
+        plus.tap()
+        // The picker runs out of process; its Cancel button or its search field shows in the hierarchy once it is up.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let shown = NSPredicate {_, _ in
+            app.buttons["Cancel"].exists || app.searchFields.firstMatch.exists || app.navigationBars["Photos"].exists
+                || springboard.buttons["Cancel"].exists
+        }
+        expectation(for: shown, evaluatedWith: app)
+        waitForExpectations(timeout: 15)
+    }
+
     /// F09: in English the screens read left to right; the step bar's first
     /// step sits on the left. In Hebrew it sits on the right.
     func testLayoutFollowsTheLanguage() throws {

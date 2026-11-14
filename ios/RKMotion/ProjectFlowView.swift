@@ -1694,6 +1694,7 @@ private struct BrandRow: View {
     @ObservedObject var model: EditorModel
     let slot: Brand.Slot
     @State private var picked: PhotosPickerItem?
+    @State private var choosing = false
     @State private var thumbnail: CGImage?
     private var asset: Brand.Asset? {_ = model.brandVersion; return Brand.asset(slot)}
     private var on: Binding<Bool> {
@@ -1723,22 +1724,24 @@ private struct BrandRow: View {
                 label.frame(maxWidth: .infinity, alignment: .leading)
             }
             if model.brandLoading == slot {ProgressView().tint(RK.accent)}
-            else {
+            else if asset == nil {
+                // Straight to Photos. A PhotosPicker inside a Menu never opened on the iPhone.
+                Button {choosing = true} label: {chooseIcon("plus.circle")}
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(Text(slot == .intro ? LocalizedStringKey("בחירת פתיח") : LocalizedStringKey("בחירת סיומת")))
+                    .accessibilityIdentifier("export.brand.\(slot.rawValue).choose")
+            } else {
                 Menu {
-                    PhotosPicker(selection: $picked, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                        Label(asset == nil ? LocalizedStringKey("בחירה מהתמונות") : LocalizedStringKey("החלפה"), systemImage: "photo.on.rectangle")
-                    }
-                    if asset != nil {
-                        Button(role: .destructive) {model.removeBrand(slot)} label: {Label("הסרה", systemImage: "trash")}
-                    }
-                } label: {
-                    Image(systemName: asset == nil ? "plus.circle" : "ellipsis.circle").font(.title3).foregroundStyle(RK.accent)
-                        .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel(Text(slot == .intro ? LocalizedStringKey("בחירת פתיח") : LocalizedStringKey("בחירת סיומת")))
-                .accessibilityIdentifier("export.brand.\(slot.rawValue).choose")
+                    Button {choosing = true} label: {Label("החלפה", systemImage: "photo.on.rectangle")}
+                    Button(role: .destructive) {model.removeBrand(slot)} label: {Label("הסרה", systemImage: "trash")}
+                } label: {chooseIcon("ellipsis.circle")}
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(Text(slot == .intro ? LocalizedStringKey("בחירת פתיח") : LocalizedStringKey("בחירת סיומת")))
+                    .accessibilityIdentifier("export.brand.\(slot.rawValue).choose")
             }
         }
+        // Presented by the row itself, so it opens from a plain button and from the menu alike.
+        .photosPicker(isPresented: $choosing, selection: $picked, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
         .onChange(of: picked) {_, item in
             guard let item else {return}
             picked = nil
@@ -1748,6 +1751,9 @@ private struct BrandRow: View {
             thumbnail = nil
             if let asset {thumbnail = await Brand.thumbnail(asset, side: 192)}
         }
+    }
+    private func chooseIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.title3).foregroundStyle(RK.accent).frame(width: 44, height: 44).contentShape(Rectangle())
     }
     private var label: some View {
         VStack(alignment: .leading, spacing: 3) {
